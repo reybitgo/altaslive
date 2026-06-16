@@ -1,0 +1,277 @@
+/**
+ * @file   assets/css/auth.css
+ * @brief  Authentication styles for login and registration pages
+ */
+
+/* ============================================================
+   AUTH.CSS — Login & Register pages
+   ============================================================ */
+.auth-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0f1728 0%, #1a2744 50%, #0f2040 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem 1rem;
+  position: relative;
+  overflow: hidden;
+}
+.auth-page::before {
+  content: "";
+  position: absolute;
+  top: -100px;
+  right: -100px;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(
+    circle,
+    rgba(59, 111, 240, 0.12),
+    transparent 65%
+  );
+  pointer-events: none;
+}
+.auth-page::after {
+  content: "";
+  position: absolute;
+  bottom: -80px;
+  left: -80px;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.1), transparent 65%);
+  pointer-events: none;
+}
+.auth-card {
+  background: #fff;
+  border-radius: 1.25rem;
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.25),
+    0 4px 16px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 440px;
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+}
+.auth-card-wide {
+  max-width: 560px;
+}
+.auth-header {
+  background: linear-gradient(135deg, #3b6ff0, #2954cc);
+  padding: 2rem 2.25rem 1.75rem;
+  text-align: center;
+}
+.auth-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 0.875rem;
+  margin-bottom: 0.875rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+.auth-logo img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+.auth-header h1 {
+  color: #fff;
+  font-size: 1.35rem;
+  font-weight: 800;
+  margin-bottom: 0.25rem;
+  letter-spacing: -0.4px;
+}
+.auth-header p {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.8rem;
+  margin: 0;
+}
+.auth-body {
+  padding: 2rem 2.25rem;
+}
+.auth-footer {
+  text-align: center;
+  padding: 0 2.25rem 1.75rem;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+/* Step bar */
+.steps-bar {
+  display: flex;
+  padding: 1.1rem 2.25rem;
+  gap: 0;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+.reg-step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  position: relative;
+}
+.reg-step::before {
+  content: "";
+  position: absolute;
+  top: 13px;
+  left: 50%;
+  right: -50%;
+  height: 2px;
+  background: #e5e7eb;
+  z-index: 0;
+}
+.reg-step:last-child::before {
+  display: none;
+}
+.reg-step.done::before {
+  background: var(--primary);
+}
+.reg-step.active::before {
+  background: linear-gradient(90deg, var(--primary), #e5e7eb);
+}
+.step-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  color: #9ca3af;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+  transition: all 0.2s;
+}
+.reg-step.done .step-dot {
+  background: var(--primary);
+  color: #fff;
+}
+.reg-step.active .step-dot {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 0 0 4px rgba(59, 111, 240, 0.2);
+}
+.step-text {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+.reg-step.active .step-text {
+  color: var(--primary);
+}
+.reg-step.done .step-text {
+  color: #374151;
+}
+
+/* Code verified banner */
+.code-verified {
+  background: #ecfdf5;
+  border: 1px solid #bbf7d0;
+  border-radius: 0.55rem;
+  padding: 0.75rem 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.8rem;
+  color: #065f46;
+  margin-bottom: 1rem;
+}
+
+/* Position toggle */
+.position-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.625rem;
+}
+.position-option input[type="radio"] {
+  display: none;
+}
+.position-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: #f9fafb;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 0.55rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #6b7280;
+  transition: all 0.2s;
+}
+.position-label:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: #eff6ff;
+}
+.position-option input:checked + .position-label {
+  border-color: var(--primary);
+  background: #eff6ff;
+  color: var(--primary);
+}
+.position-option input:disabled + .position-label {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Slot status */
+.slot-status {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.55rem;
+  padding: 0.55rem 0.875rem;
+  margin-top: 0.4rem;
+  font-size: 0.75rem;
+  display: flex;
+  gap: 1rem;
+}
+.slot-free {
+  color: var(--success);
+  font-weight: 600;
+}
+.slot-taken {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* Spinner */
+.spinner-sm {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  vertical-align: middle;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 480px) {
+  .auth-body {
+    padding: 1.5rem 1.25rem;
+  }
+  .auth-header {
+    padding: 1.5rem 1.25rem;
+  }
+  .auth-footer {
+    padding: 0 1.25rem 1.25rem;
+  }
+  .steps-bar {
+    padding: 0.875rem 1.25rem;
+  }
+}

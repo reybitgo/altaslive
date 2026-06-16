@@ -1,0 +1,318 @@
+/**
+ * @file   assets/css/layout.css
+ * @brief  Layout styles for sidebar and topbar
+ */
+
+/* ============================================================
+   LAYOUT.CSS — Sidebar + topbar (Bootstrap 5 compatible)
+   ============================================================ */
+
+/* ── Sidebar (desktop fixed) ─────────────────────────────────*/
+.sidebar {
+  width: var(--sidebar-w);
+  background: var(--sidebar-bg);
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  z-index: 1040;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ── Brand ───────────────────────────────────────────────────*/
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.1rem 1.25rem 0.875rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  flex-shrink: 0;
+  text-decoration: none;
+}
+.brand-icon {
+  width: 38px;
+  height: 38px;
+  background: var(--primary);
+  border-radius: 0.625rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.brand-icon img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+.brand-name {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.3px;
+  line-height: 1.1;
+}
+.brand-sub {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+/* ── Nav ─────────────────────────────────────────────────────*/
+.sidebar-nav {
+  flex: 1;
+  padding: 0.5rem 0;
+}
+.nav-section-label {
+  padding: 0.9rem 1.25rem 0.35rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.22);
+}
+.nav-item-link {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.625rem 1.25rem;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.83rem;
+  font-weight: 500;
+  text-decoration: none;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  position: relative;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.nav-item-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  text-decoration: none;
+}
+.nav-item-link.active {
+  background: rgba(59, 111, 240, 0.2);
+  color: #fff;
+  font-weight: 600;
+}
+.nav-item-link.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  background: var(--primary);
+  border-radius: 0 3px 3px 0;
+}
+.nav-icon {
+  font-size: 1.05rem;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+.nav-item-link.active .nav-icon,
+.nav-item-link:hover .nav-icon {
+  opacity: 1;
+}
+.nav-badge {
+  margin-left: auto;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Sidebar Footer ──────────────────────────────────────────*/
+.sidebar-footer {
+  padding: 0.875rem 1.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  flex-shrink: 0;
+}
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+.user-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(59, 111, 240, 0.25);
+  color: #8fb4ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.user-info {
+  flex: 1;
+  min-width: 0;
+}
+.user-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.user-role {
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.35);
+}
+.sidebar-logout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 0.5rem;
+  color: rgba(255, 255, 255, 0.35);
+  text-decoration: none;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.sidebar-logout:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--danger);
+}
+
+/* ── Main content wrapper ────────────────────────────────────*/
+.main-content {
+  margin-left: var(--sidebar-w);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Topbar ──────────────────────────────────────────────────*/
+.topbar-wrapper {
+  height: var(--topbar-h);
+  background: #fff;
+  border-bottom: 1px solid #e8ecf5;
+  position: sticky;
+  top: 0;
+  z-index: 1030;
+  display: flex;
+  align-items: center;
+  padding: 0 1.5rem;
+  gap: 1rem;
+}
+.topbar-title {
+  font-size: 1rem;
+  font-weight: 700;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.topbar-balance {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--primary-light);
+  border: 1px solid rgba(59, 111, 240, 0.2);
+  border-radius: 999px;
+  padding: 0.35rem 0.875rem 0.35rem 0.625rem;
+}
+.topbar-balance .bal-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.topbar-balance .bal-amount {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--primary);
+  font-family: var(--font-mono);
+}
+.topbar-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 700;
+  border: 2px solid rgba(59, 111, 240, 0.2);
+  overflow: hidden;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+.topbar-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ── Page content ────────────────────────────────────────────*/
+.page-content {
+  padding: 1.5rem;
+  flex: 1;
+}
+
+/* ── Mobile sidebar via Bootstrap Offcanvas ──────────────────*/
+/* Override Bootstrap offcanvas to match our dark sidebar */
+#mobileSidebar.offcanvas {
+  width: var(--sidebar-w) !important;
+  background: var(--sidebar-bg) !important;
+  border-right: none !important;
+}
+
+/* ── Responsive ──────────────────────────────────────────────*/
+@media (max-width: 991.98px) {
+  .sidebar {
+    display: none;
+  } /* hidden — use offcanvas on mobile/tablet */
+  .main-content {
+    margin-left: 0;
+  }
+  .topbar-wrapper {
+    padding: 0 1rem;
+  }
+  .page-content {
+    padding: 1rem;
+  }
+  .topbar-balance .bal-label {
+    display: none;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .topbar-balance {
+    padding: 0.3rem 0.7rem;
+  }
+  .bal-amount {
+    font-size: 0.8rem;
+  }
+}
