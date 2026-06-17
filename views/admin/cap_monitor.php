@@ -66,9 +66,25 @@
 
     <!-- Members table -->
     <div class="card">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span class="card-title">Members</span>
-        <span class="badge bg-secondary-subtle text-secondary"><?= $result['total'] ?> records</span>
+      <div class="card-header">
+        <form method="GET" action="<?= APP_URL ?>/" class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <input type="hidden" name="page" value="admin_cap_monitor">
+          <input type="hidden" name="status" value="<?= e($status) ?>">
+          <div class="d-flex align-items-center gap-2">
+            <span class="card-title">Members</span>
+            <span class="badge bg-secondary-subtle text-secondary"><?= $result['total'] ?> records</span>
+          </div>
+
+          <!-- Rows per page -->
+          <div class="d-flex align-items-center gap-2">
+            <label for="perPageSelect" class="form-label mb-0 text-muted" style="font-size:.78rem;white-space:nowrap;">Rows per page</label>
+            <select id="perPageSelect" name="per_page" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
+              <?php foreach ([5, 10, 25, 50, 100] as $n): ?>
+                <option value="<?= $n ?>" <?= $perPage === $n ? 'selected' : '' ?>><?= $n ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+        </form>
       </div>
       <div class="table-responsive">
         <table class="table table-hover mb-0" style="font-size:.85rem;">
@@ -132,7 +148,7 @@
       </div>
       <?php if ($result['total_pages'] > 1): ?>
         <div class="card-footer">
-          <?= pagination_links($result, APP_URL . '/?page=admin_cap_monitor&status=' . urlencode($status)) ?>
+          <?= pagination_links($result, APP_URL . '/?page=admin_cap_monitor&status=' . urlencode($status) . '&per_page=' . $perPage) ?>
         </div>
       <?php endif; ?>
     </div>

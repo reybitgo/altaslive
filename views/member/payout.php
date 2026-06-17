@@ -30,11 +30,12 @@ if ($gcashEnabled) {
 if ($mayaEnabled) {
   $methods[] = ['maya', 'Maya', '#48b0db', $user['maya_number'] ?? ''];
 }
-// USDT is always enabled
-$methods[] = ['usdt', 'USDT TRC20', '#26a17b', $user['usdt_address'] ?? ''];
+// USDT networks are always enabled
+$methods[] = ['usdt_trc20', 'USDT TRC20', '#26a17b', $user['usdt_trc20_address'] ?? ''];
+$methods[] = ['usdt_bep20', 'USDT BEP20', '#f0b90b', $user['usdt_bep20_address'] ?? ''];
 
 // Default: first method with saved account, or first available
-$defaultMethod = 'usdt';
+$defaultMethod = 'usdt_trc20';
 foreach ($methods as $m) {
   if (!empty($m[3])) {
     $defaultMethod = $m[0];
@@ -46,12 +47,14 @@ foreach ($methods as $m) {
 $jsFeePct = [];
 if ($gcashEnabled) $jsFeePct['gcash'] = (float)setting('service_fee_gcash', '0');
 if ($mayaEnabled)  $jsFeePct['maya']  = (float)setting('service_fee_maya', '0');
-$jsFeePct['usdt'] = (float)setting('service_fee_usdt', '5');
+$jsFeePct['usdt_trc20']  = (float)setting('service_fee_usdt_trc20', '5');
+$jsFeePct['usdt_bep20'] = (float)setting('service_fee_usdt_bep20', '5');
 
 $jsAccounts = [];
 if ($gcashEnabled) $jsAccounts['gcash'] = $user['gcash_number'] ?? '';
 if ($mayaEnabled)  $jsAccounts['maya']  = $user['maya_number']  ?? '';
-$jsAccounts['usdt'] = $user['usdt_address'] ?? '';
+$jsAccounts['usdt_trc20'] = $user['usdt_trc20_address'] ?? '';
+$jsAccounts['usdt_bep20'] = $user['usdt_bep20_address'] ?? '';
 
 $jsLabels = [];
 if ($gcashEnabled) {
@@ -60,12 +63,14 @@ if ($gcashEnabled) {
 if ($mayaEnabled) {
   $jsLabels['maya'] = ['label' => 'Maya Number', 'placeholder' => '09XXXXXXXXX', 'type' => 'tel', 'mono' => false];
 }
-$jsLabels['usdt'] = ['label' => 'USDT TRC20 Address', 'placeholder' => 'T... (34 characters)', 'type' => 'text', 'mono' => true];
+$jsLabels['usdt_trc20']  = ['label' => 'USDT TRC20 Address', 'placeholder' => 'T... (34 characters)', 'type' => 'text', 'mono' => true];
+$jsLabels['usdt_bep20'] = ['label' => 'USDT BEP20 Address', 'placeholder' => '0x... (42 characters)', 'type' => 'text', 'mono' => true];
 
 $jsHints = [];
 if ($gcashEnabled) $jsHints['gcash'] = 'Funds will be sent to this GCash number.';
 if ($mayaEnabled)  $jsHints['maya']  = 'Funds will be sent to this Maya number.';
-$jsHints['usdt'] = 'USDT will be sent to this TRC20 wallet address.';
+$jsHints['usdt_trc20']  = 'USDT will be sent to this TRC20 wallet address.';
+$jsHints['usdt_bep20'] = 'USDT will be sent to this BEP20 wallet address (Binance Smart Chain).';
 ?>
 <?php require 'views/partials/head.php'; ?>
 <?php require 'views/partials/sidebar_member.php'; ?>
@@ -125,11 +130,21 @@ $jsHints['usdt'] = 'USDT will be sent to this TRC20 wallet address.';
                     <?php endforeach; ?>
                   </div>
                 </div>
+                <?php
+                $defaultMethodDef = null;
+                foreach ($methods as $m) {
+                    if ($m[0] === $defaultMethod) {
+                        $defaultMethodDef = $m;
+                        break;
+                    }
+                }
+                $defaultMethodDef = $defaultMethodDef ?: ['usdt_trc20', 'USDT TRC20', '#26a17b', $user['usdt_trc20_address'] ?? ''];
+                ?>
                 <div class="mb-3" id="accountGroup">
-                  <label class="form-label" id="accountLabel"><?= $methods[0][1] ?? 'USDT TRC20' ?> <span class="text-danger">*</span></label>
+                  <label class="form-label" id="accountLabel"><?= $defaultMethodDef[1] ?> <span class="text-danger">*</span></label>
                   <input type="text" name="payout_account" id="accountInput" class="form-control"
-                    value="<?= e($methods[0][3] ?? ($user['usdt_address'] ?? '')) ?>"
-                    placeholder="<?= $methods[0][0] === 'usdt' ? 'T... (34 characters)' : '09XXXXXXXXX' ?>" required>
+                    value="<?= e($defaultMethodDef[3]) ?>"
+                    placeholder="<?= $defaultMethodDef[0] === 'usdt_trc20' ? 'T... (34 characters)' : ($defaultMethodDef[0] === 'usdt_bep20' ? '0x... (42 characters)' : '09XXXXXXXXX') ?>" required>
                   <div class="form-text" id="accountHint">Funds will be sent to this account.</div>
                 </div>
 
@@ -144,7 +159,7 @@ $jsHints['usdt'] = 'USDT will be sent to this TRC20 wallet address.';
                     <span id="previewFee" class="font-mono text-danger">—</span>
                   </div>
                   <div class="d-flex justify-content-between mb-1 d-none" id="previewGasRow">
-                    <span class="text-muted">TRC20 Gas Fee (<span id="previewGasUsdt"></span> USDT)</span>
+                    <span class="text-muted"><span id="previewGasLabel">TRC20 Gas Fee</span> (<span id="previewGasUsdt"></span> USDT)</span>
                     <span id="previewGasPhp" class="font-mono text-danger">—</span>
                   </div>
                   <hr class="my-2">
@@ -160,7 +175,8 @@ $jsHints['usdt'] = 'USDT will be sent to this TRC20 wallet address.';
                 </div>
 
                 <!-- Hidden fields for server-side fee calculation -->
-                <input type="hidden" name="usdt_rate" id="usdtRateInput" value="0">
+                <input type="hidden" name="usdt_trc20_rate" id="usdtTrc20RateInput" value="0">
+                <input type="hidden" name="usdt_bep20_rate" id="usdtBep20RateInput" value="0">
 
                 <button type="submit" class="btn btn-primary w-100" id="submitBtn">Submit Payout Request</button>
               </form>
@@ -171,7 +187,22 @@ $jsHints['usdt'] = 'USDT will be sent to this TRC20 wallet address.';
     </div>
 
     <div class="card">
-      <div class="card-header"><span class="card-title">📋 Payout History</span></div>
+      <div class="card-header">
+        <form method="GET" action="<?= APP_URL ?>/" class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <input type="hidden" name="page" value="payout">
+          <span class="card-title">📋 Payout History</span>
+
+          <!-- Rows per page -->
+          <div class="d-flex align-items-center gap-2">
+            <label for="perPageSelect" class="form-label mb-0 text-muted" style="font-size:.78rem;white-space:nowrap;">Rows per page</label>
+            <select id="perPageSelect" name="per_page" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
+              <?php foreach ([5, 10, 25, 50, 100] as $n): ?>
+                <option value="<?= $n ?>" <?= $perPage === $n ? 'selected' : '' ?>><?= $n ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+        </form>
+      </div>
       <div class="table-responsive">
         <table class="table table-hover mb-0">
           <thead>
@@ -195,25 +226,30 @@ $jsHints['usdt'] = 'USDT will be sent to this TRC20 wallet address.';
                 $method  = $row['payout_method']  ?: 'gcash';
                 $account = $row['payout_account'];
                 $methodLabel = match ($method) {
-                  'maya' => 'Maya',
-                  'usdt' => 'USDT TRC20',
-                  default => 'GCash'
+                  'maya'        => 'Maya',
+                  'usdt_trc20'  => 'USDT TRC20',
+                  'usdt_bep20'  => 'USDT BEP20',
+                  default       => 'GCash'
                 };
                 $methodColor = match ($method) {
-                  'maya' => '#48b0db',
-                  'usdt' => '#26a17b',
-                  default => '#0070d8'
+                  'maya'        => '#48b0db',
+                  'usdt_trc20'  => '#26a17b',
+                  'usdt_bep20'  => '#f0b90b',
+                  default       => '#0070d8'
                 };
               ?>
                 <tr>
                   <td class="td-muted" style="font-size:.75rem;"><?= fmt_datetime($row['requested_at']) ?></td>
                   <td class="font-mono fw-bold"><?= fmt_money($row['amount']) ?></td>
                   <td>
-                    <?php if ($row['payout_method'] === 'usdt'): ?>
-                      <?php if ($row['usdt_amount'] > 0): ?>
-                        <div class="fw-bold text-success font-mono"><?= number_format($row['usdt_amount'], 4) ?> USDT</div>
-                        <?php if ($row['usdt_rate'] > 0): ?>
-                          <div class="text-muted" style="font-size:.68rem;">@ ₱<?= number_format($row['usdt_rate'], 2) ?></div>
+                    <?php if ($row['payout_method'] === 'usdt_trc20' || $row['payout_method'] === 'usdt_bep20'):
+                      $rateCol   = $row['payout_method'] === 'usdt_bep20' ? 'usdt_bep20_rate'   : 'usdt_trc20_rate';
+                      $amountCol = $row['payout_method'] === 'usdt_bep20' ? 'usdt_bep20_amount' : 'usdt_trc20_amount';
+                      ?>
+                      <?php if ($row[$amountCol] > 0): ?>
+                        <div class="fw-bold text-success font-mono"><?= number_format($row[$amountCol], 4) ?> USDT</div>
+                        <?php if ($row[$rateCol] > 0): ?>
+                          <div class="text-muted" style="font-size:.68rem;">@ ₱<?= number_format($row[$rateCol], 2) ?></div>
                         <?php endif; ?>
                       <?php else: ?>
                         <span class="text-muted">—</span>
@@ -248,7 +284,7 @@ $jsHints['usdt'] = 'USDT will be sent to this TRC20 wallet address.';
         </table>
       </div>
       <?php if ($history['total_pages'] > 1): ?>
-        <div class="card-footer"><?= pagination_links($history, APP_URL . '/?page=payout') ?></div>
+        <div class="card-footer"><?= pagination_links($history, APP_URL . '/?page=payout&per_page=' . $perPage) ?></div>
       <?php endif; ?>
     </div>
   </div>
@@ -322,7 +358,8 @@ $jsHints['usdt'] = 'USDT will be sent to this TRC20 wallet address.';
     availableBalance: <?= $availableBalance ?>,
     minPayout: <?= $minPayout ?>,
     appUrl: '<?= APP_URL ?>',
-    usdtGasFee: <?= (float)setting('usdt_gas_fee', '2.50') ?>,
+    usdtTrc20GasFee: <?= (float)setting('usdt_trc20_gas_fee', '2.50') ?>,
+    usdtBep20GasFee: <?= (float)setting('usdt_bep20_gas_fee', '0.05') ?>,
   };
 
   const FEE_PCT = window.PAYOUT_CONFIG.feePct;
@@ -331,12 +368,10 @@ $jsHints['usdt'] = 'USDT will be sent to this TRC20 wallet address.';
 
   let currentMethod = window.PAYOUT_CONFIG.defaultMethod;
   let liveRate = 0; // PHP per 1 USDT
+  let trc20GasInFlight = null;
+  let bep20GasInFlight = null;
 
-  // ── Fetch live USDT/PHP rate + live TRC20 gas fee ────────────────────────────
-  async function fetchRateAndGas() {
-    await Promise.all([fetchRate(), fetchGasFee()]);
-  }
-
+  // ── Fetch live USDT/PHP rate (shared by TRC20 & BEP20) ───────────────────────
   async function fetchRate() {
     try {
       const saved = localStorage.getItem('usdt_rate_cache');
@@ -344,7 +379,8 @@ $jsHints['usdt'] = 'USDT will be sent to this TRC20 wallet address.';
         const c = JSON.parse(saved);
         if ((Date.now() - c.ts) < 300000) { // 5 min cache
           liveRate = c.rate;
-          document.getElementById('usdtRateInput').value = liveRate;
+          document.getElementById('usdtTrc20RateInput').value = liveRate;
+          document.getElementById('usdtBep20RateInput').value = liveRate;
           updatePreview();
           return;
         }
@@ -356,7 +392,8 @@ $jsHints['usdt'] = 'USDT will be sent to this TRC20 wallet address.';
         rate: liveRate,
         ts: Date.now()
       }));
-      document.getElementById('usdtRateInput').value = liveRate;
+      document.getElementById('usdtTrc20RateInput').value = liveRate;
+      document.getElementById('usdtBep20RateInput').value = liveRate;
     } catch (e) {
       console.warn('Rate fetch failed, using cached/default.');
     }
@@ -364,8 +401,8 @@ $jsHints['usdt'] = 'USDT will be sent to this TRC20 wallet address.';
   }
 
   // ── Live TRC20 gas fee fetch (two strategies, persists to DB if changed) ─────
-  async function fetchGasFee() {
-    const GAS_CACHE_KEY = 'usdt_gas_fee_cache';
+  async function fetchTrc20GasFeeInternal() {
+    const GAS_CACHE_KEY = 'usdt_trc20_gas_fee_cache';
     const GAS_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
     // Check local cache first
@@ -374,7 +411,7 @@ $jsHints['usdt'] = 'USDT will be sent to this TRC20 wallet address.';
       if (cached) {
         const c = JSON.parse(cached);
         if ((Date.now() - c.ts) < GAS_CACHE_TTL) {
-          window.PAYOUT_CONFIG.usdtGasFee = c.fee;
+          window.PAYOUT_CONFIG.usdtTrc20GasFee = c.fee;
           updatePreview();
           return;
         }
@@ -420,7 +457,7 @@ $jsHints['usdt'] = 'USDT will be sent to this TRC20 wallet address.';
         newFee = parseFloat((13.5 * trxPrice).toFixed(4));
         console.log('Gas fee from CoinGecko TRX price:', newFee, 'USDT');
       } catch (e) {
-        console.warn('Both gas fee APIs failed — keeping DB value:', window.PAYOUT_CONFIG.usdtGasFee);
+        console.warn('Both gas fee APIs failed — keeping DB value:', window.PAYOUT_CONFIG.usdtTrc20GasFee);
         return;
       }
     }
@@ -428,7 +465,7 @@ $jsHints['usdt'] = 'USDT will be sent to this TRC20 wallet address.';
     if (!newFee || newFee <= 0) return;
 
     // Update in-memory + local cache
-    window.PAYOUT_CONFIG.usdtGasFee = newFee;
+    window.PAYOUT_CONFIG.usdtTrc20GasFee = newFee;
     localStorage.setItem(GAS_CACHE_KEY, JSON.stringify({
       fee: newFee,
       ts: Date.now()
@@ -452,6 +489,94 @@ $jsHints['usdt'] = 'USDT will be sent to this TRC20 wallet address.';
     }
   }
 
+  function fetchTrc20GasFee() {
+    if (!trc20GasInFlight) {
+      trc20GasInFlight = fetchTrc20GasFeeInternal().finally(() => {
+        trc20GasInFlight = null;
+      });
+    }
+    return trc20GasInFlight;
+  }
+
+  // ── Live BEP20 gas fee fetch (CoinGecko BNB price, persists to DB) ───────────
+  async function fetchBep20GasFeeInternal() {
+    const GAS_CACHE_KEY = 'usdt_bep20_gas_fee_cache';
+    const GAS_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+
+    // Check local cache first
+    try {
+      const cached = localStorage.getItem(GAS_CACHE_KEY);
+      if (cached) {
+        const c = JSON.parse(cached);
+        if ((Date.now() - c.ts) < GAS_CACHE_TTL) {
+          window.PAYOUT_CONFIG.usdtBep20GasFee = c.fee;
+          updatePreview();
+          return;
+        }
+      }
+    } catch (e) {}
+
+    let newFee = null;
+
+    try {
+      // Fetch BNB and USDT prices in USD from CoinGecko
+      const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=binancecoin,tether&vs_currencies=usd');
+      const data = await res.json();
+      const bnbUsd  = data?.binancecoin?.usd  || 0;
+      const usdtUsd = data?.tether?.usd       || 1;
+
+      if (bnbUsd > 0 && usdtUsd > 0) {
+        // Typical USDT BEP20 transfer: ~65,000 gas @ 5 gwei
+        const gasUnits   = 65000;
+        const gasPriceGwei = 5;
+        const gasBnb     = (gasUnits * gasPriceGwei) / 1e9;
+        const gasUsd     = gasBnb * bnbUsd;
+        const gasUsdt    = gasUsd / usdtUsd;
+
+        newFee = parseFloat(gasUsdt.toFixed(6));
+        console.log('BEP20 gas fee from CoinGecko BNB price:', newFee, 'USDT');
+      }
+    } catch (e) {
+      console.warn('BEP20 gas fee API failed — keeping DB value:', window.PAYOUT_CONFIG.usdtBep20GasFee);
+      return;
+    }
+
+    if (!newFee || newFee <= 0) return;
+
+    // Update in-memory + local cache
+    window.PAYOUT_CONFIG.usdtBep20GasFee = newFee;
+    localStorage.setItem(GAS_CACHE_KEY, JSON.stringify({
+      fee: newFee,
+      ts: Date.now()
+    }));
+    updatePreview();
+
+    // Persist to DB in background — only if value changed
+    try {
+      await fetch(window.PAYOUT_CONFIG.appUrl + '/?page=update_usdt_bep20_gas', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          fee: newFee
+        }),
+      });
+      console.log('BEP20 gas fee synced to DB:', newFee, 'USDT');
+    } catch (e) {
+      console.warn('DB sync for BEP20 gas fee failed (non-critical):', e);
+    }
+  }
+
+  function fetchBep20GasFee() {
+    if (!bep20GasInFlight) {
+      bep20GasInFlight = fetchBep20GasFeeInternal().finally(() => {
+        bep20GasInFlight = null;
+      });
+    }
+    return bep20GasInFlight;
+  }
+
   // ── Method switch ────────────────────────────────────────────────────────────
   function switchMethod(method, account) {
     currentMethod = method;
@@ -471,7 +596,9 @@ $jsHints['usdt'] = 'USDT will be sent to this TRC20 wallet address.';
     const hints = window.PAYOUT_CONFIG.hints;
     hint.textContent = hints[method] || 'Funds will be sent to this account.';
 
-    if (method === 'usdt' && !liveRate) fetchRateAndGas();
+    if ((method === 'usdt_trc20' || method === 'usdt_bep20') && !liveRate) fetchRate();
+    if (method === 'usdt_trc20') fetchTrc20GasFee();
+    if (method === 'usdt_bep20') fetchBep20GasFee();
     updatePreview();
   }
 
@@ -509,14 +636,18 @@ $jsHints['usdt'] = 'USDT will be sent to this TRC20 wallet address.';
     const gasRow = document.getElementById('previewGasRow');
     const usdtRow = document.getElementById('previewUsdtRow');
 
-    if (currentMethod === 'usdt' && liveRate > 0) {
-      const gasPhp = window.PAYOUT_CONFIG.usdtGasFee * liveRate;
+    if ((currentMethod === 'usdt_trc20' || currentMethod === 'usdt_bep20') && liveRate > 0) {
+      const isBep20 = currentMethod === 'usdt_bep20';
+      const gasFeeUsdt = isBep20 ? window.PAYOUT_CONFIG.usdtBep20GasFee : window.PAYOUT_CONFIG.usdtTrc20GasFee;
+      const gasLabel   = isBep20 ? 'BEP20 Gas Fee' : 'TRC20 Gas Fee';
+      const gasPhp = gasFeeUsdt * liveRate;
       const netAfterGas = netPhp - gasPhp;
       const usdtAmt = netAfterGas > 0 ? netAfterGas / liveRate : 0;
 
       gasRow.classList.remove('d-none');
       gasRow.classList.add('d-flex');
-      document.getElementById('previewGasUsdt').textContent = window.PAYOUT_CONFIG.usdtGasFee.toFixed(2);
+      document.getElementById('previewGasLabel').textContent = gasLabel;
+      document.getElementById('previewGasUsdt').textContent = gasFeeUsdt.toFixed(isBep20 ? 6 : 2);
       document.getElementById('previewGasPhp').textContent = '−₱' + gasPhp.toLocaleString('en-PH', {
         minimumFractionDigits: 2
       });
@@ -526,7 +657,7 @@ $jsHints['usdt'] = 'USDT will be sent to this TRC20 wallet address.';
       document.getElementById('previewRate').textContent = '@ ₱' + liveRate.toLocaleString('en-PH', {
         minimumFractionDigits: 2
       }) + ' per USDT';
-      document.getElementById('usdtRateInput').value = liveRate;
+      document.getElementById(isBep20 ? 'usdtBep20RateInput' : 'usdtTrc20RateInput').value = liveRate;
     } else {
       gasRow.classList.remove('d-flex');
       gasRow.classList.add('d-none');
@@ -559,7 +690,6 @@ $jsHints['usdt'] = 'USDT will be sent to this TRC20 wallet address.';
   document.addEventListener('DOMContentLoaded', () => {
     const checked = document.querySelector('[name=payout_method]:checked');
     if (checked) switchMethod(checked.value, ACCOUNTS[checked.value]);
-    fetchRateAndGas();
   });
 </script>
 

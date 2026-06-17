@@ -34,8 +34,9 @@ class AdminController
         $search   = trim($_GET['q']      ?? '');
         $status   = $_GET['status']      ?? '';
         $pkgId    = (int)($_GET['pkg']   ?? 0);
+        $perPage  = max(5, (int)($_GET['per_page'] ?? 10));
         $packages = Package::all();
-        $result   = User::allMembers($page, $search, $status, $pkgId);
+        $result   = User::allMembers($page, $search, $status, $pkgId, $perPage);
         require 'views/admin/users.php';
     }
 
@@ -49,10 +50,14 @@ class AdminController
             redirect('/?page=admin_users');
         }
 
+        $tab     = $_GET['tab'] ?? 'commissions';
+        $page    = max(1, (int)($_GET['pg'] ?? 1));
+        $perPage = max(5, (int)($_GET['per_page'] ?? 10));
+
         $summary  = Commission::summary($id);
-        $payouts  = Payout::forUser($id);
-        $commHist = Commission::history($id, 1, 20);
-        $ledger   = Ewallet::ledger($id, 1);
+        $payouts  = Payout::forUser($id, $page, $perPage);
+        $commHist = Commission::history($id, $page, $perPage);
+        $ledger   = Ewallet::ledger($id, $page, $perPage);
         $pairingStatus = User::todayPairingStatus($id);
         $cdStatus = CdStatus::getActive($id);
         $cdHistory = CdStatus::history($id);
@@ -60,21 +65,30 @@ class AdminController
         // v2: Cap & DFI data for admin user view tab
         $capStatus = User::getCapStatus($id);
         $dfiStatus = DailyFixedIncome::getMemberDFIStatus($id);
-        $reactivationHistory = Reactivation::getReactivationHistory($id);
-        $capBlocked = db()->prepare("SELECT c.*, u.username AS source_username FROM commissions c LEFT JOIN users u ON u.id = c.source_user_id WHERE c.user_id = ? AND c.cap_deduction > 0 ORDER BY c.created_at DESC LIMIT 20");
-        $capBlocked->execute([$id]);
+        $reactivationHistory = Reactivation::getReactivationHistory($id, $page, $perPage);
+        $capBlocked = paginate(
+            "SELECT c.*, u.username AS source_username
+             FROM commissions c
+             LEFT JOIN users u ON u.id = c.source_user_id
+             WHERE c.user_id = ? AND c.cap_deduction > 0
+             ORDER BY c.created_at DESC",
+            [$id],
+            $page,
+            $perPage
+        );
 
         // Transfer history for e-wallet tab
-        $transferHistory = db()->prepare("
-            SELECT t.*, su.username AS sender_username, ru.username AS recipient_username
-            FROM ewallet_transfers t
-            JOIN users su ON su.id = t.sender_id
-            JOIN users ru ON ru.id = t.recipient_id
-            WHERE t.sender_id = ? OR t.recipient_id = ?
-            ORDER BY t.created_at DESC
-            LIMIT 50
-        ");
-        $transferHistory->execute([$id, $id]);
+        $transferHistory = paginate(
+            "SELECT t.*, su.username AS sender_username, ru.username AS recipient_username
+             FROM ewallet_transfers t
+             JOIN users su ON su.id = t.sender_id
+             JOIN users ru ON ru.id = t.recipient_id
+             WHERE t.sender_id = ? OR t.recipient_id = ?
+             ORDER BY t.created_at DESC",
+            [$id, $id],
+            $page,
+            $perPage
+        );
 
         require 'views/admin/user_view.php';
     }
@@ -147,14 +161,38 @@ class AdminController
             json_response(['ok' => false, 'error' => 'Invalid fee value.'], 400);
         }
 
-        $current = round((float)setting('usdt_gas_fee', '2.50'), 4);
+        $current = round((float)setting('usdt_trc20_gas_fee', '2.50'), 4);
 
         // Only write if value actually changed (avoid unnecessary DB writes)
         if (abs($fee - $current) < 0.0001) {
             json_response(['ok' => true, 'updated' => false, 'fee' => $fee]);
         }
 
-        db()->prepare("UPDATE settings SET value = ? WHERE key_name = 'usdt_gas_fee'")
+        db()->prepare("UPDATE settings SET value = ? WHERE key_name = 'usdt_trc20_gas_fee'")
+            ->execute([(string)$fee]);
+
+        json_response(['ok' => true, 'updated' => true, 'fee' => $fee, 'previous' => $current]);
+    }
+
+    public function updateUsdtBep20Gas(): void
+    {
+        // Require JSON POST
+        $raw  = file_get_contents('php://input');
+        $body = json_decode($raw, true);
+        $fee  = isset($body['fee']) ? round((float)$body['fee'], 4) : null;
+
+        if ($fee === null || $fee <= 0 || $fee > 50) {
+            json_response(['ok' => false, 'error' => 'Invalid fee value.'], 400);
+        }
+
+        $current = round((float)setting('usdt_bep20_gas_fee', '0.05'), 4);
+
+        // Only write if value actually changed (avoid unnecessary DB writes)
+        if (abs($fee - $current) < 0.0001) {
+            json_response(['ok' => true, 'updated' => false, 'fee' => $fee]);
+        }
+
+        db()->prepare("UPDATE settings SET value = ? WHERE key_name = 'usdt_bep20_gas_fee'")
             ->execute([(string)$fee]);
 
         json_response(['ok' => true, 'updated' => true, 'fee' => $fee, 'previous' => $current]);
@@ -238,8 +276,9 @@ class AdminController
         $page     = max(1, (int)($_GET['pg']  ?? 1));
         $status   = $_GET['status']            ?? '';
         $pkgId    = (int)($_GET['pkg']         ?? 0);
+        $perPage  = max(5, (int)($_GET['per_page'] ?? 10));
         $packages = Package::all(true);
-        $codes    = Code::all($page, $status, $pkgId);
+        $codes    = Code::all($page, $status, $pkgId, $perPage);
         $stats    = Code::stats();
         require 'views/admin/codes.php';
     }
@@ -278,9 +317,10 @@ class AdminController
     public function payouts(): void
     {
         Auth::guard('admin');
-        $page   = max(1, (int)($_GET['pg']     ?? 1));
-        $status = $_GET['status']               ?? 'pending';
-        $result = Payout::all($page, $status);
+        $page    = max(1, (int)($_GET['pg']     ?? 1));
+        $status  = $_GET['status']               ?? 'pending';
+        $perPage = max(5, (int)($_GET['per_page'] ?? 10));
+        $result  = Payout::all($page, $status, $perPage);
         require 'views/admin/payouts.php';
     }
 
@@ -337,14 +377,17 @@ class AdminController
             'maintenance_mode',
             'service_fee_gcash',
             'service_fee_maya',
-            'service_fee_usdt',
-            'usdt_gas_fee',
+            'service_fee_usdt_trc20',
+            'service_fee_usdt_bep20',
+            'usdt_trc20_gas_fee',
+            'usdt_bep20_gas_fee',
             'gcash_enabled',
             'maya_enabled',
             'dfi_enabled',
             'gcash_number',
             'maya_number',
-            'usdt_address',
+            'usdt_trc20_address',
+            'usdt_bep20_address',
             'default_cap_multiplier',
             'reactivation_ewallet_enabled',
             'reactivation_external_enabled',
@@ -411,8 +454,9 @@ class AdminController
             'perminact' => (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role='member' AND cap_status='perminact'")->fetchColumn(),
         ];
 
-        $page   = max(1, (int)($_GET['pg'] ?? 1));
-        $status = $_GET['status'] ?? '';
+        $page    = max(1, (int)($_GET['pg'] ?? 1));
+        $status  = $_GET['status'] ?? '';
+        $perPage = max(5, (int)($_GET['per_page'] ?? 10));
 
         $where = "u.role='member'";
         $params = [];
@@ -430,7 +474,7 @@ class AdminController
              ORDER BY u.cap_status DESC, u.lifetime_earned DESC",
             $params,
             $page,
-            25
+            $perPage
         );
 
         require 'views/admin/cap_monitor.php';
@@ -519,9 +563,10 @@ class AdminController
     public function reactivations(): void
     {
         Auth::guard('admin');
-        $page   = max(1, (int)($_GET['pg'] ?? 1));
-        $status = $_GET['status'] ?? '';
-        $result = Reactivation::all($page, $status);
+        $page    = max(1, (int)($_GET['pg'] ?? 1));
+        $status  = $_GET['status'] ?? '';
+        $perPage = max(5, (int)($_GET['per_page'] ?? 10));
+        $result  = Reactivation::all($page, $status, $perPage);
 
         $totalRevenue = Reactivation::completedTotal();
         $pendingTotal = Reactivation::pendingTotal();
@@ -529,7 +574,7 @@ class AdminController
         // Fetch admin payment details for reactivation display
         $pdo = db();
         $adminPayment = [];
-        foreach (['gcash_number','maya_number','usdt_address'] as $k) {
+        foreach (['gcash_number','maya_number','usdt_trc20_address','usdt_bep20_address'] as $k) {
             $adminPayment[$k] = $pdo->query("SELECT value FROM settings WHERE key_name='{$k}'")->fetchColumn() ?: '';
         }
 

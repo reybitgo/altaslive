@@ -14,7 +14,7 @@ $dfiEnabled      = setting('dfi_enabled', '1') === '1';
 $gcashEnabled    = setting('gcash_enabled', '1') === '1';
 $mayaEnabled     = setting('maya_enabled', '1') === '1';
 $minPayout       = (float) setting('min_payout', '500');
-$usdtFee         = (float) setting('service_fee_usdt', '5');
+$usdtFee         = (float) setting('service_fee_usdt_trc20', '5');
 $gcashFee        = (float) setting('service_fee_gcash', '0');
 $mayaFee         = (float) setting('service_fee_maya', '0');
 

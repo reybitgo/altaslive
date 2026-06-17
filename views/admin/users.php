@@ -29,24 +29,32 @@
 
     <div class="card">
       <div class="card-header">
-        <form method="GET" action="<?= APP_URL ?>/" class="row g-2 align-items-end mb-0">
+        <form method="GET" action="<?= APP_URL ?>/" class="d-flex flex-wrap align-items-end justify-content-between gap-2">
           <input type="hidden" name="page" value="admin_users">
-          <div class="col-12 col-md-5"><input type="text" name="q" value="<?= e($search) ?>" class="form-control form-control-sm" placeholder="🔍 Search username, name, email…"></div>
-          <div class="col-6 col-md-2">
-            <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+
+          <!-- Filters -->
+          <div class="d-flex flex-wrap align-items-end gap-2">
+            <input type="text" name="q" value="<?= e($search) ?>" class="form-control form-control-sm" style="min-width:220px;" placeholder="🔍 Search username, name, email…">
+            <select name="status" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
               <option value="">All Statuses</option>
               <?php foreach (['active', 'suspended', 'pending'] as $s): ?><option value="<?= $s ?>" <?= $status === $s ? 'selected' : '' ?>><?= ucfirst($s) ?></option><?php endforeach; ?>
             </select>
-          </div>
-          <div class="col-6 col-md-2">
-            <select name="pkg" class="form-select form-select-sm" onchange="this.form.submit()">
+            <select name="pkg" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
               <option value="">All Packages</option>
               <?php foreach ($packages as $pkg): ?><option value="<?= $pkg['id'] ?>" <?= $pkgId === (int)$pkg['id'] ? 'selected' : '' ?>><?= e($pkg['name']) ?></option><?php endforeach; ?>
             </select>
-          </div>
-          <div class="col-auto d-flex gap-2">
             <button type="submit" class="btn btn-primary btn-sm">Search</button>
             <?php if ($search || $status || $pkgId): ?><a href="<?= APP_URL ?>/?page=admin_users" class="btn btn-outline-secondary btn-sm">✕ Clear</a><?php endif; ?>
+          </div>
+
+          <!-- Rows per page -->
+          <div class="d-flex align-items-center gap-2">
+            <label for="perPageSelect" class="form-label mb-0 text-muted" style="font-size:.78rem;white-space:nowrap;">Rows per page</label>
+            <select id="perPageSelect" name="per_page" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
+              <?php foreach ([5, 10, 25, 50, 100] as $n): ?>
+                <option value="<?= $n ?>" <?= $perPage === $n ? 'selected' : '' ?>><?= $n ?></option>
+              <?php endforeach; ?>
+            </select>
           </div>
         </form>
       </div>
@@ -72,7 +80,7 @@
               </tr>
               <?php else: foreach ($result['data'] as $i => $m): ?>
                 <tr>
-                  <td class="td-muted" style="font-size:.7rem;"><?= ($result['page'] - 1) * 25 + $i + 1 ?></td>
+                  <td class="td-muted" style="font-size:.7rem;"><?= ($result['page'] - 1) * $result['per_page'] + $i + 1 ?></td>
                   <td><a href="<?= APP_URL ?>/?page=admin_user_view&id=<?= $m['id'] ?>" class="fw-bold text-decoration-none">@<?= e($m['username']) ?></a></td>
                   <td style="font-size:.825rem;"><?= e($m['full_name'] ?? '—') ?></td>
                   <td><span class="badge bg-primary-subtle text-primary"><?= e($m['package_name'] ?? '—') ?></span></td>
@@ -108,12 +116,14 @@
                     </div>
                   </td>
                 </tr>
-                <?php if ($result['total_pages'] > 1): ?><div class="card-footer"><?= pagination_links($result, APP_URL . '/?page=admin_users&q=' . urlencode($search) . '&status=' . $status . '&pkg=' . $pkgId) ?></div><?php endif; ?>
             <?php endforeach;
             endif; ?>
           </tbody>
         </table>
       </div>
+      <?php if (!empty($result['total_pages']) && $result['total_pages'] > 1): ?>
+        <div class="card-footer"><?= pagination_links($result, APP_URL . '/?page=admin_users&q=' . urlencode($search) . '&status=' . $status . '&pkg=' . $pkgId . '&per_page=' . $perPage) ?></div>
+      <?php endif; ?>
     </div>
   </div>
 </div>

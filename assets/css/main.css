@@ -374,9 +374,12 @@ body {
   font-size: 0.8rem;
   font-weight: 600;
 }
-.pagination .page-item.active .page-link {
+.pagination .page-item.active .page-link,
+.pagination .page-item.active .page-link:hover,
+.pagination .page-item.active .page-link:focus {
   background: var(--primary);
   border-color: var(--primary);
+  color: #fff !important;
 }
 
 /* Toast container */

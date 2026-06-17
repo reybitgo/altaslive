@@ -322,19 +322,80 @@ function paginate(string $query, array $params, int $page, int $perPage = 20): a
 }
 
 /**
- * Render pagination links as HTML.
+ * Render Bootstrap 5 pagination links as HTML.
  */
 function pagination_links(array $p, string $baseUrl): string
 {
-    if ($p['total_pages'] <= 1) return '';
-    $html = '<div class="pagination">';
-    if ($p['has_prev']) {
-        $html .= '<a href="' . $baseUrl . '&pg=' . ($p['page'] - 1) . '" class="page-btn">‹ Prev</a>';
+    $totalPages = (int) ($p['total_pages'] ?? 1);
+    $page       = (int) ($p['page'] ?? 1);
+    if ($totalPages <= 1) return '';
+
+    $pages = _pagination_page_range($page, $totalPages);
+
+    $html = '<nav aria-label="Page navigation"><ul class="pagination justify-content-center mb-0">';
+
+    // Previous
+    if ($page > 1) {
+        $html .= '<li class="page-item"><a class="page-link" href="' . $baseUrl . '&pg=' . ($page - 1) . '" aria-label="Previous"><span aria-hidden="true">&laquo;</span></a></li>';
+    } else {
+        $html .= '<li class="page-item disabled"><span class="page-link" aria-label="Previous"><span aria-hidden="true">&laquo;</span></span></li>';
     }
-    $html .= '<span class="page-info">Page ' . $p['page'] . ' of ' . $p['total_pages'] . '</span>';
-    if ($p['has_next']) {
-        $html .= '<a href="' . $baseUrl . '&pg=' . ($p['page'] + 1) . '" class="page-btn">Next ›</a>';
+
+    // Page numbers with ellipsis for gaps
+    $lastShown = 0;
+    foreach ($pages as $i) {
+        if ($i - $lastShown > 1) {
+            $html .= '<li class="page-item disabled"><span class="page-link">&hellip;</span></li>';
+        }
+        if ($i === $page) {
+            $html .= '<li class="page-item active" aria-current="page"><span class="page-link">' . $i . '</span></li>';
+        } else {
+            $html .= '<li class="page-item"><a class="page-link" href="' . $baseUrl . '&pg=' . $i . '">' . $i . '</a></li>';
+        }
+        $lastShown = $i;
     }
-    $html .= '</div>';
+
+    // Next
+    if ($page < $totalPages) {
+        $html .= '<li class="page-item"><a class="page-link" href="' . $baseUrl . '&pg=' . ($page + 1) . '" aria-label="Next"><span aria-hidden="true">&raquo;</span></a></li>';
+    } else {
+        $html .= '<li class="page-item disabled"><span class="page-link" aria-label="Next"><span aria-hidden="true">&raquo;</span></span></li>';
+    }
+
+    $html .= '</ul></nav>';
     return $html;
+}
+
+/**
+ * Build a compact page-number array for Bootstrap pagination.
+ * Always includes first/last pages and pages around the current page.
+ */
+function _pagination_page_range(int $current, int $total): array
+{
+    if ($total <= 7) {
+        return range(1, $total);
+    }
+
+    $pages = [1, 2];
+
+    $start = max(3, $current - 1);
+    $end   = min($total - 2, $current + 1);
+
+    for ($i = $start; $i <= $end; $i++) {
+        $pages[] = $i;
+    }
+
+    $pages[] = $total - 1;
+    $pages[] = $total;
+
+    // Remove duplicates while preserving order
+    $seen = [];
+    $out  = [];
+    foreach ($pages as $i) {
+        if (!isset($seen[$i])) {
+            $out[] = $i;
+            $seen[$i] = true;
+        }
+    }
+    return $out;
 }

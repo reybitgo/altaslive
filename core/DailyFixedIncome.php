@@ -254,13 +254,13 @@ class DailyFixedIncome
      * @param int $page   Page number (1-based)
      * @return array Paginated result with data, total, page, per_page, total_pages
      */
-    public static function getDFIHistory(int $userId, int $page = 1): array
+    public static function getDFIHistory(int $userId, int $page = 1, int $perPage = 10): array
     {
         return paginate(
             "SELECT * FROM daily_fixed_income_log WHERE user_id = ? ORDER BY created_at DESC",
             [$userId],
             $page,
-            20
+            $perPage
         );
     }
 

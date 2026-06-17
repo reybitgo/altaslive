@@ -90,16 +90,30 @@
 
     <div class="card">
       <div class="card-header">
-        <ul class="nav nav-pills card-header-pills gap-1">
-          <?php
-          $filterTabs = ['' => 'All', 'pairing' => '🤝 Pairing', 'direct_referral' => '👥 Direct', ...(setting('indirect_referral_enabled', '1') === '1' ? ['indirect_referral' => '🔗 Indirect'] : []), 'daily_fixed_income' => '📅 DFI'];
-          foreach ($filterTabs as $val => $label):
-          ?>
-            <li class="nav-item">
-              <a class="nav-link <?= $type === $val ? 'active' : '' ?>" href="<?= APP_URL ?>/?page=earnings&type=<?= $val ?>"><?= $label ?></a>
-            </li>
-          <?php endforeach; ?>
-        </ul>
+        <form method="GET" action="<?= APP_URL ?>/" class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <input type="hidden" name="page" value="earnings">
+          <input type="hidden" name="type" value="<?= e($type) ?>">
+          <ul class="nav nav-pills card-header-pills gap-1">
+            <?php
+            $filterTabs = ['' => 'All', 'pairing' => '🤝 Pairing', 'direct_referral' => '👥 Direct', ...(setting('indirect_referral_enabled', '1') === '1' ? ['indirect_referral' => '🔗 Indirect'] : []), 'daily_fixed_income' => '📅 DFI'];
+            foreach ($filterTabs as $val => $label):
+            ?>
+              <li class="nav-item">
+                <a class="nav-link <?= $type === $val ? 'active' : '' ?>" href="<?= APP_URL ?>/?page=earnings&type=<?= $val ?>"><?= $label ?></a>
+              </li>
+            <?php endforeach; ?>
+          </ul>
+
+          <!-- Rows per page -->
+          <div class="d-flex align-items-center gap-2">
+            <label for="perPageSelect" class="form-label mb-0 text-muted" style="font-size:.78rem;white-space:nowrap;">Rows per page</label>
+            <select id="perPageSelect" name="per_page" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
+              <?php foreach ([5, 10, 25, 50, 100] as $n): ?>
+                <option value="<?= $n ?>" <?= $perPage === $n ? 'selected' : '' ?>><?= $n ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+        </form>
       </div>
       <div class="table-responsive">
         <table class="table table-hover mb-0">
@@ -149,7 +163,7 @@
         </table>
       </div>
       <?php if ($history['total_pages'] > 1): ?>
-        <div class="card-footer"><?= pagination_links($history, APP_URL . '/?page=earnings&type=' . urlencode($type)) ?></div>
+        <div class="card-footer"><?= pagination_links($history, APP_URL . '/?page=earnings&type=' . urlencode($type) . '&per_page=' . $perPage) ?></div>
       <?php endif; ?>
     </div>
   </div>

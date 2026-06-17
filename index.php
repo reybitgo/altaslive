@@ -278,7 +278,8 @@ $routes = [
     'api_binary_tree'    => ['MemberController', 'apiBinaryTree',   'member'],
     'payout'             => ['MemberController', 'payout',          'member'],
     'request_payout'     => ['MemberController', 'requestPayout',   'member'],
-    'update_usdt_gas'    => ['AdminController',  'updateUsdtGas',   'member'],
+    'update_usdt_gas'       => ['AdminController',  'updateUsdtGas',      'member'],
+    'update_usdt_bep20_gas' => ['AdminController',  'updateUsdtBep20Gas', 'member'],
 
     // NEW v2: Member cap + DFI + reactivation pages
     'cap_status'         => ['MemberController', 'capStatus',       'member'],

@@ -222,7 +222,7 @@ class User
 
     public static function updateProfile(int $id, array $data): bool
     {
-        $allowed = ['full_name', 'email', 'mobile', 'gcash_number', 'maya_number', 'usdt_address', 'address', 'photo'];
+        $allowed = ['full_name', 'email', 'mobile', 'gcash_number', 'maya_number', 'usdt_trc20_address', 'usdt_bep20_address', 'address', 'photo'];
         $fields  = [];
         $values  = [];
 
@@ -353,7 +353,7 @@ class User
 
     // ── Admin Queries ─────────────────────────────────────────────────────────
 
-    public static function allMembers(int $page = 1, string $search = '', string $status = '', int $pkgId = 0): array
+    public static function allMembers(int $page = 1, string $search = '', string $status = '', int $pkgId = 0, int $perPage = 10): array
     {
         $where  = "u.role = 'member'";
         $params = [];
@@ -380,7 +380,7 @@ class User
              ORDER BY u.joined_at DESC",
             $params,
             $page,
-            25
+            $perPage
         );
     }
 
@@ -403,7 +403,7 @@ class User
     /**
      * Get direct recruits by this member (sponsor_id = $userId).
      */
-    public static function directReferrals(int $userId, int $page = 1): array
+    public static function directReferrals(int $userId, int $page = 1, int $perPage = 10): array
     {
         return paginate(
             "SELECT u.*, p.name AS package_name
@@ -413,7 +413,7 @@ class User
              ORDER BY u.joined_at DESC",
             [$userId],
             $page,
-            20
+            $perPage
         );
     }
 

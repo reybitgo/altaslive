@@ -8,21 +8,22 @@
 $pageTitle = 'Reactivate Account';
 
 // Build method config for JS
+// E-Wallet is always shown (like register page) but disabled when balance is insufficient
 $methods = [];
-if ($request['can_use_ewallet']) {
-  $methods[] = ['ewallet', 'E-Wallet', '#2d6a35', '💳', 'Deduct from your balance'];
-}
+$methods[] = ['ewallet', 'E-Wallet', '#2d6a35', '💳', 'Deduct from your balance'];
 $methods[] = ['gcash', 'GCash', '#0070d8', '', 'Send via GCash'];
 $methods[] = ['maya', 'Maya', '#48b0db', '', 'Send via Maya'];
-$methods[] = ['usdt', 'USDT TRC20', '#26a17b', '', 'Send via USDT'];
+$methods[] = ['usdt_trc20', 'USDT TRC20', '#26a17b', '', 'Send via USDT'];
+$methods[] = ['usdt_bep20', 'USDT BEP20', '#f0b90b', '', 'Send via USDT'];
 
 $defaultMethod = $request['can_use_ewallet'] ? 'ewallet' : 'gcash';
 
 // Admin details for JS
 $jsAdmin = [
-  'gcash' => ['number' => $admin['gcash_number'] ?? '', 'label' => 'GCash Number', 'color' => '#0070d8'],
-  'maya'  => ['number' => $admin['maya_number']  ?? '', 'label' => 'Maya Number',  'color' => '#48b0db'],
-  'usdt'  => ['number' => $admin['usdt_address'] ?? '', 'label' => 'USDT TRC20 Address', 'color' => '#26a17b'],
+  'gcash'      => ['number' => $admin['gcash_number'] ?? '', 'label' => 'GCash Number', 'color' => '#0070d8'],
+  'maya'       => ['number' => $admin['maya_number']  ?? '', 'label' => 'Maya Number',  'color' => '#48b0db'],
+  'usdt_trc20' => ['number' => $admin['usdt_trc20_address'] ?? '', 'label' => 'USDT TRC20 Address', 'color' => '#26a17b'],
+  'usdt_bep20' => ['number' => $admin['usdt_bep20_address'] ?? '', 'label' => 'USDT BEP20 Address', 'color' => '#f0b90b'],
 ];
 ?>
 <?php require 'views/partials/head.php'; ?>
@@ -77,7 +78,7 @@ $jsAdmin = [
                       $title = '';
                       if ($val === 'ewallet' && !$request['can_use_ewallet']) {
                         $isDisabled = true;
-                        $title = 'Insufficient balance';
+                        $title = 'Insufficient balance: ' . fmt_money($request['ewallet_balance']) . ' available, ' . fmt_money($request['fee']) . ' required';
                       }
                     ?>
                     <label class="method-option <?= $isDisabled ? 'method-disabled' : '' ?>"
@@ -120,11 +121,18 @@ $jsAdmin = [
                     <div class="font-mono fw-bold" style="font-size:1rem;color:#48b0db;"><?= e($admin['maya_number'] ?? '—') ?></div>
                   </div>
 
-                  <div id="detailUsdt" class="d-none">
+                  <div id="detailUsdtTrc20" class="d-none">
                     <div class="d-flex align-items-center gap-2 mb-1">
                       <span class="fw-bold">USDT (TRC20)</span>
                     </div>
-                    <div class="font-mono fw-bold" style="font-size:.85rem;color:#26a17b;word-break:break-all;"><?= e($admin['usdt_address'] ?? '—') ?></div>
+                    <div class="font-mono fw-bold" style="font-size:.85rem;color:#26a17b;word-break:break-all;"><?= e($admin['usdt_trc20_address'] ?? '—') ?></div>
+                  </div>
+
+                  <div id="detailUsdtBep20" class="d-none">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                      <span class="fw-bold">USDT (BEP20)</span>
+                    </div>
+                    <div class="font-mono fw-bold" style="font-size:.85rem;color:#f0b90b;word-break:break-all;"><?= e($admin['usdt_bep20_address'] ?? '—') ?></div>
                   </div>
 
                   <div class="mt-3 pt-2" style="border-top:1px dashed #dde3ef;">
@@ -295,11 +303,17 @@ $jsAdmin = [
       }
 
       // Show specific detail
-      ['Gcash', 'Maya', 'Usdt'].forEach(function (m) {
+      ['Gcash', 'Maya', 'UsdtTrc20', 'UsdtBep20'].forEach(function (m) {
         const el = document.getElementById('detail' + m);
         if (el) el.classList.add('d-none');
       });
-      const activeDetail = document.getElementById('detail' + method.charAt(0).toUpperCase() + method.slice(1));
+      const detailMap = {
+        'gcash': 'detailGcash',
+        'maya': 'detailMaya',
+        'usdt_trc20': 'detailUsdtTrc20',
+        'usdt_bep20': 'detailUsdtBep20'
+      };
+      const activeDetail = document.getElementById(detailMap[method] || '');
       if (activeDetail) activeDetail.classList.remove('d-none');
     }
 

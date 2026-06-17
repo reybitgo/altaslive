@@ -53,9 +53,25 @@
     </div>
 
     <div class="card">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span class="card-title">🔄 Reactivation Requests</span>
-        <span class="badge bg-secondary-subtle text-secondary"><?= $result['total'] ?> records</span>
+      <div class="card-header">
+        <form method="GET" action="<?= APP_URL ?>/" class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <input type="hidden" name="page" value="admin_reactivations">
+          <input type="hidden" name="status" value="<?= e($status) ?>">
+          <div class="d-flex align-items-center gap-2">
+            <span class="card-title">🔄 Reactivation Requests</span>
+            <span class="badge bg-secondary-subtle text-secondary"><?= $result['total'] ?> records</span>
+          </div>
+
+          <!-- Rows per page -->
+          <div class="d-flex align-items-center gap-2">
+            <label for="perPageSelect" class="form-label mb-0 text-muted" style="font-size:.78rem;white-space:nowrap;">Rows per page</label>
+            <select id="perPageSelect" name="per_page" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
+              <?php foreach ([5, 10, 25, 50, 100] as $n): ?>
+                <option value="<?= $n ?>" <?= $perPage === $n ? 'selected' : '' ?>><?= $n ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+        </form>
       </div>
       <div class="table-responsive">
         <table class="table table-hover mb-0" style="font-size:.85rem;">
@@ -79,18 +95,20 @@
               </tr>
             <?php else: foreach ($result['data'] as $row):
                 $methodLabel = match ($row['payment_method']) {
-                    'ewallet' => 'E-Wallet',
-                    'maya'    => 'Maya',
-                    'usdt'    => 'USDT',
-                    'admin'   => 'Admin',
-                    default   => 'GCash'
+                    'ewallet'     => 'E-Wallet',
+                    'maya'        => 'Maya',
+                    'usdt_trc20'  => 'USDT TRC20',
+                    'usdt_bep20'  => 'USDT BEP20',
+                    'admin'       => 'Admin',
+                    default       => 'GCash'
                 };
                 $methodColor = match ($row['payment_method']) {
-                    'ewallet' => '#3b6ff0',
-                    'maya'    => '#48b0db',
-                    'usdt'    => '#26a17b',
-                    'admin'   => '#6b7280',
-                    default   => '#0070d8'
+                    'ewallet'     => '#3b6ff0',
+                    'maya'        => '#48b0db',
+                    'usdt_trc20'  => '#26a17b',
+                    'usdt_bep20'  => '#f0b90b',
+                    'admin'       => '#6b7280',
+                    default       => '#0070d8'
                 };
             ?>
               <tr>
@@ -107,10 +125,11 @@
                   </span>
                   <?php
                   $adminAccount = match ($row['payment_method']) {
-                      'gcash' => $adminPayment['gcash_number'] ?? '',
-                      'maya'  => $adminPayment['maya_number'] ?? '',
-                      'usdt'  => $adminPayment['usdt_address'] ?? '',
-                      default => ''
+                      'gcash'       => $adminPayment['gcash_number'] ?? '',
+                      'maya'        => $adminPayment['maya_number'] ?? '',
+                      'usdt_trc20'  => $adminPayment['usdt_trc20_address'] ?? '',
+                      'usdt_bep20'  => $adminPayment['usdt_bep20_address'] ?? '',
+                      default       => ''
                   };
                   ?>
                   <?php if ($adminAccount): ?>
@@ -150,10 +169,11 @@
                     <div class="d-flex gap-1 flex-wrap">
                       <?php
                       $acct = match ($row['payment_method']) {
-                          'gcash' => e($adminPayment['gcash_number'] ?? ''),
-                          'maya'  => e($adminPayment['maya_number'] ?? ''),
-                          'usdt'  => e($adminPayment['usdt_address'] ?? ''),
-                          default => ''
+                          'gcash'       => e($adminPayment['gcash_number'] ?? ''),
+                          'maya'        => e($adminPayment['maya_number'] ?? ''),
+                          'usdt_trc20'  => e($adminPayment['usdt_trc20_address'] ?? ''),
+                          'usdt_bep20'  => e($adminPayment['usdt_bep20_address'] ?? ''),
+                          default       => ''
                       };
                       ?>
                       <button class="btn btn-sm btn-success"
@@ -178,7 +198,7 @@
       </div>
       <?php if ($result && $result['total_pages'] > 1): ?>
         <div class="card-footer">
-          <?= pagination_links($result, APP_URL . '/?page=admin_reactivations&status=' . urlencode($status)) ?>
+          <?= pagination_links($result, APP_URL . '/?page=admin_reactivations&status=' . urlencode($status) . '&per_page=' . $perPage) ?>
         </div>
       <?php endif; ?>
     </div>

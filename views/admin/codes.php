@@ -123,11 +123,28 @@
 
     <!-- Codes table -->
     <div class="card no-print">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span class="card-title">🎟️ Code List</span>
-        <?php if ($status || $pkgId): ?>
-          <a href="<?= APP_URL ?>/?page=admin_codes" class="btn btn-sm btn-outline-secondary">✕ Clear filter</a>
-        <?php endif; ?>
+      <div class="card-header">
+        <form method="GET" action="<?= APP_URL ?>/" class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <input type="hidden" name="page" value="admin_codes">
+          <input type="hidden" name="status" value="<?= e($status ?? '') ?>">
+          <input type="hidden" name="pkg" value="<?= $pkgId ?? 0 ?>">
+          <div class="d-flex align-items-center gap-2">
+            <span class="card-title">🎟️ Code List</span>
+            <?php if ($status || $pkgId): ?>
+              <a href="<?= APP_URL ?>/?page=admin_codes" class="btn btn-sm btn-outline-secondary">✕ Clear filter</a>
+            <?php endif; ?>
+          </div>
+
+          <!-- Rows per page -->
+          <div class="d-flex align-items-center gap-2">
+            <label for="perPageSelect" class="form-label mb-0 text-muted" style="font-size:.78rem;white-space:nowrap;">Rows per page</label>
+            <select id="perPageSelect" name="per_page" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
+              <?php foreach ([5, 10, 25, 50, 100] as $n): ?>
+                <option value="<?= $n ?>" <?= $perPage === $n ? 'selected' : '' ?>><?= $n ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+        </form>
       </div>
       <div class="table-responsive">
         <table class="table table-hover mb-0">
@@ -151,7 +168,7 @@
               </tr>
               <?php else: foreach ($codes['data'] as $i => $c): ?>
                 <tr>
-                  <td class="td-muted" style="font-size:.72rem;"><?= ($codes['page'] - 1) * 25 + $i + 1 ?></td>
+                  <td class="td-muted" style="font-size:.72rem;"><?= ($codes['page'] - 1) * $codes['per_page'] + $i + 1 ?></td>
                   <td>
                     <div class="d-flex align-items-center gap-2">
                       <span class="reg-code"><?= e($c['code']) ?></span>
@@ -191,7 +208,7 @@
         </table>
       </div>
       <?php if ($codes['total_pages'] > 1): ?>
-        <div class="card-footer"><?= pagination_links($codes, APP_URL . '/?page=admin_codes&status=' . urlencode($status ?? '') . '&pkg=' . ($pkgId ?? 0)) ?></div>
+        <div class="card-footer"><?= pagination_links($codes, APP_URL . '/?page=admin_codes&status=' . urlencode($status ?? '') . '&pkg=' . ($pkgId ?? 0) . '&per_page=' . $perPage) ?></div>
       <?php endif; ?>
     </div>
 

@@ -360,9 +360,25 @@
     <?php else: ?>
       <!-- Indirect disabled — show direct referrals table instead -->
       <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span class="card-title">👥 Direct Referrals</span>
-          <span class="badge bg-secondary-subtle text-secondary"><?= $direct['total'] ?? 0 ?> members</span>
+        <div class="card-header">
+          <form method="GET" action="<?= APP_URL ?>/" class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <input type="hidden" name="page" value="genealogy">
+            <input type="hidden" name="view" value="referral">
+            <div class="d-flex align-items-center gap-2">
+              <span class="card-title">👥 Direct Referrals</span>
+              <span class="badge bg-secondary-subtle text-secondary"><?= $direct['total'] ?? 0 ?> members</span>
+            </div>
+
+            <!-- Rows per page -->
+            <div class="d-flex align-items-center gap-2">
+              <label for="perPageSelect" class="form-label mb-0 text-muted" style="font-size:.78rem;white-space:nowrap;">Rows per page</label>
+              <select id="perPageSelect" name="per_page" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
+                <?php foreach ([5, 10, 25, 50, 100] as $n): ?>
+                  <option value="<?= $n ?>" <?= $perPage === $n ? 'selected' : '' ?>><?= $n ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+          </form>
         </div>
         <div class="table-responsive">
           <table class="table table-hover mb-0">
@@ -385,7 +401,7 @@
                 </tr>
                 <?php else: foreach ($direct['data'] as $i => $m): ?>
                   <tr>
-                    <td class="td-muted" style="font-size:.7rem;"><?= ($direct['page'] - 1) * 20 + $i + 1 ?></td>
+                    <td class="td-muted" style="font-size:.7rem;"><?= ($direct['page'] - 1) * $direct['per_page'] + $i + 1 ?></td>
                     <td class="fw-bold">@<?= e($m['username']) ?></td>
                     <td><span class="badge bg-primary-subtle text-primary"><?= e($m['package_name'] ?? '—') ?></span></td>
                     <td class="td-muted" style="font-size:.75rem;"><?= fmt_date($m['joined_at']) ?></td>
@@ -400,7 +416,7 @@
           </table>
         </div>
         <?php if (($direct['total_pages'] ?? 1) > 1): ?>
-          <div class="card-footer"><?= pagination_links($direct, APP_URL . '/?page=genealogy&view=referral') ?></div>
+          <div class="card-footer"><?= pagination_links($direct, APP_URL . '/?page=genealogy&view=referral&per_page=' . $perPage) ?></div>
         <?php endif; ?>
       </div>
     <?php endif; ?>

@@ -31,13 +31,14 @@ class MemberController
         $user = Auth::user();
 
         $data = [
-            'full_name'    => trim($_POST['full_name']    ?? ''),
-            'email'        => trim($_POST['email']        ?? ''),
-            'mobile'       => trim($_POST['mobile']       ?? ''),
-            'gcash_number' => trim($_POST['gcash_number'] ?? ''),
-            'maya_number'  => trim($_POST['maya_number']  ?? ''),
-            'usdt_address' => trim($_POST['usdt_address'] ?? ''),
-            'address'      => trim($_POST['address']      ?? ''),
+            'full_name'          => trim($_POST['full_name']            ?? ''),
+            'email'              => trim($_POST['email']                ?? ''),
+            'mobile'             => trim($_POST['mobile']               ?? ''),
+            'gcash_number'       => trim($_POST['gcash_number']         ?? ''),
+            'maya_number'        => trim($_POST['maya_number']          ?? ''),
+            'usdt_trc20_address' => trim($_POST['usdt_trc20_address']   ?? ''),
+            'usdt_bep20_address' => trim($_POST['usdt_bep20_address']   ?? ''),
+            'address'            => trim($_POST['address']              ?? ''),
         ];
 
         // Handle photo upload
@@ -112,8 +113,9 @@ class MemberController
         $userId  = Auth::id();
         $type    = $_GET['type'] ?? '';
         $page    = max(1, (int)($_GET['pg'] ?? 1));
+        $perPage = max(5, (int)($_GET['per_page'] ?? 10));
         $summary = Commission::summary($userId);
-        $history = Commission::history($userId, $page, 20, $type);
+        $history = Commission::history($userId, $page, $perPage, $type);
         $cdStatus = CdStatus::getActive($userId);
         $cdHistory = CdStatus::history($userId);
         $cdLedger = [];
@@ -139,8 +141,9 @@ class MemberController
             if (setting('indirect_referral_enabled', '1') === '1') {
                 $indirect = User::indirectReferralTree($user['id']);
             } else {
-                $page   = max(1, (int)($_GET['pg'] ?? 1));
-                $direct = User::directReferrals($user['id'], $page);
+                $page    = max(1, (int)($_GET['pg'] ?? 1));
+                $perPage = max(5, (int)($_GET['per_page'] ?? 10));
+                $direct  = User::directReferrals($user['id'], $page, $perPage);
             }
         }
         require 'views/member/genealogy.php';
@@ -202,7 +205,9 @@ class MemberController
         Auth::guard('member');
         $userId  = Auth::id();
         $user    = Auth::user();
-        $history = Payout::forUser($userId);
+        $page    = max(1, (int)($_GET['pg'] ?? 1));
+        $perPage = max(5, (int)($_GET['per_page'] ?? 10));
+        $history = Payout::forUser($userId, $page, $perPage);
         require 'views/member/payout.php';
     }
 
@@ -214,9 +219,9 @@ class MemberController
         $amount   = (float)($_POST['amount']         ?? 0);
         $method   = trim($_POST['payout_method']     ?? 'gcash');
         $account  = trim($_POST['payout_account']    ?? '');
-        $usdtRate = (float)($_POST['usdt_rate']      ?? 0);
+        $usdtRate = (float)($_POST['usdt_trc20_rate'] ?? $_POST['usdt_bep20_rate'] ?? 0);
 
-        $allowed = ['gcash', 'maya', 'usdt'];
+        $allowed = ['gcash', 'maya', 'usdt_trc20', 'usdt_bep20'];
         if (!in_array($method, $allowed)) {
             flash('error', 'Invalid payout method.');
             redirect('/?page=payout');
@@ -257,7 +262,8 @@ class MemberController
         Auth::guard('member');
         $userId  = Auth::id();
         $page    = max(1, (int)($_GET['pg'] ?? 1));
-        $history = DailyFixedIncome::getDFIHistory($userId, $page);
+        $perPage = max(5, (int)($_GET['per_page'] ?? 10));
+        $history = DailyFixedIncome::getDFIHistory($userId, $page, $perPage);
         $status  = DailyFixedIncome::getMemberDFIStatus($userId);
 
         // Fetch all DFI records for calendar view (grouped by date)
@@ -343,7 +349,7 @@ class MemberController
 
         // Fetch admin payment details for external payment display (from settings)
         $admin = [];
-        foreach (['gcash_number','maya_number','usdt_address'] as $k) {
+        foreach (['gcash_number','maya_number','usdt_trc20_address','usdt_bep20_address'] as $k) {
             $admin[$k] = db()->query("SELECT value FROM settings WHERE key_name='{$k}'")->fetchColumn() ?: '';
         }
 

@@ -80,14 +80,16 @@ $lastReset        = setting('last_reset');
                     $method  = $pr['payout_method']  ?: 'gcash';
                     $account = $pr['payout_account']  ?: '—';
                     $mLabel  = match ($method) {
-                      'maya' => 'Maya',
-                      'usdt' => 'USDT',
-                      default => 'GCash'
+                      'maya'        => 'Maya',
+                      'usdt_trc20'  => 'USDT TRC20',
+                      'usdt_bep20'  => 'USDT BEP20',
+                      default       => 'GCash'
                     };
                     $mColor  = match ($method) {
-                      'maya' => '#48b0db',
-                      'usdt' => '#26a17b',
-                      default => '#0070d8'
+                      'maya'        => '#48b0db',
+                      'usdt_trc20'  => '#26a17b',
+                      'usdt_bep20'  => '#f0b90b',
+                      default       => '#0070d8'
                     };
                   ?>
                     <tr>

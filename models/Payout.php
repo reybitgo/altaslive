@@ -39,8 +39,9 @@ class Payout
         // Calculate USDT amount for USDT payouts
         $gasFeeUsdt = 0.0;
         $usdtAmount = 0.0;
-        if ($method === 'usdt' && $usdtRate > 0) {
-            $gasFeeUsdt = (float)setting('usdt_gas_fee', '2.50');
+        if (($method === 'usdt_trc20' || $method === 'usdt_bep20') && $usdtRate > 0) {
+            $gasFeeKey  = $method === 'usdt_bep20' ? 'usdt_bep20_gas_fee' : 'usdt_trc20_gas_fee';
+            $gasFeeUsdt = (float)setting($gasFeeKey, $method === 'usdt_bep20' ? '0.05' : '2.50');
             $netPhp     = $netAmount - ($gasFeeUsdt * $usdtRate);
             $usdtAmount = $netPhp > 0 ? round($netPhp / $usdtRate, 4) : 0;
         }
@@ -49,8 +50,9 @@ class Payout
             INSERT INTO payout_requests
               (user_id, amount, payout_method, payout_account,
                service_fee_pct, service_fee_amount,
-               usdt_rate, usdt_gas_fee, usdt_amount)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+               usdt_trc20_rate, usdt_trc20_gas_fee, usdt_trc20_amount,
+               usdt_bep20_rate, usdt_bep20_gas_fee, usdt_bep20_amount)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ")->execute([
             $userId,
             $amount,
@@ -58,9 +60,12 @@ class Payout
             $account,
             $feePct,
             $feeAmount,
-            $usdtRate,
-            $gasFeeUsdt,
-            $usdtAmount,
+            $method === 'usdt_trc20' ? $usdtRate : 0,
+            $method === 'usdt_trc20' ? $gasFeeUsdt : 0,
+            $method === 'usdt_trc20' ? $usdtAmount : 0,
+            $method === 'usdt_bep20' ? $usdtRate : 0,
+            $method === 'usdt_bep20' ? $gasFeeUsdt : 0,
+            $method === 'usdt_bep20' ? $usdtAmount : 0,
         ]);
 
         return ['ok' => true, 'id' => (int)db()->lastInsertId()];
@@ -144,17 +149,17 @@ class Payout
         return $st->fetch() ?: null;
     }
 
-    public static function forUser(int $userId, int $page = 1): array
+    public static function forUser(int $userId, int $page = 1, int $perPage = 10): array
     {
         return paginate(
             "SELECT * FROM payout_requests WHERE user_id = ? ORDER BY requested_at DESC",
             [$userId],
             $page,
-            20
+            $perPage
         );
     }
 
-    public static function all(int $page = 1, string $status = ''): array
+    public static function all(int $page = 1, string $status = '', int $perPage = 10): array
     {
         $where  = '1=1';
         $params = [];
@@ -172,7 +177,7 @@ class Payout
              ORDER BY pr.requested_at DESC",
             $params,
             $page,
-            25
+            $perPage
         );
     }
 

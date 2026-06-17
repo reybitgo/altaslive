@@ -103,13 +103,22 @@
                 </div>
               <?php endif; ?>
 
-              <div class="mb-0">
+              <div class="mb-3">
                 <label class="form-label">
                   <span style="color:#26a17b;font-weight:700;margin-right:.35rem;">₮</span>USDT TRC20 Address
                 </label>
-                <input type="text" name="usdt_address" class="form-control font-mono"
-                  value="<?= e($user['usdt_address'] ?? '') ?>" placeholder="T..." maxlength="42" spellcheck="false">
+                <input type="text" name="usdt_trc20_address" class="form-control font-mono"
+                  value="<?= e($user['usdt_trc20_address'] ?? '') ?>" placeholder="T..." maxlength="42" spellcheck="false">
                 <div class="form-text">TRC20 addresses start with <strong>T</strong> and are 34 characters.</div>
+              </div>
+
+              <div class="mb-0">
+                <label class="form-label">
+                  <span style="color:#f0b90b;font-weight:700;margin-right:.35rem;">₮</span>USDT BEP20 Address
+                </label>
+                <input type="text" name="usdt_bep20_address" class="form-control font-mono"
+                  value="<?= e($user['usdt_bep20_address'] ?? '') ?>" placeholder="0x..." maxlength="42" spellcheck="false">
+                <div class="form-text">BEP20 addresses start with <strong>0x</strong> and are 42 characters.</div>
               </div>
 
               <?php if (!$gcashEnabled || !$mayaEnabled): ?>

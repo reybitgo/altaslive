@@ -128,7 +128,7 @@
           <!-- Reactivation events -->
           <?php
           $reactivationHistory = Reactivation::getReactivationHistory($userId);
-          foreach ($reactivationHistory as $r):
+          foreach ($reactivationHistory['data'] as $r):
           ?>
           <div class="timeline-item">
             <div class="timeline-dot" style="background:#3b6ff0;"></div>
@@ -186,7 +186,7 @@
     <!-- Reactivation History -->
     <?php
     $reactivationHistory = Reactivation::getReactivationHistory($userId);
-    if (!empty($reactivationHistory)):
+    if (!empty($reactivationHistory['data'])):
     ?>
       <div class="card mb-4">
         <div class="card-header"><span class="card-title">🔄 Reactivation History</span></div>
@@ -202,7 +202,7 @@
                 </tr>
               </thead>
               <tbody>
-                <?php foreach ($reactivationHistory as $r): ?>
+                <?php foreach ($reactivationHistory['data'] as $r): ?>
                   <tr>
                     <td><?= fmt_datetime($r['created_at']) ?></td>
                     <td><?= fmt_money((float)$r['previous_earned']) ?></td>

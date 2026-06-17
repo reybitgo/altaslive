@@ -217,6 +217,14 @@
                 <td><strong><?= e($user['gcash_number'] ?? '—') ?></strong></td>
               </tr>
               <tr>
+                <td>USDT TRC20</td>
+                <td><strong><?= e($user['usdt_trc20_address'] ?? '—') ?></strong></td>
+              </tr>
+              <tr>
+                <td>USDT BEP20</td>
+                <td><strong><?= e($user['usdt_bep20_address'] ?? '—') ?></strong></td>
+              </tr>
+              <tr>
                 <td>Address</td>
                 <td><?= e($user['address'] ?? '—') ?></td>
               </tr>
@@ -275,84 +283,110 @@
     </div>
 
     <!-- Tabs -->
-    <?php $tab = $_GET['tab'] ?? 'commissions'; ?>
     <div class="card">
-      <div class="card-header">
+      <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <ul class="nav nav-pills card-header-pills gap-1">
           <?php foreach (['commissions' => '💰 Commissions', 'ledger' => '📒 E-Wallet Ledger', 'payouts' => '💳 Payouts', 'cap_dfi' => '🛡️ Cap & DFI', 'ewallet' => '💱 Transfers'] as $t => $label): ?>
             <li class="nav-item"><a class="nav-link <?= $tab === $t ? 'active' : '' ?>" href="<?= APP_URL ?>/?page=admin_user_view&id=<?= $user['id'] ?>&tab=<?= $t ?>"><?= $label ?></a></li>
           <?php endforeach; ?>
         </ul>
+        <div class="d-flex align-items-center gap-2 ms-auto">
+          <label for="perPageSelect" class="form-label mb-0 text-muted" style="font-size:.78rem;white-space:nowrap;">Rows per page</label>
+          <form method="GET" action="<?= APP_URL ?>/" class="m-0">
+            <input type="hidden" name="page" value="admin_user_view">
+            <input type="hidden" name="id" value="<?= $user['id'] ?>">
+            <input type="hidden" name="tab" value="<?= e($tab) ?>">
+            <select id="perPageSelect" name="per_page" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
+              <?php foreach ([5, 10, 25, 50, 100] as $n): ?>
+                <option value="<?= $n ?>" <?= $perPage === $n ? 'selected' : '' ?>><?= $n ?></option>
+              <?php endforeach; ?>
+            </select>
+          </form>
+        </div>
       </div>
 
       <?php if ($tab === 'commissions'): ?>
-        <div class="table-responsive">
-          <table class="table table-hover mb-0">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Type</th>
-                <th>Description</th>
-                <th>From</th>
-                <th>Amount</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php if (empty($commHist['data'])): ?><tr>
-                  <td colspan="6" class="text-center py-4 text-muted">No commissions.</td>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Description</th>
+                  <th>From</th>
+                  <th>Amount</th>
+                  <th>Status</th>
                 </tr>
-                <?php else: foreach ($commHist['data'] as $c):
-                  $tn = match ($c['type']) {
-                    'pairing' => '🤝 Pairing',
-                    'direct_referral' => '👥 Direct',
-                    'indirect_referral' => setting('indirect_referral_enabled', '1') === '1' ? '🔗 Indirect Lvl ' . $c['level'] : '🔗 Indirect (disabled)',
-                    default => $c['type']
-                  };
-                ?>
-                  <tr>
-                    <td class="td-muted" style="font-size:.72rem;"><?= fmt_datetime($c['created_at']) ?></td>
-                    <td><?= $tn ?></td>
-                    <td class="text-truncate" style="max-width:180px;font-size:.8rem;"><?= e($c['description']) ?></td>
-                    <td class="td-muted"><?= $c['source_username'] ? '@' . e($c['source_username']) : '—' ?></td>
-                    <td class="<?= $c['status'] === 'credited' ? 'td-green' : ' td-muted' ?> font-mono"><?= $c['status'] === 'credited' ? '+' . fmt_money($c['amount']) : '—' ?></td>
-                    <td><span class="badge <?= $c['status'] === 'credited' ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning' ?>"><?= ucfirst($c['status']) ?></span></td>
+              </thead>
+              <tbody>
+                <?php if (empty($commHist['data'])): ?><tr>
+                    <td colspan="6" class="text-center py-4 text-muted">No commissions.</td>
                   </tr>
-              <?php endforeach;
-              endif; ?>
-            </tbody>
-          </table>
+                  <?php else: foreach ($commHist['data'] as $c):
+                    $tn = match ($c['type']) {
+                      'pairing' => '🤝 Pairing',
+                      'direct_referral' => '👥 Direct',
+                      'indirect_referral' => setting('indirect_referral_enabled', '1') === '1' ? '🔗 Indirect Lvl ' . $c['level'] : '🔗 Indirect (disabled)',
+                      default => $c['type']
+                    };
+                  ?>
+                    <tr>
+                      <td class="td-muted" style="font-size:.72rem;"><?= fmt_datetime($c['created_at']) ?></td>
+                      <td><?= $tn ?></td>
+                      <td class="text-truncate" style="max-width:180px;font-size:.8rem;"><?= e($c['description']) ?></td>
+                      <td class="td-muted"><?= $c['source_username'] ? '@' . e($c['source_username']) : '—' ?></td>
+                      <td class="<?= $c['status'] === 'credited' ? 'td-green' : ' td-muted' ?> font-mono"><?= $c['status'] === 'credited' ? '+' . fmt_money($c['amount']) : '—' ?></td>
+                      <td><span class="badge <?= $c['status'] === 'credited' ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning' ?>"><?= ucfirst($c['status']) ?></span></td>
+                    </tr>
+                <?php endforeach;
+                endif; ?>
+              </tbody>
+            </table>
+          </div>
         </div>
+        <?php if (!empty($commHist['total_pages']) && $commHist['total_pages'] > 1): ?>
+          <div class="card-footer">
+            <?= pagination_links($commHist, APP_URL . '/?page=admin_user_view&id=' . $user['id'] . '&tab=' . $tab . '&per_page=' . $perPage) ?>
+          </div>
+        <?php endif; ?>
 
       <?php elseif ($tab === 'ledger'): ?>
-        <div class="table-responsive">
-          <table class="table table-hover mb-0">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Type</th>
-                <th>Amount</th>
-                <th>Balance After</th>
-                <th>Note</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php if (empty($ledger['data'])): ?><tr>
-                  <td colspan="5" class="text-center py-4 text-muted">No ledger entries.</td>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Amount</th>
+                  <th>Balance After</th>
+                  <th>Note</th>
                 </tr>
-                <?php else: foreach ($ledger['data'] as $l): ?>
-                  <tr>
-                    <td class="td-muted" style="font-size:.72rem;"><?= fmt_datetime($l['created_at']) ?></td>
-                    <td><span class="badge <?= $l['type'] === 'credit' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger' ?>"><?= ucfirst($l['type']) ?></span></td>
-                    <td class="font-mono <?= $l['type'] === 'credit' ? 'td-green' : 'td-red' ?>"><?= ($l['type'] === 'credit' ? '+' : '-') . fmt_money($l['amount']) ?></td>
-                    <td class="font-mono fw-bold"><?= fmt_money($l['balance_after']) ?></td>
-                    <td class="td-muted" style="font-size:.78rem;"><?= e($l['note'] ?? '—') ?></td>
+              </thead>
+              <tbody>
+                <?php if (empty($ledger['data'])): ?><tr>
+                    <td colspan="5" class="text-center py-4 text-muted">No ledger entries.</td>
                   </tr>
-              <?php endforeach;
-              endif; ?>
-            </tbody>
-          </table>
+                  <?php else: foreach ($ledger['data'] as $l): ?>
+                    <tr>
+                      <td class="td-muted" style="font-size:.72rem;"><?= fmt_datetime($l['created_at']) ?></td>
+                      <td><span class="badge <?= $l['type'] === 'credit' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger' ?>"><?= ucfirst($l['type']) ?></span></td>
+                      <td class="font-mono <?= $l['type'] === 'credit' ? 'td-green' : 'td-red' ?>"><?= ($l['type'] === 'credit' ? '+' : '-') . fmt_money($l['amount']) ?></td>
+                      <td class="font-mono fw-bold"><?= fmt_money($l['balance_after']) ?></td>
+                      <td class="td-muted" style="font-size:.78rem;"><?= e($l['note'] ?? '—') ?></td>
+                    </tr>
+                <?php endforeach;
+                endif; ?>
+              </tbody>
+            </table>
+          </div>
         </div>
+        <?php if (!empty($ledger['total_pages']) && $ledger['total_pages'] > 1): ?>
+          <div class="card-footer">
+            <?= pagination_links($ledger, APP_URL . '/?page=admin_user_view&id=' . $user['id'] . '&tab=' . $tab . '&per_page=' . $perPage) ?>
+          </div>
+        <?php endif; ?>
 
       <?php elseif ($tab === 'cap_dfi'): ?>
         <div class="card-body">
@@ -418,147 +452,189 @@
           </div>
 
           <!-- Reactivation History -->
-          <?php if (!empty($reactivationHistory)): ?>
+          <?php if (!empty($reactivationHistory['data'])): ?>
             <div class="card mb-4">
               <div class="card-header"><span class="card-title">🔄 Reactivation History</span></div>
-              <div class="table-responsive">
-                <table class="table table-hover mb-0" style="font-size:.85rem;">
-                  <thead class="table-light">
-                    <tr><th>Date</th><th>Previous Earned</th><th>Fee Paid</th><th>Method</th><th>Status</th></tr>
-                  </thead>
-                  <tbody>
-                    <?php foreach ($reactivationHistory as $r): ?>
-                      <tr>
-                        <td><?= fmt_datetime($r['created_at']) ?></td>
-                        <td><?= fmt_money((float)$r['previous_earned']) ?></td>
-                        <td class="fw-semibold text-success"><?= fmt_money((float)$r['amount_paid']) ?></td>
-                        <td><span class="badge bg-secondary-subtle text-secondary" style="text-transform:uppercase;font-size:.65rem;"><?= e($r['payment_method']) ?></span></td>
-                        <td><span class="badge <?= $r['status'] === 'completed' ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning' ?>"><?= ucfirst($r['status']) ?></span></td>
-                      </tr>
-                    <?php endforeach; ?>
-                  </tbody>
-                </table>
+              <div class="card-body p-0">
+                <div class="table-responsive">
+                  <table class="table table-hover mb-0" style="font-size:.85rem;">
+                    <thead class="table-light">
+                      <tr><th>Date</th><th>Previous Earned</th><th>Fee Paid</th><th>Method</th><th>Status</th></tr>
+                    </thead>
+                    <tbody>
+                      <?php foreach ($reactivationHistory['data'] as $r): ?>
+                        <tr>
+                          <td><?= fmt_datetime($r['created_at']) ?></td>
+                          <td><?= fmt_money((float)$r['previous_earned']) ?></td>
+                          <td class="fw-semibold text-success"><?= fmt_money((float)$r['amount_paid']) ?></td>
+                          <td><span class="badge bg-secondary-subtle text-secondary" style="text-transform:uppercase;font-size:.65rem;"><?= e($r['payment_method']) ?></span></td>
+                          <td><span class="badge <?= $r['status'] === 'completed' ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning' ?>"><?= ucfirst($r['status']) ?></span></td>
+                        </tr>
+                      <?php endforeach; ?>
+                    </tbody>
+                  </table>
+                </div>
               </div>
+              <?php if (!empty($reactivationHistory['total_pages']) && $reactivationHistory['total_pages'] > 1): ?>
+                <div class="card-footer">
+                  <?= pagination_links($reactivationHistory, APP_URL . '/?page=admin_user_view&id=' . $user['id'] . '&tab=' . $tab . '&per_page=' . $perPage) ?>
+                </div>
+              <?php endif; ?>
             </div>
           <?php endif; ?>
 
           <!-- Cap-Blocked Commissions -->
           <div class="card">
             <div class="card-header"><span class="card-title">⛔ Cap-Triggered Blocks</span></div>
-            <div class="table-responsive">
-              <table class="table table-hover mb-0" style="font-size:.85rem;">
-                <thead class="table-light">
-                  <tr><th>Date</th><th>Type</th><th>Description</th><th>Credited</th><th>Blocked</th></tr>
-                </thead>
-                <tbody>
-                  <?php $blockedRows = $capBlocked->fetchAll(); if (empty($blockedRows)): ?>
-                    <tr><td colspan="5" class="text-center py-4 text-muted">No cap-blocked commissions.</td></tr>
-                  <?php else: foreach ($blockedRows as $c):
-                    $tn = match ($c['type']) {
-                      'pairing' => '🤝 Pairing',
-                      'direct_referral' => '👥 Direct',
-                      'indirect_referral' => setting('indirect_referral_enabled', '1') === '1' ? '🔗 Indirect Lvl ' . $c['level'] : '🔗 Indirect (disabled)',
-                      'daily_fixed_income' => '📅 DFI',
-                      default => $c['type']
-                    };
-                  ?>
-                    <tr>
-                      <td class="td-muted" style="font-size:.72rem;"><?= fmt_datetime($c['created_at']) ?></td>
-                      <td><?= $tn ?></td>
-                      <td class="text-truncate" style="max-width:200px;font-size:.78rem;"><?= e($c['description']) ?></td>
-                      <td class="td-green font-mono">+<?= fmt_money($c['amount']) ?></td>
-                      <td class="text-warning font-mono">−<?= fmt_money($c['cap_deduction']) ?></td>
-                    </tr>
-                  <?php endforeach; endif; ?>
-                </tbody>
-              </table>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-hover mb-0" style="font-size:.85rem;">
+                  <thead class="table-light">
+                    <tr><th>Date</th><th>Type</th><th>Description</th><th>Credited</th><th>Blocked</th></tr>
+                  </thead>
+                  <tbody>
+                    <?php if (empty($capBlocked['data'])): ?>
+                      <tr><td colspan="5" class="text-center py-4 text-muted">No cap-blocked commissions.</td></tr>
+                    <?php else: foreach ($capBlocked['data'] as $c):
+                      $tn = match ($c['type']) {
+                        'pairing' => '🤝 Pairing',
+                        'direct_referral' => '👥 Direct',
+                        'indirect_referral' => setting('indirect_referral_enabled', '1') === '1' ? '🔗 Indirect Lvl ' . $c['level'] : '🔗 Indirect (disabled)',
+                        'daily_fixed_income' => '📅 DFI',
+                        default => $c['type']
+                      };
+                    ?>
+                      <tr>
+                        <td class="td-muted" style="font-size:.72rem;"><?= fmt_datetime($c['created_at']) ?></td>
+                        <td><?= $tn ?></td>
+                        <td class="text-truncate" style="max-width:200px;font-size:.78rem;"><?= e($c['description']) ?></td>
+                        <td class="td-green font-mono">+<?= fmt_money($c['amount']) ?></td>
+                        <td class="text-warning font-mono">−<?= fmt_money($c['cap_deduction']) ?></td>
+                      </tr>
+                    <?php endforeach; endif; ?>
+                  </tbody>
+                </table>
+              </div>
             </div>
+            <?php if (!empty($capBlocked['total_pages']) && $capBlocked['total_pages'] > 1): ?>
+              <div class="card-footer">
+                <?= pagination_links($capBlocked, APP_URL . '/?page=admin_user_view&id=' . $user['id'] . '&tab=' . $tab . '&per_page=' . $perPage) ?>
+              </div>
+            <?php endif; ?>
           </div>
         </div>
 
       <?php elseif ($tab === 'ewallet'): ?>
-        <div class="card-body">
+        <div class="card-body p-0">
           <!-- Transfer History -->
           <div class="card mb-0">
             <div class="card-header"><span class="card-title">💱 Transfer History</span></div>
-            <div class="table-responsive">
-              <table class="table table-hover mb-0" style="font-size:.85rem;">
-                <thead class="table-light">
-                  <tr><th>Date</th><th>Direction</th><th>Counterparty</th><th>Amount</th><th>Fee</th><th>Note</th></tr>
-                </thead>
-                <tbody>
-                  <?php
-                  $transferRows = [];
-                  if (!empty($transferHistory)) {
-                      $transferRows = $transferHistory;
-                  }
-                  if (empty($transferRows)): ?>
-                    <tr><td colspan="6" class="text-center py-4 text-muted">No transfer history.</td></tr>
-                  <?php else: foreach ($transferRows as $t): ?>
-                    <tr>
-                      <td style="font-size:.75rem;"><?= fmt_datetime($t['created_at']) ?></td>
-                      <td>
-                        <?php if ($t['sender_id'] == $user['id']): ?>
-                          <span class="badge bg-danger-subtle text-danger" style="font-size:.65rem;">SENT</span>
-                        <?php else: ?>
-                          <span class="badge bg-success-subtle text-success" style="font-size:.65rem;">RECEIVED</span>
-                        <?php endif; ?>
-                      </td>
-                      <td>
-                        <?php if ($t['sender_id'] == $user['id']): ?>
-                          <a href="<?= APP_URL ?>/?page=admin_user_view&id=<?= $t['recipient_id'] ?>" class="text-decoration-none fw-semibold">@<?= e($t['recipient_username'] ?? '') ?></a>
-                        <?php else: ?>
-                          <a href="<?= APP_URL ?>/?page=admin_user_view&id=<?= $t['sender_id'] ?>" class="text-decoration-none fw-semibold">@<?= e($t['sender_username'] ?? '') ?></a>
-                        <?php endif; ?>
-                      </td>
-                      <td class="font-mono fw-semibold"><?= fmt_money($t['amount']) ?></td>
-                      <td class="font-mono text-muted"><?= ($t['fee'] ?? 0) > 0 ? fmt_money($t['fee']) : '—' ?></td>
-                      <td class="text-muted" style="font-size:.75rem;"><?= e($t['note'] ?? '') ?></td>
-                    </tr>
-                  <?php endforeach; endif; ?>
-                </tbody>
-              </table>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-hover mb-0" style="font-size:.85rem;">
+                  <thead class="table-light">
+                    <tr><th>Date</th><th>Direction</th><th>Counterparty</th><th>Amount</th><th>Fee</th><th>Note</th></tr>
+                  </thead>
+                  <tbody>
+                    <?php
+                    $transferRows = $transferHistory['data'] ?? [];
+                    if (empty($transferRows)): ?>
+                      <tr><td colspan="6" class="text-center py-4 text-muted">No transfer history.</td></tr>
+                    <?php else: foreach ($transferRows as $t): ?>
+                      <tr>
+                        <td style="font-size:.75rem;"><?= fmt_datetime($t['created_at']) ?></td>
+                        <td>
+                          <?php if ($t['sender_id'] == $user['id']): ?>
+                            <span class="badge bg-danger-subtle text-danger" style="font-size:.65rem;">SENT</span>
+                          <?php else: ?>
+                            <span class="badge bg-success-subtle text-success" style="font-size:.65rem;">RECEIVED</span>
+                          <?php endif; ?>
+                        </td>
+                        <td>
+                          <?php if ($t['sender_id'] == $user['id']): ?>
+                            <a href="<?= APP_URL ?>/?page=admin_user_view&id=<?= $t['recipient_id'] ?>" class="text-decoration-none fw-semibold">@<?= e($t['recipient_username'] ?? '') ?></a>
+                          <?php else: ?>
+                            <a href="<?= APP_URL ?>/?page=admin_user_view&id=<?= $t['sender_id'] ?>" class="text-decoration-none fw-semibold">@<?= e($t['sender_username'] ?? '') ?></a>
+                          <?php endif; ?>
+                        </td>
+                        <td class="font-mono fw-semibold"><?= fmt_money($t['amount']) ?></td>
+                        <td class="font-mono text-muted"><?= ($t['fee'] ?? 0) > 0 ? fmt_money($t['fee']) : '—' ?></td>
+                        <td class="text-muted" style="font-size:.75rem;"><?= e($t['note'] ?? '') ?></td>
+                      </tr>
+                    <?php endforeach; endif; ?>
+                  </tbody>
+                </table>
+              </div>
             </div>
+            <?php if (!empty($transferHistory['total_pages']) && $transferHistory['total_pages'] > 1): ?>
+              <div class="card-footer">
+                <?= pagination_links($transferHistory, APP_URL . '/?page=admin_user_view&id=' . $user['id'] . '&tab=' . $tab . '&per_page=' . $perPage) ?>
+              </div>
+            <?php endif; ?>
           </div>
         </div>
 
-      <?php else: ?>
-        <div class="table-responsive">
-          <table class="table table-hover mb-0">
-            <thead>
-              <tr>
-                <th>Requested</th>
-                <th>Amount</th>
-                <th>GCash</th>
-                <th>Status</th>
-                <th>Processed</th>
-                <th>Note</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php if (empty($payouts['data'])): ?><tr>
-                  <td colspan="6" class="text-center py-4 text-muted">No payout history.</td>
+      <?php elseif ($tab === 'payouts'): ?>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead>
+                <tr>
+                  <th>Requested</th>
+                  <th>Amount</th>
+                  <th>Method</th>
+                  <th>Account</th>
+                  <th>Status</th>
+                  <th>Processed</th>
+                  <th>Note</th>
                 </tr>
-                <?php else: foreach ($payouts['data'] as $pr): ?>
-                  <tr>
-                    <td class="td-muted" style="font-size:.72rem;"><?= fmt_datetime($pr['requested_at']) ?></td>
-                    <td class="font-mono fw-bold"><?= fmt_money($pr['amount']) ?></td>
-                    <td class="td-muted font-mono"><?= e($pr['gcash_number']) ?></td>
-                    <td><?php $b = match ($pr['status']) {
-                          'pending' => 'bg-warning-subtle text-warning',
-                          'approved' => 'bg-info-subtle text-info',
-                          'completed' => 'bg-success-subtle text-success',
-                          'rejected' => 'bg-danger-subtle text-danger',
-                          default => 'bg-secondary-subtle'
-                        }; ?><span class="badge <?= $b ?>"><?= ucfirst($pr['status']) ?></span></td>
-                    <td class="td-muted" style="font-size:.72rem;"><?= $pr['processed_at'] ? fmt_datetime($pr['processed_at']) : '—' ?></td>
-                    <td class="td-muted" style="font-size:.78rem;"><?= e($pr['admin_note'] ?? '—') ?></td>
+              </thead>
+              <tbody>
+                <?php if (empty($payouts['data'])): ?><tr>
+                    <td colspan="7" class="text-center py-4 text-muted">No payout history.</td>
                   </tr>
-              <?php endforeach;
-              endif; ?>
-            </tbody>
-          </table>
+                  <?php else: foreach ($payouts['data'] as $pr): ?>
+                    <?php
+                    $uvMethod  = $pr['payout_method'] ?: 'gcash';
+                    $uvMethodLabel = match ($uvMethod) {
+                      'maya'        => 'Maya',
+                      'usdt_trc20'  => 'USDT TRC20',
+                      'usdt_bep20'  => 'USDT BEP20',
+                      default       => 'GCash'
+                    };
+                    $uvMethodColor = match ($uvMethod) {
+                      'maya'        => '#48b0db',
+                      'usdt_trc20'  => '#26a17b',
+                      'usdt_bep20'  => '#f0b90b',
+                      default       => '#0070d8'
+                    };
+                    ?>
+                    <tr>
+                      <td class="td-muted" style="font-size:.72rem;"><?= fmt_datetime($pr['requested_at']) ?></td>
+                      <td class="font-mono fw-bold"><?= fmt_money($pr['amount']) ?></td>
+                      <td><span class="badge" style="background:<?= $uvMethodColor ?>20;color:<?= $uvMethodColor ?>;border:1px solid <?= $uvMethodColor ?>40;font-size:.72rem;"><?= $uvMethodLabel ?></span></td>
+                      <td class="td-muted font-mono" style="font-size:.78rem;word-break:break-all;"><?= e($pr['payout_account'] ?? '—') ?></td>
+                      <td><?php $b = match ($pr['status']) {
+                            'pending' => 'bg-warning-subtle text-warning',
+                            'approved' => 'bg-info-subtle text-info',
+                            'completed' => 'bg-success-subtle text-success',
+                            'rejected' => 'bg-danger-subtle text-danger',
+                            default => 'bg-secondary-subtle'
+                          }; ?><span class="badge <?= $b ?>"><?= ucfirst($pr['status']) ?></span></td>
+                      <td class="td-muted" style="font-size:.72rem;"><?= $pr['processed_at'] ? fmt_datetime($pr['processed_at']) : '—' ?></td>
+                      <td class="td-muted" style="font-size:.78rem;"><?= e($pr['admin_note'] ?? '—') ?></td>
+                    </tr>
+                <?php endforeach;
+                endif; ?>
+              </tbody>
+            </table>
+          </div>
         </div>
+        <?php if (!empty($payouts['total_pages']) && $payouts['total_pages'] > 1): ?>
+          <div class="card-footer">
+            <?= pagination_links($payouts, APP_URL . '/?page=admin_user_view&id=' . $user['id'] . '&tab=' . $tab . '&per_page=' . $perPage) ?>
+          </div>
+        <?php endif; ?>
       <?php endif; ?>
     </div>
   </div>
