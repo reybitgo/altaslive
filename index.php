@@ -314,6 +314,7 @@ $routes = [
     'admin_reactivation_action' => ['AdminController',  'reactivationAction',  'admin'],
 
     // VIP bypass toggles
+    'admin_change_password'  => ['AdminController',  'changePassword',       'admin'],
     'admin_toggle_vip'       => ['AdminController',  'toggleVipBypass',      'admin'],
     'admin_toggle_daily_cap' => ['AdminController',  'toggleDailyCapBypass', 'admin'],
 

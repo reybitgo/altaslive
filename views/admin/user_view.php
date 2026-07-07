@@ -71,6 +71,11 @@
           <?= $isSuspend ? '🔒 Suspend' : '✅ Activate' ?>
         </button>
       </form>
+
+      <!-- Change Password -->
+      <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#changePwModal">
+        🔑 Change Password
+      </button>
     </div>
 
     <!-- CD Status Card (if any) -->
@@ -672,5 +677,117 @@
     </div>
   </div>
 </div>
+
+<!-- Change Password Modal -->
+<div class="modal fade" id="changePwModal" tabindex="-1" aria-labelledby="changePwModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="changePwModalLabel">🔑 Change Password</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="POST" action="<?= APP_URL ?>/?page=admin_change_password" id="changePwForm">
+        <?= csrf_field() ?>
+        <input type="hidden" name="user_id" value="<?= $user['id'] ?>">
+        <div class="modal-body">
+          <div class="alert alert-warning d-flex align-items-start gap-2 mb-3 py-2 px-3" role="alert" style="font-size:.8rem;">
+            <span style="font-size:1.1rem;">⚠️</span>
+            <span>This will change the member's password immediately. <strong>This action cannot be undone.</strong></span>
+          </div>
+          <div class="mb-3">
+            <label for="adminNewPw" class="form-label" style="font-size:.85rem;">New Password</label>
+            <div class="input-group">
+              <input type="password" id="adminNewPw" name="new_password" class="form-control" minlength="8" placeholder="Min. 8 characters" autocomplete="new-password" required oninput="checkPwStrength(this.value)">
+              <button type="button" class="btn btn-outline-secondary" onclick="togglePwField('adminNewPw',this)" tabindex="-1">👁</button>
+            </div>
+            <div id="pwStrength" class="mt-2" style="display:none;">
+              <div class="pw-strength-bar" style="height:4px;border-radius:4px;background:#e9ecef;overflow:hidden;">
+                <div id="pwStrengthFill" style="height:100%;width:0;border-radius:4px;transition:width .3s,background .3s;"></div>
+              </div>
+              <div id="pwStrengthLabel" style="font-size:.72rem;margin-top:2px;"></div>
+            </div>
+          </div>
+          <div class="mb-0">
+            <label for="adminConfirmPw" class="form-label" style="font-size:.85rem;">Confirm New Password</label>
+            <div class="input-group">
+              <input type="password" id="adminConfirmPw" name="new_password_confirm" class="form-control" placeholder="Repeat password" autocomplete="new-password" required>
+              <button type="button" class="btn btn-outline-secondary" onclick="togglePwField('adminConfirmPw',this)" tabindex="-1">👁</button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary btn-sm" id="changePwSubmitBtn"
+            onclick="confirmPwChange(this)">Change Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function togglePwField(id, btn) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.type = el.type === 'password' ? 'text' : 'password';
+  btn.textContent = el.type === 'password' ? '👁' : '🙈';
+}
+
+function checkPwStrength(pw) {
+  const bar = document.getElementById('pwStrengthFill');
+  const label = document.getElementById('pwStrengthLabel');
+  const container = document.getElementById('pwStrength');
+  if (!bar || !label || !container) return;
+
+  if (!pw) {
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = 'block';
+
+  let score = 0;
+  if (pw.length >= 8) score++;
+  if (pw.length >= 12) score++;
+  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) score++;
+  if (/\d/.test(pw)) score++;
+  if (/[^a-zA-Z0-9]/.test(pw)) score++;
+
+  const levels = [
+    { min: 0, pct: 20,  color: '#dc3545', text: 'Weak' },
+    { min: 1, pct: 40,  color: '#f59e0b', text: 'Fair' },
+    { min: 2, pct: 60,  color: '#f59e0b', text: 'Fair' },
+    { min: 3, pct: 80,  color: '#10b981', text: 'Strong' },
+    { min: 4, pct: 100, color: '#10b981', text: 'Very Strong' },
+  ];
+  const level = levels.reduce((a, l) => score >= l.min ? l : a, levels[0]);
+  bar.style.width = level.pct + '%';
+  bar.style.background = level.color;
+  label.textContent = level.text;
+  label.style.color = level.color;
+}
+
+function confirmPwChange(btn) {
+  const form = btn.closest('form');
+  const newPw = document.getElementById('adminNewPw').value;
+  const confirmPw = document.getElementById('adminConfirmPw').value;
+
+  if (newPw.length < 8) {
+    showToast('Password must be at least 8 characters.', 'warning');
+    return;
+  }
+  if (newPw !== confirmPw) {
+    showToast('Passwords do not match.', 'warning');
+    return;
+  }
+
+  showConfirm({
+    title: 'Change Password',
+    message: 'Change password for <strong>@<?= e($user['username']) ?></strong>? This action is irreversible.',
+    confirmText: 'Change Password',
+    confirmClass: 'btn-primary',
+    onConfirm: () => form.submit()
+  });
+}
+</script>
 
 <?php require 'views/partials/footer.php'; ?>

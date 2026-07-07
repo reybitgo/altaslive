@@ -145,6 +145,47 @@ class AdminController
         redirect('/?page=admin_users');
     }
 
+    public function changePassword(): void
+    {
+        Auth::guard('admin');
+        csrf_verify();
+
+        $userId       = (int)($_POST['user_id'] ?? 0);
+        $newPassword  = $_POST['new_password'] ?? '';
+        $confirmPw    = $_POST['new_password_confirm'] ?? '';
+
+        if ($userId <= 0) {
+            flash('error', 'Invalid member ID.');
+            redirect('/?page=admin_users');
+        }
+
+        $user = User::find($userId);
+        if (!$user || $user['role'] !== 'member') {
+            flash('error', 'Member not found.');
+            redirect("/?page=admin_user_view&id={$userId}");
+        }
+
+        if (strlen($newPassword) < 8) {
+            flash('error', 'New password must be at least 8 characters.');
+            redirect("/?page=admin_user_view&id={$userId}");
+        }
+
+        if ($newPassword !== $confirmPw) {
+            flash('error', 'New passwords do not match.');
+            redirect("/?page=admin_user_view&id={$userId}");
+        }
+
+        $updated = User::updatePassword($userId, $newPassword);
+
+        if ($updated) {
+            flash('success', "Password for @{$user['username']} has been changed successfully.");
+        } else {
+            flash('error', 'Failed to update password. Please try again.');
+        }
+
+        redirect("/?page=admin_user_view&id={$userId}");
+    }
+
     /**
      * Called from payout.php JS when live TRC20 gas fee differs from DB value.
      * Updates the setting only if the rounded value actually changed (max 2 decimals).
