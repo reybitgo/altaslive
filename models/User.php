@@ -124,9 +124,11 @@ class User
         // ── Real-time commissions (outside transaction to prevent lock contention) ──
         // 1. Walk binary tree upward → increment leg counts (pairing bonuses only if active)
         //    Pending users: do NOT increment leg counts; counts will be incremented at activation.
-        Commission::processBinaryPlacement($newId, $data['binary_parent_id'], $data['binary_position'], $status !== 'pending');
+        if ($data['binary_parent_id'] !== null) {
+            Commission::processBinaryPlacement($newId, $data['binary_parent_id'], $data['binary_position'], $status !== 'pending');
+        }
 
-        if ($status !== 'pending') {
+        if ($status !== 'pending' && $data['sponsor_id'] !== null) {
             // 2. Direct referral bonus → sponsor
             Commission::processDirectReferral($data['sponsor_id'], $newId, $data['package_id']);
 
@@ -164,6 +166,17 @@ class User
         $user = self::find($userId);
         if (!$user || $user['status'] !== 'active') {
             throw new RuntimeException('Activation failed — user not found or not pending.');
+        }
+
+        // Auto-assign CD if activation uses a CD code
+        if ($regCodeId) {
+            $isCd = (int)$pdo->query("SELECT is_cd FROM reg_codes WHERE id = {$regCodeId}")->fetchColumn();
+            if ($isCd) {
+                $pkg = Package::find($packageId);
+                if ($pkg) {
+                    CdStatus::assign($userId, (float)$pkg['entry_fee'], 1);
+                }
+            }
         }
 
         // Fire commissions now that user is active.
@@ -252,6 +265,21 @@ class User
         $st->execute([$id]);
         $hash = $st->fetchColumn();
         return $hash && password_verify($password, $hash);
+    }
+
+    public static function isPaidMember(int $userId): bool
+    {
+        $st = db()->prepare("
+            SELECT u.reg_payment_method, COALESCE(c.is_cd, 0) AS is_cd
+            FROM users u
+            LEFT JOIN reg_codes c ON c.id = u.reg_code_id
+            WHERE u.id = ?
+        ");
+        $st->execute([$userId]);
+        $row = $st->fetch();
+        if (!$row) return false;
+        return $row['reg_payment_method'] !== 'pending'
+            && !($row['reg_payment_method'] === 'code' && (int)$row['is_cd'] === 1);
     }
 
     /**

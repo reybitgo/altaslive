@@ -30,6 +30,7 @@ class Commission
         $newUserStatus = $pdo->prepare('SELECT status FROM users WHERE id = ?');
         $newUserStatus->execute([$newUserId]);
         $newUserIsActive = ($newUserStatus->fetchColumn() ?? '') === 'active';
+        $newUserIsPaid = $newUserIsActive && User::isPaidMember($newUserId);
 
         while ($cur !== null) {
 
@@ -68,9 +69,9 @@ class Commission
             $st->execute([$cur]);
             $ancestor = $st->fetch();
 
-            // Only fire pairing bonuses if the NEW user is active.
-            // Pending users increment leg counts but don't trigger payouts.
-            if ($newUserIsActive && $ancestor) {
+            // Only fire pairing bonuses if the NEW user is a paid member.
+            // CD-sourced and pending users increment leg counts but don't trigger payouts.
+            if ($newUserIsPaid && $ancestor) {
                 $processed = $ancestor['pairs_paid'] + $ancestor['pairs_flushed'];
                 $available = min($ancestor['left_count'], $ancestor['right_count']);
                 $newPairs  = $available - $processed;
@@ -138,6 +139,11 @@ class Commission
         // Skip if sponsor is not active (e.g., pending activation)
         $sponsorStatus = db()->query("SELECT status FROM users WHERE id = {$sponsorId}")->fetchColumn();
         if ($sponsorStatus !== 'active') {
+            return;
+        }
+
+        // Skip if the new member is CD-sourced — only paid members earn direct referral
+        if (!User::isPaidMember($newUserId)) {
             return;
         }
 
@@ -217,6 +223,11 @@ class Commission
         int $packageId
     ): void {
         if (setting('indirect_referral_enabled', '1') !== '1') {
+            return;
+        }
+
+        // Skip if the new member is CD-sourced — only paid members earn indirect referral
+        if (!User::isPaidMember($newUserId)) {
             return;
         }
 
