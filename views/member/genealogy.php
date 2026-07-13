@@ -75,6 +75,12 @@
     stroke-width: 2px;
   }
 
+  .node.cd rect {
+    fill: #b45309;
+    stroke: #92400e;
+    stroke-width: 2px;
+  }
+
   /* Node Text */
   .node text {
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -238,6 +244,10 @@
   .legend-dot.pending {
     background: #f59e0b;
   }
+
+  .legend-dot.cd {
+    background: #b45309;
+  }
 </style>
 
 <div class="main-content">
@@ -310,6 +320,10 @@
             <div class="legend-item">
               <div class="legend-dot pending"></div>
               <span>Pending</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot cd"></div>
+              <span>CD Active</span>
             </div>
             <span class="ms-auto text-muted">Click nodes to expand/collapse • Drag to pan</span>
           </div>
@@ -558,7 +572,7 @@
 
       // Enter new nodes at parent's previous position
       const nodeEnter = node.enter().append('g')
-        .attr('class', d => `node ${d.data.status || 'active'} ${d.data.isPlaceholder ? 'empty' : ''}`)
+        .attr('class', d => `node ${d.data.status || 'active'} ${d.data.isPlaceholder ? 'empty' : ''} ${d.data.cd_active ? 'cd' : ''}`)
         .attr('transform', d => `translate(${source.x0 || 0},${source.y0 || 0})`)
         .on('click', (event, d) => {
           // Skip click on empty-slot placeholders
@@ -826,6 +840,9 @@
         html += `Left: ${data.left_count || 0} · Right: ${data.right_count || 0}<br>`;
         const statusColor = data.status==='active'?'#4ade80':data.status==='pending'?'#fbbf24':'#f87171';
         html += `Status: <span style="color:${statusColor};font-weight:600;">${data.status || 'active'}</span>`;
+        if (data.cd_active) {
+          html += ` &middot; <span style="color:#fbbf24;font-weight:600;">CD Active</span>`;
+        }
         html += `</div>`;
       } else {
         html += `<div style="color:rgba(255,255,255,0.7);font-size:0.75rem;">Open slot available</div>`;

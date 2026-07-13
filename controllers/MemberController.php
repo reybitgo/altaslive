@@ -171,6 +171,7 @@ class MemberController
             'joined'      => fmt_date($u['joined_at']),
             'left_count'  => (int)$u['left_count'],
             'right_count' => (int)$u['right_count'],
+            'cd_active'   => !empty($u['cd_active']),
             'left'        => null,
             'right'       => null,
             'hasMore'     => false,

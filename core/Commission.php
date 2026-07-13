@@ -34,11 +34,19 @@ class Commission
 
         while ($cur !== null) {
 
-            // 1. Increment the correct leg count on this ancestor
+            // 1. Increment the correct leg count on this ancestor.
+            //    Paid leg counts (left_count_paid/right_count_paid) only increment
+            //    for non-CD-sourced members, preventing CD bodies from contributing
+            //    to future pairing bonuses.
             if ($incrementCounts) {
                 $col = ($side === 'left') ? 'left_count' : 'right_count';
                 $pdo->prepare("UPDATE users SET {$col} = {$col} + 1 WHERE id = ?")
                     ->execute([$cur]);
+                if ($newUserIsPaid) {
+                    $paidCol = ($side === 'left') ? 'left_count_paid' : 'right_count_paid';
+                    $pdo->prepare("UPDATE users SET {$paidCol} = {$paidCol} + 1 WHERE id = ?")
+                        ->execute([$cur]);
+                }
             }
 
             // v2: Skip capped/perminact members entirely — no pairing bonuses for them
@@ -58,6 +66,7 @@ class Commission
             // 2. Read fresh state (after increment) with package info
             $st = $pdo->prepare("
                 SELECT u.id, u.left_count, u.right_count,
+                       u.left_count_paid, u.right_count_paid,
                        u.pairs_paid, u.pairs_flushed, u.pairs_paid_today,
                        u.daily_cap_bypass,
                        p.pairing_bonus, p.daily_pair_cap
@@ -73,7 +82,7 @@ class Commission
             // CD-sourced and pending users increment leg counts but don't trigger payouts.
             if ($newUserIsPaid && $ancestor) {
                 $processed = $ancestor['pairs_paid'] + $ancestor['pairs_flushed'];
-                $available = min($ancestor['left_count'], $ancestor['right_count']);
+                $available = min($ancestor['left_count_paid'], $ancestor['right_count_paid']);
                 $newPairs  = $available - $processed;
 
                 if ($newPairs > 0) {

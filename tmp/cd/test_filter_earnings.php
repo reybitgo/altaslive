@@ -175,9 +175,9 @@ function get_commission_count_raw(): int
 
 function get_pairing_info(int $userId): array
 {
-    $st = td()->prepare("SELECT left_count, right_count, pairs_paid, pairs_paid_today FROM users WHERE id = ?");
+    $st = td()->prepare("SELECT left_count, left_count_paid, right_count, right_count_paid, pairs_paid, pairs_paid_today FROM users WHERE id = ?");
     $st->execute([$userId]);
-    return $st->fetch() ?: ['left_count' => 0, 'right_count' => 0, 'pairs_paid' => 0, 'pairs_paid_today' => 0];
+    return $st->fetch() ?: ['left_count' => 0, 'left_count_paid' => 0, 'right_count' => 0, 'right_count_paid' => 0, 'pairs_paid' => 0, 'pairs_paid_today' => 0];
 }
 
 function get_package_id(): int
@@ -402,10 +402,12 @@ test('T4: CD binary placement increments leg counts but does NOT trigger pairing
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-//  TEST 5: Mixed Binary -- Paid Placement Triggers Pair
+//  TEST 5: Mixed Binary -- CD counts excluded from pairing bonus
 //  Tree: create t5_anchor under t3_cd.left, place CD-left, then paid right
+//  CD-sourced left count should NOT enable a pair when paid right is placed.
+//  Only left_count_paid (non-CD bodies) contributes to min(left,right).
 // ══════════════════════════════════════════════════════════════════════════════
-test('T5: Paid placement triggers pairing bonus after CD-built counts', function () use ($packageId, &$tree) {
+test('T5: CD-sourced leg counts excluded from pairing bonus', function () use ($packageId, &$tree) {
     $parent = $tree['t3_cd'];
 
     $anchorCode = create_test_code($packageId, false);
@@ -424,7 +426,7 @@ test('T5: Paid placement triggers pairing bonus after CD-built counts', function
 
     $before = get_pairing_info($anchorId);
 
-    // Place CD at left -- increments left_count, no pair (CD not paid)
+    // Place CD at left -- increments left_count but NOT left_count_paid
     $cdLeftCode = create_test_code($packageId, true);
     register_user([
         'username'           => '_cdtest_t5_cd_left',
@@ -439,7 +441,7 @@ test('T5: Paid placement triggers pairing bonus after CD-built counts', function
     ]);
     $afterCd = get_pairing_info($anchorId);
 
-    // Place paid at right -- triggers pair (left > 0, new user is paid)
+    // Place paid at right -- increments right_count AND right_count_paid
     $paidCode = create_test_code($packageId, false);
     register_user([
         'username'           => '_cdtest_t5_paid_right',
@@ -455,10 +457,16 @@ test('T5: Paid placement triggers pairing bonus after CD-built counts', function
     $afterPaid = get_pairing_info($anchorId);
 
     return [
+        // Total counts always increment
         assert_eq($before['left_count'] + 1,  $afterCd['left_count'],   'CD left placement increments left_count'),
-        assert_eq($before['pairs_paid'],       $afterCd['pairs_paid'],   'CD left placement does NOT trigger pair'),
         assert_eq($afterCd['right_count'] + 1, $afterPaid['right_count'], 'Paid right placement increments right_count'),
-        assert_gt($afterCd['pairs_paid'],      $afterPaid['pairs_paid'], 'Paid right placement triggers pairing bonus'),
+        // Paid counts: CD user does NOT contribute to left_count_paid
+        assert_eq($before['left_count_paid'],   $afterCd['left_count_paid'],   'CD left placement does NOT increment left_count_paid'),
+        // Paid user DOES contribute to right_count_paid
+        assert_eq($afterCd['right_count_paid'] + 1, $afterPaid['right_count_paid'], 'Paid right placement increments right_count_paid'),
+        // No pair fires because left_count_paid=0, so min(0,1)=0
+        assert_eq($before['pairs_paid'],       $afterCd['pairs_paid'],   'CD left placement does NOT trigger pair'),
+        assert_eq($afterCd['pairs_paid'],      $afterPaid['pairs_paid'], 'Paid right with only CD left does NOT trigger pair'),
     ];
 });
 

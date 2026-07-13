@@ -52,7 +52,9 @@ CREATE TABLE users (
 
   -- Pair counters (pairs_paid + pairs_flushed = total ever processed)
   left_count        INT UNSIGNED NOT NULL DEFAULT 0,
+  left_count_paid   INT UNSIGNED NOT NULL DEFAULT 0,
   right_count       INT UNSIGNED NOT NULL DEFAULT 0,
+  right_count_paid  INT UNSIGNED NOT NULL DEFAULT 0,
   pairs_paid        INT UNSIGNED NOT NULL DEFAULT 0,
   pairs_flushed     INT UNSIGNED NOT NULL DEFAULT 0,
   pairs_paid_today  INT UNSIGNED NOT NULL DEFAULT 0,  -- reset by midnight cron
