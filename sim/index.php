@@ -940,7 +940,7 @@
               <strong style="color: #e2e8f0">maximum total income cap</strong>
               equal to the
               <strong style="color: #c4b5fd">configured income cap</strong>
-              (₱30,000 by default). This cap applies to
+              (₱50,000 by default). This cap applies to
               <strong style="color: #e2e8f0">all income types combined</strong>
               — binary pairing bonuses, daily fixed income, direct referral,
               and unilevel bonuses all count toward the cap. Once cumulative
@@ -1068,7 +1068,7 @@
         <strong>skipped</strong> in pair counting — their sub-tree nodes exist
         but contribute no bonuses to that member. The
         <strong style="color: #c4b5fd">income cap is a configurable amount</strong
-        > (₱30,000 by default) and covers <strong>all earnings combined</strong>:
+        > (₱50,000 by default) and covers <strong>all earnings combined</strong>:
         binary pairing bonuses + daily fixed income + direct referral + unilevel.
         When the cap is reached, all income streams stop and the member earns
         nothing. Reactivation is probabilistic: each
@@ -1176,14 +1176,14 @@
                   min="100"
                   max="20000"
                   step="100"
-                  value="2000"
+                  value="1500"
                   oninput="syncFromSlider('bonus')"
                 />
                 <input
                   type="number"
                   class="num-input"
                   id="n-bonus"
-                  value="2000"
+                  value="1500"
                   min="100"
                   max="20000"
                   step="100"
@@ -1243,14 +1243,14 @@
                   min="1000"
                   max="1000000"
                   step="1000"
-                  value="30000"
+                  value="50000"
                   oninput="syncFromSlider('incap')"
                 />
                 <input
                   type="number"
                   class="num-input purple"
                   id="n-incap"
-                  value="30000"
+                  value="50000"
                   min="1000"
                   max="1000000"
                   step="1000"
@@ -1381,15 +1381,15 @@
                   id="s-dfi"
                   min="0"
                   max="5000"
-                  step="50"
-                  value="100"
+                  step="1"
+                  value="33"
                   oninput="syncFromSlider('dfi')"
                 />
                 <input
                   type="number"
                   class="num-input pink"
                   id="n-dfi"
-                  value="100"
+                  value="33"
                   min="0"
                   max="5000"
                   step="1"
@@ -1412,18 +1412,18 @@
                   class="pink-thumb"
                   id="s-dfidays"
                   min="7"
-                  max="730"
+                  max="3000"
                   step="1"
-                  value="90"
+                  value="1515"
                   oninput="syncFromSlider('dfidays')"
                 />
                 <input
                   type="number"
                   class="num-input pink"
                   id="n-dfidays"
-                  value="90"
+                  value="1515"
                   min="7"
-                  max="730"
+                  max="3000"
                   step="1"
                   oninput="syncFromNum('dfidays')"
                 />
@@ -1454,14 +1454,14 @@
                   min="0"
                   max="10000"
                   step="50"
-                  value="500"
+                  value="1000"
                   oninput="syncFromSlider('direct')"
                 />
                 <input
                   type="number"
                   class="num-input"
                   id="n-direct"
-                  value="500"
+                  value="1000"
                   min="0"
                   max="10000"
                   step="1"
@@ -1483,14 +1483,14 @@
                   min="0"
                   max="3000"
                   step="10"
-                  value="300"
+                  value="0"
                   oninput="syncFromSlider('ul1')"
                 />
                 <input
                   type="number"
                   class="num-input"
                   id="n-ul1"
-                  value="300"
+                  value="0"
                   min="0"
                   max="3000"
                   step="1"
@@ -1511,14 +1511,14 @@
                   min="0"
                   max="2000"
                   step="10"
-                  value="200"
+                  value="0"
                   oninput="syncFromSlider('ul2')"
                 />
                 <input
                   type="number"
                   class="num-input"
                   id="n-ul2"
-                  value="200"
+                  value="0"
                   min="0"
                   max="2000"
                   step="1"
@@ -1539,14 +1539,14 @@
                   min="0"
                   max="1000"
                   step="10"
-                  value="150"
+                  value="0"
                   oninput="syncFromSlider('ul3')"
                 />
                 <input
                   type="number"
                   class="num-input"
                   id="n-ul3"
-                  value="150"
+                  value="0"
                   min="0"
                   max="1000"
                   step="1"
@@ -1567,14 +1567,14 @@
                   min="0"
                   max="500"
                   step="10"
-                  value="100"
+                  value="0"
                   oninput="syncFromSlider('ul4')"
                 />
                 <input
                   type="number"
                   class="num-input"
                   id="n-ul4"
-                  value="100"
+                  value="0"
                   min="0"
                   max="500"
                   step="1"
@@ -1595,14 +1595,14 @@
                   min="0"
                   max="500"
                   step="10"
-                  value="100"
+                  value="0"
                   oninput="syncFromSlider('ul5')"
                 />
                 <input
                   type="number"
                   class="num-input"
                   id="n-ul5"
-                  value="100"
+                  value="0"
                   min="0"
                   max="500"
                   step="1"
@@ -1623,14 +1623,14 @@
                   min="0"
                   max="300"
                   step="10"
-                  value="50"
+                  value="0"
                   oninput="syncFromSlider('ul6')"
                 />
                 <input
                   type="number"
                   class="num-input"
                   id="n-ul6"
-                  value="50"
+                  value="0"
                   min="0"
                   max="300"
                   step="1"
@@ -1651,14 +1651,14 @@
                   min="0"
                   max="300"
                   step="10"
-                  value="50"
+                  value="0"
                   oninput="syncFromSlider('ul7')"
                 />
                 <input
                   type="number"
                   class="num-input"
                   id="n-ul7"
-                  value="50"
+                  value="0"
                   min="0"
                   max="300"
                   step="1"
@@ -1679,14 +1679,14 @@
                   min="0"
                   max="300"
                   step="10"
-                  value="50"
+                  value="0"
                   oninput="syncFromSlider('ul8')"
                 />
                 <input
                   type="number"
                   class="num-input"
                   id="n-ul8"
-                  value="50"
+                  value="0"
                   min="0"
                   max="300"
                   step="1"
@@ -1707,14 +1707,14 @@
                   min="0"
                   max="300"
                   step="10"
-                  value="50"
+                  value="0"
                   oninput="syncFromSlider('ul9')"
                 />
                 <input
                   type="number"
                   class="num-input"
                   id="n-ul9"
-                  value="50"
+                  value="0"
                   min="0"
                   max="300"
                   step="1"
@@ -1735,14 +1735,14 @@
                   min="0"
                   max="300"
                   step="10"
-                  value="50"
+                  value="0"
                   oninput="syncFromSlider('ul10')"
                 />
                 <input
                   type="number"
                   class="num-input"
                   id="n-ul10"
-                  value="50"
+                  value="0"
                   min="0"
                   max="300"
                   step="1"
@@ -2155,42 +2155,40 @@
     <script>
       // ══════════════════════════════════════════
       //  PRESETS
-      //  Optimal rationale:
-      //    Entry ₱10,000 · goods 60% → cash-in ₱4,000/member
-      //    Pairing ₱1,500 · cap 2/day → max ₱3,000 payout risk
-      //    Income cap ₱40,000 = ~26× pairing bonus (fair ceiling)
-      //    Reactivation fee ₱2,000 (20% of entry, low barrier)
-      //    Window 30 days (reasonable deadline)
-      //    Reactrate 70% (most members choose to re-up)
-      //    DFI ₱150/day × 120 days = ₱18,000 max fixed income per member
-      //    Direct ₱500 + Unilevel L1 300/L2 200/L3 150/L4-5 100/L6-10 50
-      //    Per-join commission load: 500+300+200+150+100+100+50+50+50+50 = ~1,550
-      //    Gross cash-in ₱4,000 − ₱1,550 referral − ₱150 DFI = ₱2,300 pre-pairing buffer
-      //    Sustained ~25–30% net margin over run (healthy company, decent member ROI)
+      //  Default rationale:
+      //    Entry ₱10,000 · 30% goods → cash-in ₱7,000/member
+      //    Pairing ₱1,500 · cap 3/day → max ₱4,500 payout risk
+      //    Income cap ₱50,000 = all income types combined (fair ceiling)
+      //    Reactivation fee ₱10,000 (100% of entry, high barrier)
+      //    Window 15 days (reasonable deadline)
+      //    Reactrate 100% (all capped members choose to re-up)
+      //    DFI ₱33/day × 1,515 days = ₱50,000 max fixed income per member
+      //    Direct ₱1,000 · Unilevel ₱0 across all levels (L1–L10 off)
+      //    Max 1,000 members · 50 new/day · avg depth 4
       // ══════════════════════════════════════════
       const PRESETS = {
         default: {
           entry: 10000,
           pcost: 30,
-          bonus: 2000,
+          bonus: 1500,
           cap: 3,
-          incap: 30000,
+          incap: 50000,
           reactfee: 10000,
           reactwin: 15,
           reactrate: 100,
-          dfi: 100,
-          dfidays: 90,
-          direct: 500,
-          ul1: 300,
-          ul2: 200,
-          ul3: 150,
-          ul4: 100,
-          ul5: 100,
-          ul6: 50,
-          ul7: 50,
-          ul8: 50,
-          ul9: 50,
-          ul10: 50,
+          dfi: 33,
+          dfidays: 1515,
+          direct: 1000,
+          ul1: 0,
+          ul2: 0,
+          ul3: 0,
+          ul4: 0,
+          ul5: 0,
+          ul6: 0,
+          ul7: 0,
+          ul8: 0,
+          ul9: 0,
+          ul10: 0,
           maxm: 1000,
           npd: 50,
           depth: 4,
@@ -2340,7 +2338,7 @@
         reactwin: { min: 1, max: 180, step: 1 },
         reactrate: { min: 0, max: 100, step: 1 },
         dfi: { min: 0, max: 5000, step: 1 },
-        dfidays: { min: 7, max: 730, step: 1 },
+        dfidays: { min: 7, max: 3000, step: 1 },
         direct: { min: 0, max: 10000, step: 1 },
         ul1: { min: 0, max: 3000, step: 1 },
         ul2: { min: 0, max: 2000, step: 1 },
