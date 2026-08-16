@@ -67,8 +67,8 @@
         <?= csrf_field() ?><input type="hidden" name="id" value="<?= $user['id'] ?>">
         <?php $isSuspend = $user['status'] === 'active'; ?>
         <button type="button" class="btn btn-sm <?= $isSuspend ? 'btn-outline-danger' : 'btn-outline-success' ?>"
-          onclick="showConfirm({title:'<?= $isSuspend ? 'Suspend' : 'Activate' ?> Member',message:'<?= $isSuspend ? 'Suspend' : 'Activate' ?> <strong>@<?= e($user['username']) ?></strong>?',confirmText:'<?= $isSuspend ? 'Suspend' : 'Activate' ?>',confirmClass:'<?= $isSuspend ? 'btn-danger' : 'btn-success' ?>',onConfirm:()=>this.closest(\'form\').submit()})">
-          <?= $isSuspend ? '🔒 Suspend' : '✅ Activate' ?>
+          onclick="showConfirm({title:'<?= $isSuspend ? 'Suspend' : 'Unsuspend' ?> Member',message:'<?= $isSuspend ? 'Suspend' : 'Unsuspend' ?> <strong>@<?= e($user['username']) ?></strong>?',confirmText:'<?= $isSuspend ? 'Suspend' : 'Unsuspend' ?>',confirmClass:'<?= $isSuspend ? 'btn-danger' : 'btn-success' ?>',onConfirm:()=>this.closest('form').submit()})">
+          <?= $isSuspend ? '🔒 Suspend' : '🔓 Unsuspend' ?>
         </button>
       </form>
 
