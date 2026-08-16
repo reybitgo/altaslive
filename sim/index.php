@@ -938,18 +938,19 @@
             <div class="comp-desc">
               Each member has a
               <strong style="color: #e2e8f0">maximum total income cap</strong>
-              equal to
-              <strong style="color: #c4b5fd">3× the entry fee</strong> per
-              cycle. This cap applies to
+              equal to the
+              <strong style="color: #c4b5fd">configured income cap</strong>
+              (₱30,000 by default). This cap applies to
               <strong style="color: #e2e8f0">all income types combined</strong>
-              — binary pairing bonuses <em>and</em> daily fixed income both
-              count toward the cap. Once cumulative earnings reach this limit,
-              the account becomes
+              — binary pairing bonuses, daily fixed income, direct referral,
+              and unilevel bonuses all count toward the cap. Once cumulative
+              earnings reach this limit, the account becomes
               <strong style="color: #fca5a5">inactive</strong> — no pairing
-              bonuses, no daily fixed income, and the member is skipped in
-              binary pair counting. To resume, the member pays the
+              bonuses, no daily fixed income, no direct referral, no unilevel:
+              the member earns nothing until reactivation. To resume, the
+              member pays the
               <strong style="color: #e2e8f0">Reactivation Fee</strong>. Only
-              pairs and fixed income earned <em>after</em> reactivation count
+              income earned <em>after</em> reactivation counts
               toward the new cycle. If the member does not reactivate within the
               <strong style="color: #e2e8f0">Reactivation Window</strong>, the
               account becomes
@@ -957,7 +958,7 @@
               Reactivation resets all earnings counters from zero.
             </div>
             <span class="comp-badge purple"
-              >Cap = 3× Entry Fee · Covers Pairing + Daily Fixed</span
+              >Cap = Configurable Amount · Covers All Income Streams</span
             >
             <span class="comp-badge red" style="margin-left: 4px"
               >Missed Window → Permanently Inactive</span
@@ -978,7 +979,7 @@
               The daily fixed income is also subject to the
               <strong style="color: #e2e8f0">total income cap</strong> — it
               stops permanently if either the duration limit is exhausted
-              <em>or</em> the member's cumulative earnings hit the 3× entry cap,
+              <em>or</em> the member's cumulative earnings hit the income cap,
               whichever comes first. Days while inactive do <em>not</em> count —
               the duration clock pauses and resumes on reactivation (but the cap
               resets on reactivation, so fresh DFI can be earned in the new
@@ -1005,11 +1006,13 @@
               When a member directly recruits a new member, the sponsor
               immediately receives the
               <strong style="color: #e2e8f0">Direct Referral Bonus</strong> — a
-              one-time cash payment per new recruit, paid at registration
-              regardless of sponsor's cap or active status.
+              one-time cash payment per new recruit, paid at registration only
+              while the sponsor is active and under the income cap. Once the
+              sponsor's cap is reached, further referral bonuses are
+              <strong style="color: #fca5a5">blocked</strong>.
             </div>
             <span class="comp-badge green"
-              >Paid Once Per Direct Recruit · Immediate</span
+              >Paid Once Per Direct Recruit · Blocked When Capped</span
             >
           </div>
         </div>
@@ -1024,6 +1027,8 @@
               (direct sponsor) gets the most; higher levels get less. Configured
               separately for L1, L2, L3, L4–5, L6–10. Limited by the
               <strong style="color: #e2e8f0">Avg Sponsor Depth</strong> setting.
+              Each upline receives their share only while active and under the
+              income cap.
             </div>
             <span
               class="comp-badge"
@@ -1062,10 +1067,11 @@
         Binary tree uses BFS placement. Inactive members are
         <strong>skipped</strong> in pair counting — their sub-tree nodes exist
         but contribute no bonuses to that member. The
-        <strong style="color: #c4b5fd">income cap = 3× entry fee</strong> and
-        covers <strong>all earnings combined</strong>: binary pairing bonuses +
-        daily fixed income. When the cap is reached, both income streams stop
-        and the account becomes inactive. Reactivation is probabilistic: each
+        <strong style="color: #c4b5fd">income cap is a configurable amount</strong
+        > (₱30,000 by default) and covers <strong>all earnings combined</strong>:
+        binary pairing bonuses + daily fixed income + direct referral + unilevel.
+        When the cap is reached, all income streams stop and the member earns
+        nothing. Reactivation is probabilistic: each
         capped member reactivates (based on rate %) on the day after capping;
         reactivation resets all earnings counters to zero for a fresh cycle.
         Daily fixed income stops at either the duration limit OR when the
@@ -1223,66 +1229,38 @@
           Reactivation
         </div>
         <div class="row g-3">
-          <!-- Auto-computed cap display -->
+          <!-- Adjustable income cap -->
           <div class="col-12 col-sm-6 col-lg-3">
             <div class="si">
               <div class="si-label" style="color: var(--purple)">
-                Total income cap (auto)
+                Total income cap (₱)
               </div>
-              <div
-                style="
-                  background: var(--surface-3);
-                  border: 1px solid var(--purple-border);
-                  border-radius: 9px;
-                  padding: 8px 12px;
-                  display: flex;
-                  align-items: center;
-                  justify-content: space-between;
-                  gap: 8px;
-                  margin-top: 2px;
-                "
-              >
-                <div>
-                  <div
-                    id="cap-display"
-                    style="
-                      font-family: var(--font-mono);
-                      font-size: 15px;
-                      font-weight: 700;
-                      color: var(--purple);
-                    "
-                  >
-                    ₱30,000
-                  </div>
-                  <div
-                    style="
-                      font-size: 10px;
-                      color: var(--muted);
-                      margin-top: 2px;
-                    "
-                  >
-                    = 3 × entry fee
-                  </div>
-                </div>
-                <div
-                  style="
-                    background: var(--purple-dim);
-                    border: 1px solid var(--purple-border);
-                    border-radius: 6px;
-                    padding: 3px 9px;
-                    font-size: 11px;
-                    font-weight: 700;
-                    color: var(--purple);
-                    white-space: nowrap;
-                  "
-                >
-                  AUTO
-                </div>
+              <div class="ctrl-row">
+                <input
+                  type="range"
+                  class="purple-thumb"
+                  id="s-incap"
+                  min="1000"
+                  max="1000000"
+                  step="1000"
+                  value="30000"
+                  oninput="syncFromSlider('incap')"
+                />
+                <input
+                  type="number"
+                  class="num-input purple"
+                  id="n-incap"
+                  value="30000"
+                  min="1000"
+                  max="1000000"
+                  step="1000"
+                  oninput="syncFromNum('incap')"
+                />
               </div>
               <div class="si-hint">
                 applies to
                 <strong style="color: #c4b5fd">all income types</strong>
-                combined: pairing + daily fixed
+                combined: pairing + daily fixed + referral + unilevel
               </div>
             </div>
           </div>
@@ -2196,6 +2174,7 @@
           pcost: 30,
           bonus: 2000,
           cap: 3,
+          incap: 30000,
           reactfee: 10000,
           reactwin: 15,
           reactrate: 100,
@@ -2221,6 +2200,7 @@
           pcost: 70,
           bonus: 3000,
           cap: 5,
+          incap: 50000,
           reactfee: 4000,
           reactwin: 45,
           reactrate: 70,
@@ -2246,6 +2226,7 @@
           pcost: 35,
           bonus: 2000,
           cap: 3,
+          incap: 20000,
           reactfee: 2000,
           reactwin: 30,
           reactrate: 60,
@@ -2271,6 +2252,7 @@
           pcost: 60,
           bonus: 2000,
           cap: 3,
+          incap: 100000,
           reactfee: 5000,
           reactwin: 60,
           reactrate: 50,
@@ -2296,6 +2278,7 @@
           pcost: 60,
           bonus: 1000,
           cap: 3,
+          incap: 30000,
           reactfee: 2000,
           reactwin: 20,
           reactrate: 55,
@@ -2321,6 +2304,7 @@
           pcost: 55,
           bonus: 1000,
           cap: 2,
+          incap: 40000,
           reactfee: 3000,
           reactwin: 30,
           reactrate: 65,
@@ -2351,6 +2335,7 @@
         pcost: { min: 0, max: 95, step: 1 },
         bonus: { min: 100, max: 20000, step: 100 },
         cap: { min: 1, max: 30, step: 1 },
+        incap: { min: 1000, max: 1000000, step: 1000 },
         reactfee: { min: 0, max: 50000, step: 500 },
         reactwin: { min: 1, max: 180, step: 1 },
         reactrate: { min: 0, max: 100, step: 1 },
@@ -2379,20 +2364,12 @@
         return Math.min(max, Math.max(min, v));
       }
 
-      function updateCapDisplay() {
-        const entry = getVal("entry");
-        const capVal = entry * 3;
-        const el = document.getElementById("cap-display");
-        if (el) el.textContent = "₱" + fmtN(capVal);
-      }
-
       function syncFromSlider(k) {
         const sl = document.getElementById("s-" + k);
         const ni = document.getElementById("n-" + k);
         if (!sl || !ni) return;
         ni.value = parseFloat(sl.value);
         ni.classList.remove("err");
-        if (k === "entry") updateCapDisplay();
       }
 
       function syncFromNum(k) {
@@ -2410,7 +2387,6 @@
         const slMin = parseFloat(sl.min),
           slMax = parseFloat(sl.max);
         sl.value = clamp(v, slMin, slMax);
-        if (k === "entry") updateCapDisplay();
       }
 
       function getVal(k) {
@@ -2438,7 +2414,6 @@
             ni.classList.remove("err");
           }
         });
-        updateCapDisplay();
       }
 
       function getUniLevels() {
@@ -2478,7 +2453,7 @@
             pcostPct: getVal("pcost") / 100,
             bonus: getVal("bonus"),
             cap: getVal("cap"),
-            incap: entryVal * 3, // always 3× entry fee — all income types combined
+            incap: getVal("incap"), // configurable total income cap — all income types combined
             reactfee: getVal("reactfee"),
             reactwin: getVal("reactwin"),
             reactrate: getVal("reactrate") / 100,
@@ -2502,7 +2477,7 @@
 
       // ══════════════════════════════════════════
       //  CORE SIMULATION
-      //  incap = 3 × entry · covers binary pairing + daily fixed income combined
+      //  incap = configurable total income cap · covers ALL income types combined
       // ══════════════════════════════════════════
       function simulate(p) {
         const {
@@ -2543,7 +2518,10 @@
         let totalPairsPaid = 0,
           totalFlushed = 0,
           totalCapSaved = 0,
-          totalDfiCapSaved = 0;
+          totalDfiCapSaved = 0,
+          totalPairSaved = 0,
+          totalDirectSaved = 0,
+          totalUniSaved = 0;
         let totalCappedEver = 0,
           totalReacts = 0,
           totalPermInact = 0;
@@ -2552,7 +2530,7 @@
 
         const uniPerMember = uniPerJoin(levels, depth);
 
-        function addMember() {
+        function addMember(acc) {
           const idx = totalMembers;
           leftCount.push(0);
           rightCount.push(0);
@@ -2565,10 +2543,7 @@
           totalMembers++;
           totalGross += entry;
           totalGoods += entry * pcostPct;
-          if (idx > 0) totalBonusDirect += direct;
-          const myDepth = Math.min(idx, depth);
-          for (let lv = 1; lv <= myDepth && lv <= 10; lv++)
-            totalBonusUni += levels[lv];
+          if (idx > 0) creditReferralChain(idx, acc);
           let cur = idx;
           while (cur > 0) {
             const parent = (cur - 1) >> 1;
@@ -2576,6 +2551,47 @@
             else rightCount[parent]++;
             cur = parent;
           }
+        }
+
+        // Cap-aware credit of one payment to a recipient. Only active members
+        // with remaining cap room receive anything; blocked amounts are saved.
+        function creditRecipient(rec, amount, isDirect, acc) {
+          const block = (amt) => {
+            if (isDirect) {
+              totalDirectSaved += amt;
+              acc.directSaved += amt;
+            } else {
+              totalUniSaved += amt;
+              acc.uniSaved += amt;
+            }
+            totalCapSaved += amt;
+          };
+          if (rec < 0) return;
+          if (memberStatus[rec] !== "active") {
+            block(amount);
+            return;
+          }
+          const capRoom = Math.max(0, incap - memberEarned[rec]);
+          const pay = Math.min(amount, capRoom);
+          memberEarned[rec] += pay;
+          if (isDirect) {
+            totalBonusDirect += pay;
+            acc.direct += pay;
+          } else {
+            totalBonusUni += pay;
+            acc.uni += pay;
+          }
+          if (amount - pay > 0) block(amount - pay);
+          checkCap(rec);
+        }
+
+        // Direct + unilevel flow up the single sponsor chain (idx-1, idx-2, …).
+        function creditReferralChain(idx, acc) {
+          const sponsor = idx - 1;
+          creditRecipient(sponsor, direct, true, acc);
+          const myDepth = Math.min(idx, depth);
+          for (let lv = 1; lv <= myDepth && lv <= 10; lv++)
+            creditRecipient(idx - lv, levels[lv], false, acc);
         }
 
         // Helper: check and apply cap — returns true if member just became capped
@@ -2622,22 +2638,20 @@
           // ── 3. New members ──
           const toAdd = Math.min(npd, maxM - totalMembers);
           const prevTotal = totalMembers;
-          for (let i = 0; i < toAdd; i++) addMember();
+          const refAcc = { direct: 0, uni: 0, directSaved: 0, uniSaved: 0 };
+          for (let i = 0; i < toAdd; i++) addMember(refAcc);
           const newMembers = totalMembers - prevTotal;
           const entryToday = newMembers * entry;
           const goodsToday = newMembers * entry * pcostPct;
           const cashInToday = entryToday - goodsToday + dayReactRev;
-          const directPaidToday =
-            day === 1 && prevTotal === 0
-              ? (newMembers - 1) * direct
-              : newMembers * direct;
-          const uniToday = newMembers * uniPerMember;
+          const directPaidToday = refAcc.direct;
+          const uniToday = refAcc.uni;
 
           // ── 4. Pairing bonuses (cap-aware, covers combined earnings) ──
           let pairToday = 0,
             paidToday = 0,
             flushedToday = 0,
-            capSavedToday = 0;
+            pairSavedToday = 0;
           for (let i = 0; i < totalMembers; i++) {
             if (memberStatus[i] !== "active") continue;
             const maxPairs = Math.min(leftCount[i], rightCount[i]);
@@ -2659,13 +2673,14 @@
             pairToday += earned;
             paidToday += payNow;
             flushedToday += flushed;
-            capSavedToday += capsaved * bonus;
+            pairSavedToday += capsaved * bonus;
             checkCap(i);
           }
           totalBonusPair += pairToday;
           totalPairsPaid += paidToday;
           totalFlushed += flushedToday;
-          totalCapSaved += capSavedToday;
+          totalCapSaved += pairSavedToday;
+          totalPairSaved += pairSavedToday;
 
           // ── 5. Daily fixed income (also subject to combined cap) ──
           let dfiToday = 0,
@@ -2738,7 +2753,7 @@
             cumulProfit,
             paidToday,
             flushedToday,
-            capSavedToday,
+            pairSavedToday,
           });
         }
 
@@ -2760,6 +2775,9 @@
           totalFlushed,
           totalCapSaved,
           totalDfiCapSaved,
+          totalPairSaved,
+          totalDirectSaved,
+          totalUniSaved,
           totalCappedEver,
           totalReacts,
           totalPermInact,
@@ -2907,7 +2925,13 @@
           r.totalBonusDirect,
         );
         document.getElementById("r-direct-s").textContent =
-          "~" + fmtN(r.totalMembers) + " members × " + fmtP(direct);
+          fmtP(r.totalBonusDirect) +
+          " paid · " +
+          fmtP(r.totalDirectSaved) +
+          " cap-blocked · ~" +
+          fmtN(r.totalMembers) +
+          " × " +
+          fmtP(direct);
         document.getElementById("r-uni-paid").textContent = fmtP(
           r.totalBonusUni,
         );
@@ -2915,8 +2939,16 @@
           .slice(1, depth + 1)
           .map((v, i) => `L${i + 1}:${fmtP(v)}`)
           .join(" · ");
+        const uniPaidAvg = r.totalMembers
+          ? Math.round(r.totalBonusUni / r.totalMembers)
+          : 0;
         document.getElementById("r-uni-s").textContent =
-          "avg " + fmtP(r.uniPerMember) + "/join · " + uniBreakdown;
+          "avg " +
+          fmtP(uniPaidAvg) +
+          "/join paid · " +
+          fmtP(r.totalUniSaved) +
+          " cap-blocked · " +
+          uniBreakdown;
         document.getElementById("r-dfi-paid").textContent = fmtP(
           r.totalBonusDfi,
         );
@@ -2937,7 +2969,14 @@
           r.totalCapSaved,
         );
         document.getElementById("r-capsaved-s").textContent =
-          "cap = " + fmtP(r.incap) + " (3× entry) · pair+DFI blocked";
+          "cap = " +
+          fmtP(r.incap) +
+          " · blocked: pair " +
+          fmtP(r.totalPairSaved) +
+          " + dfi " +
+          fmtP(r.totalDfiCapSaved) +
+          " + ref " +
+          fmtP(r.totalDirectSaved + r.totalUniSaved);
         document.getElementById("r-pairs-n").textContent = fmtN(
           r.totalPairsPaid,
         );
@@ -3005,8 +3044,7 @@
           .scrollIntoView({ behavior: "smooth", block: "start" });
       }
 
-      // Initialise cap display on page load
-      updateCapDisplay();
+      // Income cap is set directly via the Total income cap field
     </script>
   </body>
 </html>
