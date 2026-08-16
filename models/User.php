@@ -417,13 +417,14 @@ class User
         $row = db()->query("
             SELECT
               COUNT(*)                                                        AS total,
-              COALESCE(SUM(CASE WHEN status='active'    THEN 1 ELSE 0 END),0) AS active,
-              COALESCE(SUM(CASE WHEN status='suspended' THEN 1 ELSE 0 END),0) AS suspended,
-              COALESCE(SUM(CASE WHEN status='pending'   THEN 1 ELSE 0 END),0) AS pending,
+              COALESCE(SUM(CASE WHEN status='active'       THEN 1 ELSE 0 END),0) AS active,
+              COALESCE(SUM(CASE WHEN status='suspended'    THEN 1 ELSE 0 END),0) AS suspended,
+              COALESCE(SUM(CASE WHEN status='pending'      THEN 1 ELSE 0 END),0) AS pending,
+              COALESCE(SUM(CASE WHEN status='deactivated'  THEN 1 ELSE 0 END),0) AS deactivated,
               COALESCE(SUM(CASE WHEN joined_at >= CURDATE() THEN 1 ELSE 0 END),0) AS joined_today
             FROM users WHERE role = 'member'
         ")->fetch();
-        return $row ?: ['total' => 0, 'active' => 0, 'suspended' => 0, 'pending' => 0, 'joined_today' => 0];
+        return $row ?: ['total' => 0, 'active' => 0, 'suspended' => 0, 'pending' => 0, 'deactivated' => 0, 'joined_today' => 0];
     }
 
     // ── Referral Chain (sponsor chain, not binary) ────────────────────────────

@@ -14,7 +14,7 @@
     <?= render_flash() ?>
     <?php $counts = User::counts(); ?>
     <div class="row g-3 mb-3">
-      <?php foreach ([['Total', (int)$counts['total'], 'primary'], ['Active', (int)$counts['active'], 'success'], ['Pending', (int)($counts['pending'] ?? 0), 'warning'], ['Suspended', (int)$counts['suspended'], 'danger'], ['Joined Today', (int)$counts['joined_today'], 'info']] as [$l, $v, $c]): ?>
+      <?php foreach ([['Total', (int)$counts['total'], 'primary'], ['Active', (int)$counts['active'], 'success'], ['Pending', (int)($counts['pending'] ?? 0), 'warning'], ['Suspended', (int)$counts['suspended'], 'danger'], ['Deactivated', (int)($counts['deactivated'] ?? 0), 'dark'], ['Joined Today', (int)$counts['joined_today'], 'info']] as [$l, $v, $c]): ?>
         <div class="col-6 col-xl-3">
           <div class="card stat-card">
             <div class="stat-accent stat-accent-<?= $c ?>"></div>
@@ -37,7 +37,7 @@
             <input type="text" name="q" value="<?= e($search) ?>" class="form-control form-control-sm" style="min-width:220px;" placeholder="🔍 Search username, name, email…">
             <select name="status" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
               <option value="">All Statuses</option>
-              <?php foreach (['active', 'suspended', 'pending'] as $s): ?><option value="<?= $s ?>" <?= $status === $s ? 'selected' : '' ?>><?= ucfirst($s) ?></option><?php endforeach; ?>
+              <?php foreach (['active', 'suspended', 'pending', 'deactivated'] as $s): ?><option value="<?= $s ?>" <?= $status === $s ? 'selected' : '' ?>><?= ucfirst($s) ?></option><?php endforeach; ?>
             </select>
             <select name="pkg" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
               <option value="">All Packages</option>
@@ -88,7 +88,7 @@
                   <td class="td-muted font-mono"><?= number_format($m['pairs_paid']) ?></td>
                   <td class="td-muted" style="font-size:.75rem;"><?= fmt_date($m['joined_at']) ?></td>
                   <td>
-                    <?php $b = $m['status'] === 'active' ? 'bg-success-subtle text-success' : ($m['status'] === 'suspended' ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning'); ?>
+                    <?php $b = match($m['status']) { 'active' => 'bg-success-subtle text-success', 'suspended' => 'bg-danger-subtle text-danger', 'deactivated' => 'bg-dark-subtle text-dark', default => 'bg-warning-subtle text-warning' }; ?>
                     <span class="badge <?= $b ?>"><?= ucfirst($m['status']) ?></span>
                     <?php if (!empty($m['cd_active'])): ?>
                       <span class="badge bg-warning-subtle text-warning" style="font-size:.65rem;">⏳ CD</span>
@@ -97,7 +97,7 @@
                   <td>
                     <div class="d-flex gap-1">
                       <a href="<?= APP_URL ?>/?page=admin_user_view&id=<?= $m['id'] ?>" class="btn btn-sm btn-outline-primary">View</a>
-                      <?php if ($m['status'] !== 'pending'): ?>
+                      <?php if ($m['status'] !== 'pending' && $m['status'] !== 'deactivated'): ?>
                       <form method="POST" action="<?= APP_URL ?>/?page=admin_toggle_user" class="m-0" id="toggleForm<?= $m['id'] ?>">
                         <?= csrf_field() ?><input type="hidden" name="id" value="<?= $m['id'] ?>">
                         <?php $isSuspend = $m['status'] === 'active'; ?>
@@ -110,6 +110,22 @@
             onConfirm: () => this.closest('form').submit()
         })">
                           <?= $isSuspend ? '🔒 Suspend' : '🔓 Unsuspend' ?>
+                        </button>
+                      </form>
+                      <?php endif; ?>
+                      <?php if ($m['status'] !== 'pending'): ?>
+                      <?php $isDeact = $m['status'] === 'deactivated'; ?>
+                      <form method="POST" action="<?= APP_URL ?>/?page=admin_deactivate_user" class="m-0" id="deactForm<?= $m['id'] ?>">
+                        <?= csrf_field() ?><input type="hidden" name="id" value="<?= $m['id'] ?>">
+                        <button type="button" class="btn btn-sm <?= $isDeact ? 'btn-outline-success' : 'btn-outline-dark' ?>"
+                          onclick="showConfirm({
+            title: '<?= $isDeact ? 'Activate' : 'Deactivate' ?> Member',
+            message: 'Are you sure you want to <?= $isDeact ? 'activate' : 'deactivate' ?> <strong>@<?= e($m['username']) ?></strong>?',
+            confirmText: '<?= $isDeact ? 'Activate' : 'Deactivate' ?>',
+            confirmClass: '<?= $isDeact ? 'btn-success' : 'btn-dark' ?>',
+            onConfirm: () => this.closest('form').submit()
+        })">
+                          <?= $isDeact ? '✅ Activate' : '⛔ Deactivate' ?>
                         </button>
                       </form>
                       <?php endif; ?>

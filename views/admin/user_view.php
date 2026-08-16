@@ -20,7 +20,7 @@
         <h4 class="mb-0 fw-800">@<?= e($user['username']) ?></h4>
         <p class="text-muted mb-0" style="font-size:.78rem;">Member since <?= fmt_datetime($user['joined_at']) ?></p>
       </div>
-      <?php $b = $user['status'] === 'active' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'; ?>
+      <?php $b = match($user['status']) { 'active' => 'bg-success-subtle text-success', 'deactivated' => 'bg-dark-subtle text-dark', default => 'bg-danger-subtle text-danger' }; ?>
       <span class="badge <?= $b ?>" style="font-size:.8rem;padding:.4em .9em;"><?= ucfirst($user['status']) ?></span>
 
       <!-- VIP Toggle -->
@@ -63,12 +63,23 @@
       </form>
       <?php endif; ?>
 
+      <?php if ($user['status'] !== 'deactivated'): ?>
       <form method="POST" action="<?= APP_URL ?>/?page=admin_toggle_user" class="m-0">
         <?= csrf_field() ?><input type="hidden" name="id" value="<?= $user['id'] ?>">
         <?php $isSuspend = $user['status'] === 'active'; ?>
         <button type="button" class="btn btn-sm <?= $isSuspend ? 'btn-outline-danger' : 'btn-outline-success' ?>"
           onclick="showConfirm({title:'<?= $isSuspend ? 'Suspend' : 'Unsuspend' ?> Member',message:'<?= $isSuspend ? 'Suspend' : 'Unsuspend' ?> <strong>@<?= e($user['username']) ?></strong>?',confirmText:'<?= $isSuspend ? 'Suspend' : 'Unsuspend' ?>',confirmClass:'<?= $isSuspend ? 'btn-danger' : 'btn-success' ?>',onConfirm:()=>this.closest('form').submit()})">
           <?= $isSuspend ? '🔒 Suspend' : '🔓 Unsuspend' ?>
+        </button>
+      </form>
+      <?php endif; ?>
+
+      <?php $isDeactivated = $user['status'] === 'deactivated'; ?>
+      <form method="POST" action="<?= APP_URL ?>/?page=admin_deactivate_user" class="m-0">
+        <?= csrf_field() ?><input type="hidden" name="id" value="<?= $user['id'] ?>">
+        <button type="button" class="btn btn-sm <?= $isDeactivated ? 'btn-outline-success' : 'btn-outline-dark' ?>"
+          onclick="showConfirm({title:'<?= $isDeactivated ? 'Activate' : 'Deactivate' ?> Member',message:'<?= $isDeactivated ? 'Activate' : 'Deactivate' ?> <strong>@<?= e($user['username']) ?></strong>?<?= $isDeactivated ? '' : ' All earnings will be shut down and ancestors will stop earning from this member.' ?>',confirmText:'<?= $isDeactivated ? 'Activate' : 'Deactivate' ?>',confirmClass:'<?= $isDeactivated ? 'btn-success' : 'btn-dark' ?>',onConfirm:()=>this.closest('form').submit()})">
+          <?= $isDeactivated ? '✅ Activate' : '⛔ Deactivate' ?>
         </button>
       </form>
 

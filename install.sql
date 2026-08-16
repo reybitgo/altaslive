@@ -85,7 +85,7 @@ CREATE TABLE users (
 
   ewallet_balance       DECIMAL(14,2) NOT NULL DEFAULT 0.00,
   withdrawable_balance  DECIMAL(14,2) NOT NULL DEFAULT 0.00,
-  status                ENUM('active','suspended','pending') NOT NULL DEFAULT 'active',
+  status                ENUM('active','suspended','pending','deactivated') NOT NULL DEFAULT 'active',
   joined_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   last_login        TIMESTAMP NULL,
 

@@ -114,6 +114,13 @@ class AdminController
 
         $newStatus = $user['status'] === 'active' ? 'suspended' : 'active';
 
+        // Deactivated users can only be reactivated via deactivateUser
+        if ($user['status'] === 'deactivated') {
+            flash('error', 'Use the Deactivate button to reactivate this member.');
+            redirect('/?page=admin_user_view&id=' . $id);
+            return;
+        }
+
         $pdo = db();
         $stmt = $pdo->prepare('UPDATE users SET status = ? WHERE id = ?');
         $success = $stmt->execute([$newStatus, $id]);
@@ -142,6 +149,52 @@ class AdminController
         }
 
         // Otherwise (from members list or anywhere else) → go back to members list
+        redirect('/?page=admin_users');
+    }
+
+    public function deactivateUser(): void
+    {
+        Auth::guard('admin');
+        csrf_verify();
+
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id <= 0) {
+            flash('error', 'Invalid user ID.');
+            redirect('/?page=admin_users');
+            return;
+        }
+
+        $user = User::find($id);
+        if (!$user || $user['role'] === 'admin') {
+            flash('error', 'Invalid user or cannot modify administrator account.');
+            redirect('/?page=admin_users');
+            return;
+        }
+
+        $newStatus = $user['status'] === 'deactivated' ? 'active' : 'deactivated';
+
+        $pdo = db();
+        $stmt = $pdo->prepare('UPDATE users SET status = ? WHERE id = ?');
+        $success = $stmt->execute([$newStatus, $id]);
+
+        if ($success) {
+            $action = ($newStatus === 'deactivated') ? 'deactivated' : 'activated';
+            flash('success', "User @{$user['username']} has been {$action} successfully.");
+        } else {
+            flash('error', 'Failed to update user status. Please try again.');
+        }
+
+        if (
+            isset($_SERVER['HTTP_X_REQUESTED_WITH']) &&
+            strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest'
+        ) {
+            json_response(['ok' => $success, 'status' => $newStatus]);
+        }
+
+        $referer = $_SERVER['HTTP_REFERER'] ?? '';
+        if (strpos($referer, 'admin_user_view') !== false && strpos($referer, "id={$id}") !== false) {
+            redirect("/?page=admin_user_view&id={$id}");
+        }
         redirect('/?page=admin_users');
     }
 

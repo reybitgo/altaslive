@@ -26,10 +26,11 @@ class Commission
         $cur  = $parentId;
         $side = $position;
 
-        // Pending users increment leg counts but do NOT trigger pairing bonuses.
+        // Pending/deactivated users increment leg counts but do NOT trigger pairing bonuses.
         $newUserStatus = $pdo->prepare('SELECT status FROM users WHERE id = ?');
         $newUserStatus->execute([$newUserId]);
-        $newUserIsActive = ($newUserStatus->fetchColumn() ?? '') === 'active';
+        $newUserStatusVal = $newUserStatus->fetchColumn() ?? '';
+        $newUserIsActive = $newUserStatusVal === 'active';
         $newUserIsPaid = $newUserIsActive && User::isPaidMember($newUserId);
 
         while ($cur !== null) {
@@ -156,6 +157,12 @@ class Commission
             return;
         }
 
+        // Skip if the new member is deactivated — no upline earns from them
+        $newStatus = db()->query("SELECT status FROM users WHERE id = {$newUserId}")->fetchColumn();
+        if ($newStatus === 'deactivated') {
+            return;
+        }
+
         $pkg = Package::find($packageId);
         if (!$pkg || (float)$pkg['direct_ref_bonus'] <= 0) return;
 
@@ -237,6 +244,12 @@ class Commission
 
         // Skip if the new member is CD-sourced — only paid members earn indirect referral
         if (!User::isPaidMember($newUserId)) {
+            return;
+        }
+
+        // Skip if the new member is deactivated — no upline earns from them
+        $newStatus = db()->query("SELECT status FROM users WHERE id = {$newUserId}")->fetchColumn();
+        if ($newStatus === 'deactivated') {
             return;
         }
 

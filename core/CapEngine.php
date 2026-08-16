@@ -28,6 +28,16 @@ class CapEngine
     {
         $status = self::getCapStatus($userId);
 
+        // Deactivated users earn nothing
+        $userStatus = db()->query("SELECT status FROM users WHERE id = {$userId}")->fetchColumn();
+        if ($userStatus === 'deactivated') {
+            return [
+                'allowed' => 0.00,
+                'blocked' => $amount,
+                'status'  => 'deactivated',
+            ];
+        }
+
         // VIP bypass — unlimited lifetime earnings
         if (!empty($status['capping_bypass'])) {
             return [
@@ -176,10 +186,12 @@ class CapEngine
     public static function isActiveForPairs(int $userId): bool
     {
         $pdo = db();
-        $st = $pdo->prepare("SELECT cap_status FROM users WHERE id = ?");
+        $st = $pdo->prepare("SELECT status, cap_status FROM users WHERE id = ?");
         $st->execute([$userId]);
-        $status = $st->fetchColumn();
-        return $status === 'active';
+        $row = $st->fetch();
+        if (!$row) return false;
+        if ($row['status'] === 'deactivated') return false;
+        return $row['cap_status'] === 'active';
     }
 
     /**
