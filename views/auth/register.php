@@ -853,6 +853,17 @@ if ($isLoggedIn && !$prefillSponsor) {
   }
   updateStep1State();
 </script>
+<style>
+  .position-label{-webkit-hyphens:none;hyphens:none;overflow-wrap:normal;min-height:42px;}
+  @media(max-width:576px){
+    .position-toggle{gap:.4rem;}
+    .position-label{padding:.6rem .4rem;font-size:.72rem;min-height:38px;}
+  }
+  @media(max-width:480px){
+    .position-toggle[style*="grid-template-columns:1fr 1fr 1fr"]{grid-template-columns:1fr !important;}
+    .position-toggle[style*="grid-template-columns:1fr 1fr 1fr"] .position-label{white-space:normal;}
+  }
+</style>
 <?php if (!$isLoggedIn): ?>
   </body>
 

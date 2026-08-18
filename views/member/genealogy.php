@@ -599,8 +599,8 @@
         .attr('transform', d => `translate(${responsiveNodeWidth / 2}, ${-responsiveNodeHeight / 2})`)
         .style('cursor', 'pointer')
         .style('opacity', 0.7)
-        .on('mouseover', function() { d3.select(this).style('opacity', 1); })
-        .on('mouseout', function() { d3.select(this).style('opacity', 0.7); })
+        .on('mouseover', function(event) { event.stopPropagation(); d3.select(this).style('opacity', 1); })
+        .on('mouseout', function(event) { event.stopPropagation(); d3.select(this).style('opacity', 0.7); })
         .on('click', function(event, d) {
           event.stopPropagation();
           openRegisterModal(d.data);
@@ -666,7 +666,9 @@
         .style('stroke', d => d.data.hasMore ? '#3b6ff0' : '#94a3b8')
         .style('stroke-width', d => d.data.hasMore ? 2 : 1.5)
         .style('cursor', 'pointer')
-        .style('display', d => (d.children || d._children || d.data.hasMore) ? null : 'none');
+        .style('display', d => (d.children || d._children || d.data.hasMore) ? null : 'none')
+        .on('mouseover', event => event.stopPropagation())
+        .on('mouseout', event => event.stopPropagation());
 
       // Add + / − text inside the toggle circle (perfectly centred)
       nodeEnter.filter(d => !d.data.isPlaceholder).append('text')
@@ -1170,6 +1172,18 @@
   .reg-modal .auth-body{padding:1.5rem 2.25rem;}
   .reg-modal .steps-bar{padding:.875rem 2.25rem;}
   .reg-modal .auth-footer-compact{text-align:center;padding:0 2.25rem 1.25rem;font-size:.8rem;color:#6b7280;}
+  .reg-modal .position-label{-webkit-hyphens:none;hyphens:none;white-space:nowrap;min-height:42px;}
+  @media(max-width:576px){
+    .reg-modal .modal-dialog{max-width:calc(100% - 1rem);margin:.5rem auto;}
+    .reg-modal .auth-body{padding:1.25rem 1rem;}
+    .reg-modal .steps-bar{padding:.75rem 1rem;}
+    .reg-modal .position-toggle{gap:.4rem;}
+    .reg-modal .position-label{padding:.6rem .4rem;font-size:.72rem;min-height:38px;}
+  }
+  @media(max-width:380px){
+    .reg-modal .position-toggle[style*="grid-template-columns:1fr 1fr 1fr"]{grid-template-columns:1fr !important;}
+    .reg-modal .position-toggle[style*="grid-template-columns:1fr 1fr 1fr"] .position-label{white-space:normal;}
+  }
 </style>
 
 <div class="modal fade reg-modal" id="regModal" tabindex="-1" aria-hidden="true">
@@ -1251,8 +1265,8 @@
           <div class="mb-3">
             <label class="form-label">Binary Position <span class="text-danger">*</span></label>
             <div class="position-toggle" style="grid-template-columns:1fr 1fr;">
-              <div class="position-option"><input type="radio" id="rm_pos_left" name="binary_position_radio" value="left" required><label class="position-label" id="rm_pos_label_left" for="rm_pos_left">⬅ Left</label></div>
-              <div class="position-option"><input type="radio" id="rm_pos_right" name="binary_position_radio" value="right"><label class="position-label" id="rm_pos_label_right" for="rm_pos_right">Right ➡</label></div>
+              <div class="position-option"><input type="radio" id="rm_pos_left" name="binary_position_radio" value="left" required><label class="position-label" id="rm_pos_label_left" for="rm_pos_left">↙ Left</label></div>
+              <div class="position-option"><input type="radio" id="rm_pos_right" name="binary_position_radio" value="right"><label class="position-label" id="rm_pos_label_right" for="rm_pos_right">↘ Right</label></div>
             </div>
           </div>
 
