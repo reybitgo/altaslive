@@ -135,6 +135,7 @@ class MemberController
         Auth::guard('member');
         $user     = Auth::user();
         $view     = $_GET['view'] ?? 'binary'; // 'binary' | 'referral'
+        $packages = Package::all(true);
         $indirect = [];
         $direct   = [];
         if ($view === 'referral') {
