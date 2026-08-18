@@ -135,7 +135,6 @@ class MemberController
         Auth::guard('member');
         $user     = Auth::user();
         $view     = $_GET['view'] ?? 'binary'; // 'binary' | 'referral'
-        $packages = Package::all(true);
         $indirect = [];
         $direct   = [];
         if ($view === 'referral') {
@@ -325,7 +324,7 @@ class MemberController
             'total_pairing'    => (float)$summary['total_pairing'],
             'total_direct'     => (float)$summary['total_direct'],
             'total_indirect'   => (float)$summary['total_indirect'],
-            'total_cap_blocked'=> (float)$summary['total_cap_blocked'],
+            'total_cap_blocked' => (float)$summary['total_cap_blocked'],
         ]);
     }
 
@@ -351,7 +350,7 @@ class MemberController
 
         // Fetch admin payment details for external payment display (from settings)
         $admin = [];
-        foreach (['gcash_number','maya_number','usdt_trc20_address','usdt_bep20_address'] as $k) {
+        foreach (['gcash_number', 'maya_number', 'usdt_trc20_address', 'usdt_bep20_address'] as $k) {
             $admin[$k] = db()->query("SELECT value FROM settings WHERE key_name='{$k}'")->fetchColumn() ?: '';
         }
 
