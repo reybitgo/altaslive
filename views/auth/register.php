@@ -109,6 +109,8 @@ if ($isLoggedIn && !$prefillSponsor) {
                 <?= csrf_field() ?>
                 <?php if ($isReferralMode): ?>
                   <input type="hidden" name="referral_mode" value="1">
+                <?php else: ?>
+                  <input type="hidden" name="referral_mode" id="referralMode" value="">
                 <?php endif; ?>
 
                 <!-- ── STEP 1 ── -->
@@ -119,9 +121,13 @@ if ($isLoggedIn && !$prefillSponsor) {
                     <!-- Payment Method Toggle (logged-in only) -->
                     <div class="mb-3">
                       <label class="form-label">Payment Method <span class="text-danger">*</span></label>
-                      <div class="position-toggle">
+                      <div class="position-toggle" style="grid-template-columns:1fr 1fr 1fr;">
                         <div class="position-option">
-                          <input type="radio" id="pay_code" name="payment_method" value="code" checked required>
+                          <input type="radio" id="pay_free" name="payment_method" value="free" checked required>
+                          <label class="position-label" for="pay_free">🎁 Free</label>
+                        </div>
+                        <div class="position-option">
+                          <input type="radio" id="pay_code" name="payment_method" value="code">
                           <label class="position-label" for="pay_code">🎫 Code</label>
                         </div>
                         <div class="position-option">
@@ -136,13 +142,13 @@ if ($isLoggedIn && !$prefillSponsor) {
                   <?php endif; ?>
 
                   <!-- Code Input -->
-                  <div id="codeSection">
+                  <div id="codeSection" style="display:none;">
                     <div class="mb-3">
                       <label class="form-label">Registration Code <span class="text-danger">*</span></label>
                       <div class="input-group">
                         <input type="text" id="reg_code" name="reg_code" class="form-control font-mono"
                           placeholder="XXXX-XXXX-XXXX or CD-XXXX-XXXX-XXXX" maxlength="18"
-                          style="text-transform:uppercase;letter-spacing:2px;font-size:1rem;" required>
+                          style="text-transform:uppercase;letter-spacing:2px;font-size:1rem;">
                         <button type="button" class="btn btn-outline-primary" id="validateCodeBtn">Validate</button>
                       </div>
                       <div class="form-text" id="codeHint"></div>
@@ -229,6 +235,9 @@ if ($isLoggedIn && !$prefillSponsor) {
 
                 <!-- ── STEP 2 ── -->
                 <div class="auth-body" id="step2" <?= $isReferralMode ? '' : 'style="display:none;"' ?>>
+                  <div id="referralAlert" class="alert alert-info py-2 mb-3" style="font-size:.85rem;display:none;">
+                    🔗 No payment is required now — the member can activate their account later with a registration code or e-wallet.
+                  </div>
                   <?php if ($isReferralMode): ?>
                     <div class="alert alert-info py-2 mb-3" style="font-size:.85rem;">
                       🔗 You are registering via a referral link. No payment is required now — you can activate your account later with a registration code or e-wallet.
@@ -300,7 +309,7 @@ if ($isLoggedIn && !$prefillSponsor) {
                     <div class="form-text" id="positionHint"></div>
                   </div>
                   <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-outline-secondary" onclick="goStep(1)">← Back</button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="goStep(1); document.getElementById('referralAlert').style.display='none';">← Back</button>
                     <button type="button" class="btn btn-primary flex-grow-1" id="toStep3Btn">Review →</button>
                   </div>
                 </div>
@@ -312,20 +321,23 @@ if ($isLoggedIn && !$prefillSponsor) {
                     <div class="card-header"><span class="card-title">📋 Registration Summary</span></div>
                     <div class="card-body">
                       <table class="info-table">
-                        <?php if (!$isReferralMode): ?>
-                        <tr>
+                        <tr id="revFreeRow" style="display:none;">
+                          <td>Activation</td>
+                          <td><span class="badge bg-warning text-dark">Pending</span></td>
+                        </tr>
+                        <tr id="revPayRow" <?= $isReferralMode ? 'style="display:none;"' : '' ?>>
                           <td>Payment</td>
                           <td id="rev_payment">—</td>
                         </tr>
-                        <tr id="revCodeRow">
+                        <tr id="revCodeRow" <?= $isReferralMode ? 'style="display:none;"' : '' ?>>
                           <td>Code</td>
                           <td><span class="reg-code" id="rev_code">—</span></td>
                         </tr>
-                        <tr>
+                        <tr id="revPkgRow" <?= $isReferralMode ? 'style="display:none;"' : '' ?>>
                           <td>Package</td>
                           <td id="rev_package">—</td>
                         </tr>
-                        <?php else: ?>
+                        <?php if ($isReferralMode): ?>
                         <tr>
                           <td>Activation</td>
                           <td><span class="badge bg-warning text-dark">Pending</span></td>
@@ -441,7 +453,7 @@ if ($isLoggedIn && !$prefillSponsor) {
   }
 
   function updateStep1State() {
-    if (IS_REFERRAL_MODE) return; // Step 1 is skipped entirely in referral mode
+    if (IS_REFERRAL_MODE) return;
 
     const method = getPaymentMethod();
     const codeSec = document.getElementById('codeSection');
@@ -449,29 +461,37 @@ if ($isLoggedIn && !$prefillSponsor) {
     const regCode = document.getElementById('reg_code');
     const pkgSel = document.getElementById('packageSelect');
     const toBtn = document.getElementById('toStep2Btn');
+    const refMode = document.getElementById('referralMode');
 
-    if (method === 'code') {
-      codeSec.style.display = 'block';
+    if (method === 'free') {
+      codeSec.style.display = 'none';
       if (pkgSec) pkgSec.style.display = 'none';
-      regCode.required = true;
+      regCode.required = false;
       if (pkgSel) pkgSel.required = false;
-      toBtn.disabled = !document.getElementById('validatedCode').value;
-    } else {
+      if (refMode) refMode.value = '1';
+      toBtn.disabled = false;
+    } else if (method === 'ewallet') {
       codeSec.style.display = 'none';
       if (pkgSec) pkgSec.style.display = 'block';
       regCode.required = false;
       if (pkgSel) pkgSel.required = true;
-      // If e-wallet balance is insufficient, keep Continue disabled
+      if (refMode) refMode.value = '';
       if (!CAN_USE_EWALLET) {
         toBtn.disabled = true;
         return;
       }
-      // Enable continue if single package, or if dropdown has a value
       if (PKG_COUNT === 1) {
         toBtn.disabled = false;
       } else {
         toBtn.disabled = !(pkgSel && pkgSel.value);
       }
+    } else {
+      codeSec.style.display = 'block';
+      if (pkgSec) pkgSec.style.display = 'none';
+      regCode.required = true;
+      if (pkgSel) pkgSel.required = false;
+      if (refMode) refMode.value = '';
+      toBtn.disabled = !document.getElementById('validatedCode').value;
     }
   }
 
@@ -589,6 +609,9 @@ if ($isLoggedIn && !$prefillSponsor) {
       const method = getPaymentMethod();
       if (method === 'code' && !document.getElementById('validatedCode').value) return;
       if (method === 'ewallet' && PKG_COUNT > 1 && !document.getElementById('packageSelect')?.value) return;
+
+      const refAlert = document.getElementById('referralAlert');
+      if (refAlert) refAlert.style.display = method === 'free' ? 'block' : 'none';
 
       goStep(2);
       if (PREFILL_SPONSOR) {
@@ -773,16 +796,21 @@ if ($isLoggedIn && !$prefillSponsor) {
     // Populate review
     if (!IS_REFERRAL_MODE) {
       const method = getPaymentMethod();
-      const revPay = document.getElementById('rev_payment');
-      if (revPay) revPay.textContent = method === 'code' ? '🎫 Registration Code' : '💳 E-Wallet';
-      const revCodeRow = document.getElementById('revCodeRow');
-      if (revCodeRow) revCodeRow.style.display = method === 'code' ? 'table-row' : 'none';
-      const revCode = document.getElementById('rev_code');
-      if (revCode) revCode.textContent = document.getElementById('validatedCode').value || '—';
-      const revPkg = document.getElementById('rev_package');
-      if (revPkg) revPkg.textContent = method === 'code' ?
-        (codeData.package_name || '—') :
-        (selectedPkg.name || (PKG_COUNT === 1 ? document.querySelector('#packageSection .fw-bold')?.textContent : '—'));
+      const isFree = method === 'free';
+      document.getElementById('revFreeRow').style.display = isFree ? '' : 'none';
+      document.getElementById('revPayRow').style.display = isFree ? 'none' : '';
+      document.getElementById('revCodeRow').style.display = (!isFree && method === 'code') ? '' : 'none';
+      document.getElementById('revPkgRow').style.display = isFree ? 'none' : '';
+      if (!isFree) {
+        const revPay = document.getElementById('rev_payment');
+        if (revPay) revPay.textContent = method === 'code' ? '🎫 Registration Code' : '💳 E-Wallet';
+        const revCode = document.getElementById('rev_code');
+        if (revCode) revCode.textContent = document.getElementById('validatedCode').value || '—';
+        const revPkg = document.getElementById('rev_package');
+        if (revPkg) revPkg.textContent = method === 'code' ?
+          (codeData.package_name || '—') :
+          (selectedPkg.name || (PKG_COUNT === 1 ? document.querySelector('#packageSection .fw-bold')?.textContent : '—'));
+      }
     }
     const revUser = document.getElementById('rev_username');
     if (revUser) revUser.textContent = '@' + document.getElementById('username').value;

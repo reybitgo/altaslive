@@ -63,10 +63,19 @@
   }
 
   .node.empty rect {
-    fill: #f8fafc;
-    stroke: #cbd5e1;
+    fill: #e2e8f0;
+    stroke: #94a3b8;
     stroke-width: 2px;
-    stroke-dasharray: 5, 5;
+    stroke-dasharray: 6, 3;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .node.empty:hover rect {
+    fill: #cbd5e1;
+    stroke: #3b6ff0;
+    stroke-dasharray: none;
+    filter: drop-shadow(0 2px 8px rgba(59, 111, 240, 0.3));
   }
 
   .node.pending rect {
@@ -92,8 +101,10 @@
   }
 
   .node.empty text {
-    fill: #64748b;
+    fill: #475569;
     font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
   }
 
   /* Count badges below nodes */
@@ -237,8 +248,8 @@
   }
 
   .legend-dot.empty {
-    background: #f8fafc;
-    border: 2px dashed #cbd5e1;
+    background: #e2e8f0;
+    border: 2px dashed #94a3b8;
   }
 
   .legend-dot.pending {
@@ -325,7 +336,11 @@
               <div class="legend-dot cd"></div>
               <span>CD Active</span>
             </div>
-            <span class="ms-auto text-muted">Click nodes to expand/collapse • Drag to pan</span>
+            <div class="legend-item">
+              <div class="legend-dot empty"></div>
+              <span>Open Slot</span>
+            </div>
+            <span class="ms-auto text-muted">Click nodes to expand/collapse • Click open slots to register</span>
           </div>
         </div>
       </div>
@@ -441,6 +456,7 @@
   <script>
     // D3.js Binary Tree Visualization
     const API_URL = '<?= APP_URL ?>/?page=api_binary_tree&root=<?= Auth::id() ?>';
+    const ROOT_USERNAME = '<?= e($user['username']) ?>';
     let svg, g, tree, root, zoom;
     let currentScale = 1;
     let currentTranslate = [0, 0];
@@ -476,29 +492,40 @@
     }
 
     // Hierarchy accessor — reusable for lazy loading
+    // Called by d3.hierarchy() with RAW data objects (not hierarchy nodes),
+    // so d.depth does not exist here — only API nodes have left/right properties.
     const treeAccessor = d => {
       const children = [];
       if (d.left) children.push(d.left);
       if (d.right) children.push(d.right);
-      // Add empty slot indicators if missing children (for visualization)
-      if (!d.left && d.depth < 3) {
-        children.push({
-          username: 'Empty',
-          status: 'empty',
-          isPlaceholder: true,
-          parent: d,
-          depth: (d.depth || 0) + 1
-        });
+
+      // Only add placeholders for real API nodes (which have left/right props),
+      // never for placeholders themselves (prevents infinite recursion).
+      if (!d.isPlaceholder) {
+        if (!d.left) {
+          children.push({
+            username: 'Register',
+            status: 'empty',
+            isPlaceholder: true,
+            parentId: d.id || null,
+            parentUsername: d.username || '',
+            sponsorUsername: ROOT_USERNAME,
+            position: 'left'
+          });
+        }
+        if (!d.right) {
+          children.push({
+            username: 'Register',
+            status: 'empty',
+            isPlaceholder: true,
+            parentId: d.id || null,
+            parentUsername: d.username || '',
+            sponsorUsername: ROOT_USERNAME,
+            position: 'right'
+          });
+        }
       }
-      if (!d.right && d.depth < 3) {
-        children.push({
-          username: 'Empty',
-          status: 'empty',
-          isPlaceholder: true,
-          parent: d,
-          depth: (d.depth || 0) + 1
-        });
-      }
+
       return children.length > 0 ? children : null;
     };
 
@@ -575,12 +602,14 @@
         .attr('class', d => `node ${d.data.status || 'active'} ${d.data.isPlaceholder ? 'empty' : ''} ${d.data.cd_active ? 'cd' : ''}`)
         .attr('transform', d => `translate(${source.x0 || 0},${source.y0 || 0})`)
         .on('click', (event, d) => {
-          // Skip click on empty-slot placeholders
-          if (!d.data.isPlaceholder) {
+          if (d.data.isPlaceholder) {
+            event.stopPropagation();
+            openRegisterModal(d.data);
+          } else {
             toggle(d);
           }
         })
-        .on('mouseover', (event, d) => showTooltip(event, d))
+        .on('mouseover', (event, d) => { if (!d.data.isPlaceholder) showTooltip(event, d); })
         .on('mouseout', hideTooltip);
 
       // Add rounded rectangle
@@ -597,7 +626,7 @@
         .attr('text-anchor', 'middle')
         .each(function(d) {
           const el = d3.select(this);
-          const name = d.data.username || 'Unknown';
+          const name = d.data.isPlaceholder ? '+ Register' : (d.data.username || 'Unknown');
           const maxChars = isMobile ? 11 : 14;
           const lineHeight = isMobile ? 11 : 12;
 
@@ -932,14 +961,514 @@
 <?php endif; ?>
 
 <script>
-  function toggleRef(lvl) {
-    const el = document.getElementById('refLevel' + lvl);
-    const arrow = document.getElementById('refArrow' + lvl);
-    if (!el) return;
-    const hidden = el.style.display === 'none';
-    el.style.display = hidden ? 'block' : 'none';
-    arrow.textContent = hidden ? '▼' : '▶';
+function toggleRef(lvl) {
+  const el = document.getElementById('refLevel' + lvl);
+  const arrow = document.getElementById('refArrow' + lvl);
+  if (!el) return;
+  const hidden = el.style.display === 'none';
+  el.style.display = hidden ? 'block' : 'none';
+  arrow.textContent = hidden ? '▼' : '▶';
+}
+
+<?php if ($view !== 'referral'): ?>
+// ── Registration Modal ──────────────────────────────────────
+let regCodeData = {}, regSelectedPkg = {}, regUsernameOk = false, regSlotData = {};
+let regCurrentStep = 1;
+
+const PACKAGES = <?= json_encode(array_map(fn($p) => ['id'=>$p['id'],'name'=>$p['name'],'entry_fee'=>fmt_money((float)$p['entry_fee']),'pairing_bonus'=>fmt_money((float)$p['pairing_bonus']),'daily_pair_cap'=>(int)$p['daily_pair_cap']], $packages ?? [])) ?>;
+const CSRF_TOKEN = '<?= csrf_token() ?>';
+const APP_URL_JS = '<?= APP_URL ?>';
+const CURRENT_USER = '<?= e($user["username"]) ?>';
+
+function rmTogglePw(id, btn) {
+  const el = document.getElementById(id);
+  el.type = el.type === 'password' ? 'text' : 'password';
+  btn.textContent = el.type === 'password' ? '👁' : '🙈';
+}
+
+function openRegisterModal(data) {
+  const modal = document.getElementById('regModal');
+  const form = document.getElementById('regModalForm');
+  form.reset();
+  regCodeData = {}; regSelectedPkg = {}; regUsernameOk = false; regSlotData = {};
+  regCurrentStep = 1;
+
+  document.getElementById('rm_referralMode').value = '1';
+
+  document.getElementById('rm_upline_username').value = data.parentUsername || '';
+  document.getElementById('rm_upline_display').textContent = '@' + (data.parentUsername || '—');
+  document.getElementById('rm_binary_position').value = data.position || '';
+  document.getElementById('rm_position_display').textContent = data.position ? data.position.charAt(0).toUpperCase() + data.position.slice(1) : '—';
+  document.getElementById('rm_sponsor_username').value = data.sponsorUsername || CURRENT_USER;
+  document.getElementById('rm_sponsor_display').textContent = '@' + (data.sponsorUsername || CURRENT_USER);
+  document.getElementById('rm_sponsorInput').value = data.sponsorUsername || CURRENT_USER;
+
+  document.getElementById('rm_codeSection').style.display = 'none';
+  document.getElementById('rm_packageSection').style.display = 'none';
+  document.getElementById('rm_packageInfo').classList.add('d-none');
+  document.getElementById('rm_validatedCode').value = '';
+  document.getElementById('rm_reg_code').removeAttribute('required');
+  document.getElementById('rm_toStep2Btn').disabled = false;
+
+  const pkgCard = document.getElementById('rm_packageCard');
+  if (pkgCard) pkgCard.classList.add('d-none');
+
+  const pw = document.querySelectorAll('#rm_step2 input[name="password"], #rm_step2 input[name="password_confirm"]');
+  pw.forEach(p => { p.value = ''; p.type = 'password'; });
+
+  regGoStep(1);
+  new bootstrap.Modal(modal).show();
+}
+
+function regGoStep(n) {
+  regCurrentStep = n;
+  for (let i = 1; i <= 3; i++) {
+    const el = document.getElementById('rm_step' + i);
+    if (el) el.style.display = i === n ? 'block' : 'none';
+    const ind = document.getElementById('rm_ind_' + i);
+    if (ind) ind.className = 'reg-step ' + (i < n ? 'done' : i === n ? 'active' : '');
   }
+}
+
+function regSetHint(id, msg, ok) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'form-text' + (ok === true ? ' text-success' : ok === false ? ' text-danger' : '');
+}
+
+function regResetCodeState() {
+  document.getElementById('rm_packageInfo').classList.add('d-none');
+  document.getElementById('rm_validatedCode').value = '';
+  regSetHint('rm_codeHint', '', null);
+  regCodeData = {};
+  document.getElementById('rm_toStep2Btn').disabled = true;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+document.querySelectorAll('[name="payment_method"]').forEach(r => {
+  r.addEventListener('change', function() {
+    regResetCodeState();
+    const v = this.value;
+    const isFree = v === 'free';
+    const codeSec = document.getElementById('rm_codeSection');
+    const pkgSec = document.getElementById('rm_packageSection');
+
+    document.getElementById('rm_referralMode').value = isFree ? '1' : '';
+
+    const codeInput = document.getElementById('rm_reg_code');
+    if (isFree) {
+      codeSec.style.display = 'none';
+      pkgSec.style.display = 'none';
+      document.getElementById('rm_toStep2Btn').disabled = false;
+      codeInput.removeAttribute('required');
+    } else if (v === 'ewallet') {
+      codeSec.style.display = 'none';
+      pkgSec.style.display = 'block';
+      document.getElementById('rm_toStep2Btn').disabled = PACKAGES.length !== 1;
+      codeInput.removeAttribute('required');
+    } else {
+      codeSec.style.display = 'block';
+      pkgSec.style.display = 'none';
+      document.getElementById('rm_toStep2Btn').disabled = true;
+      codeInput.setAttribute('required', '');
+    }
+  });
+});
+
+document.getElementById('rm_validateCodeBtn').addEventListener('click', async function() {
+  const code = document.getElementById('rm_reg_code').value.trim();
+  const isCd = code.startsWith('CD-');
+  const minLen = isCd ? 17 : 14;
+  if (code.length < minLen) {
+    regSetHint('rm_codeHint', isCd ? 'Enter a complete CD code (CD-XXXX-XXXX-XXXX)' : 'Enter a complete code (XXXX-XXXX-XXXX)', false);
+    return;
+  }
+  this.disabled = true; this.textContent = '…';
+  try {
+    const fd = new FormData();
+    fd.append('code', code);
+    fd.append('csrf_token', CSRF_TOKEN);
+    const d = await (await fetch(APP_URL_JS + '/?page=validate_code', { method: 'POST', body: fd })).json();
+    if (d.valid) {
+      regCodeData = d;
+      document.getElementById('rm_pkgName').textContent = d.package_name;
+      document.getElementById('rm_pkgDetails').textContent = 'Entry: ' + d.entry_fee + ' · Bonus: ' + d.pairing_bonus + ' · Cap: ' + d.daily_cap + ' pairs/day';
+      document.getElementById('rm_packageInfo').classList.remove('d-none');
+      document.getElementById('rm_validatedCode').value = code;
+      document.getElementById('rm_toStep2Btn').disabled = false;
+      regSetHint('rm_codeHint', '✓ Code is valid!', true);
+    } else {
+      regSetHint('rm_codeHint', d.message || 'Invalid code.', false);
+    }
+  } catch(e) { regSetHint('rm_codeHint', 'Network error.', false); }
+  this.disabled = false; this.textContent = 'Validate';
+});
+
+document.getElementById('rm_reg_code').addEventListener('input', function() {
+  let raw = this.value.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+  let formatted = '';
+  if (raw.startsWith('CD')) {
+    const body = raw.slice(2).slice(0, 12);
+    const parts = [body.slice(0,4), body.slice(4,8), body.slice(8,12)].filter(Boolean);
+    formatted = 'CD' + (parts.length ? '-' + parts.join('-') : '');
+  } else {
+    const clean = raw.slice(0, 12);
+    const parts = [clean.slice(0,4), clean.slice(4,8), clean.slice(8,12)].filter(Boolean);
+    formatted = parts.join('-');
+  }
+  this.value = formatted;
+  regResetCodeState();
+});
+
+const rmPackageSelect = document.getElementById('rm_packageSelect');
+if (rmPackageSelect) {
+  rmPackageSelect.addEventListener('change', function() {
+    if (!this.value) {
+      document.getElementById('rm_packageCard')?.classList.add('d-none');
+      document.getElementById('rm_toStep2Btn').disabled = true;
+      return;
+    }
+    const opt = this.options[this.selectedIndex];
+    regSelectedPkg = { id: this.value, name: opt.dataset.name, fee: opt.dataset.fee, bonus: opt.dataset.bonus, cap: opt.dataset.cap };
+    const card = document.getElementById('rm_packageCard');
+    if (card) {
+      document.getElementById('rm_pkgCardName').textContent = regSelectedPkg.name;
+      document.getElementById('rm_pkgCardDetails').textContent =
+        'Entry: ' + regSelectedPkg.fee + ' · Bonus: ' + regSelectedPkg.bonus + ' · Cap: ' + regSelectedPkg.cap + ' pairs/day';
+      card.classList.remove('d-none');
+    }
+    regSetHint('rm_packageHint', '✓ Package selected.', true);
+    document.getElementById('rm_toStep2Btn').disabled = false;
+  });
+}
+
+document.getElementById('rm_toStep2Btn').addEventListener('click', () => {
+  const isFree = document.querySelector('[name="payment_method"]:checked').value === 'free';
+  document.getElementById('rm_referralAlert').style.display = isFree ? 'block' : 'none';
+  regGoStep(2);
+});
+
+function rmBackToStep1() {
+  document.getElementById('rm_referralMode').value = '1';
+  document.getElementById('rm_codeSection').style.display = 'none';
+  document.getElementById('rm_packageSection').style.display = 'none';
+  document.getElementById('rm_reg_code').removeAttribute('required');
+  document.getElementById('rm_toStep2Btn').disabled = false;
+  regGoStep(1);
+}
+
+let rmUTimer;
+document.getElementById('rm_username').addEventListener('input', function() {
+  regUsernameOk = false; clearTimeout(rmUTimer);
+  const v = this.value.trim();
+  if (v.length < 3) { regSetHint('rm_usernameHint', '', null); return; }
+  regSetHint('rm_usernameHint', 'Checking…', null);
+  rmUTimer = setTimeout(async () => {
+    const d = await (await fetch(APP_URL_JS + '/?page=check_username&username=' + encodeURIComponent(v))).json();
+    regUsernameOk = d.available;
+    regSetHint('rm_usernameHint', d.message, d.available);
+  }, 600);
+});
+
+document.getElementById('rm_password_confirm').addEventListener('input', function() {
+  const ok = document.getElementById('rm_password').value === this.value;
+  regSetHint('rm_pwMatchHint', this.value ? (ok ? '✓ Passwords match.' : '✗ Passwords do not match.') : '', this.value ? ok : null);
+});
+
+document.getElementById('rm_toStep3Btn').addEventListener('click', function() {
+  const pw = document.getElementById('rm_password').value;
+  const pwc = document.getElementById('rm_password_confirm').value;
+  const username = document.getElementById('rm_username').value.trim();
+  if (!username) { regSetHint('rm_usernameHint', 'Username is required.', false); return; }
+  if (!regUsernameOk) { regSetHint('rm_usernameHint', 'Please choose a valid, available username.', false); return; }
+  if (pw.length < 8) { alert('Password must be at least 8 characters.'); return; }
+  if (pw !== pwc) { regSetHint('rm_pwMatchHint', 'Passwords do not match.', false); return; }
+
+  const method = document.querySelector('[name="payment_method"]:checked').value;
+  const isFree = method === 'free';
+  document.getElementById('rm_revFreeRow').style.display = isFree ? '' : 'none';
+  document.getElementById('rm_revPayRow').style.display = isFree ? 'none' : '';
+  document.getElementById('rm_revCodeRow').style.display = (!isFree && method === 'code') ? '' : 'none';
+  document.getElementById('rm_revPkgRow').style.display = isFree ? 'none' : '';
+  if (!isFree) {
+    document.getElementById('rm_rev_payment').textContent = method === 'code' ? '🎫 Registration Code' : '💳 E-Wallet';
+    document.getElementById('rm_rev_code').textContent = document.getElementById('rm_validatedCode').value || '—';
+    document.getElementById('rm_rev_package').textContent = method === 'code'
+      ? (regCodeData.package_name || '—')
+      : (regSelectedPkg.name || (PACKAGES.length === 1 ? PACKAGES[0].name : '—'));
+  }
+  document.getElementById('rm_rev_username').textContent = '@' + username;
+  const sponsorVal = document.getElementById('rm_sponsorInput').value.trim() || CURRENT_USER;
+  document.getElementById('rm_sponsor_username').value = sponsorVal;
+  document.getElementById('rm_rev_sponsor').textContent = '@' + sponsorVal;
+  document.getElementById('rm_rev_upline').textContent = '@' + (document.getElementById('rm_upline_username').value || '—');
+  document.getElementById('rm_rev_position').textContent = document.getElementById('rm_position_display').textContent;
+  regGoStep(3);
+});
+
+document.getElementById('rm_regModalForm').addEventListener('submit', function() {
+  document.getElementById('rm_sponsor_username').value = document.getElementById('rm_sponsorInput').value.trim() || CURRENT_USER;
+  const btn = document.getElementById('rm_submitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creating account…';
+});
+}); // end DOMContentLoaded
+<?php endif; ?>
 </script>
+
+<?php if ($view !== 'referral'): ?>
+<link rel="stylesheet" href="<?= APP_URL ?>/assets/css/auth.css">
+<style>
+  /* Modal overrides to reuse auth.css inside a Bootstrap modal */
+  .reg-modal .modal-content { max-width:560px; border-radius:1.25rem; overflow:hidden; box-shadow:0 24px 64px rgba(0,0,0,.25),0 4px 16px rgba(0,0,0,.1); }
+  .reg-modal .modal-dialog { max-width:560px; }
+  .reg-modal .auth-body { padding:1.5rem 2.25rem; }
+  .reg-modal .steps-bar { padding:.875rem 2.25rem; }
+  .reg-modal .auth-footer-compact { text-align:center; padding:0 2.25rem 1.25rem; font-size:.8rem; color:#6b7280; }
+</style>
+
+<div class="modal fade reg-modal" id="regModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+
+      <!-- Header strip (matches register.php logged-in header) -->
+      <div class="d-flex align-items-center gap-3 px-4 py-3 border-bottom" style="background:#f8fafd;">
+        <div style="width:38px;height:38px;border-radius:.625rem;background:var(--primary);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
+          <img src="<?= APP_URL ?>/assets/img/logo.png" style="width:24px;height:24px;object-fit:contain;" alt="">
+        </div>
+        <div class="flex-grow-1">
+          <div style="font-size:.875rem;font-weight:700;">Register New Member</div>
+          <div style="font-size:.72rem;color:var(--muted);">Registering as <strong>@<?= e($user['username']) ?></strong></div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">✕ Cancel</button>
+      </div>
+
+      <!-- Step bar (uses auth.css .steps-bar / .reg-step) -->
+      <div class="steps-bar" id="rm_stepsBar">
+        <div class="reg-step active" id="rm_ind_1">
+          <div class="step-dot">1</div>
+          <div class="step-text">Select Package</div>
+        </div>
+        <div class="reg-step" id="rm_ind_2">
+          <div class="step-dot">2</div>
+          <div class="step-text">Account Setup</div>
+        </div>
+        <div class="reg-step" id="rm_ind_3">
+          <div class="step-dot">3</div>
+          <div class="step-text">Confirm</div>
+        </div>
+      </div>
+
+      <form id="regModalForm" method="POST" action="<?= APP_URL ?>/?page=do_register">
+        <?= csrf_field() ?>
+        <input type="hidden" name="validated_code" id="rm_validatedCode">
+        <input type="hidden" name="sponsor_username" id="rm_sponsor_username">
+        <input type="hidden" name="upline_username" id="rm_upline_username">
+        <input type="hidden" name="binary_position" id="rm_binary_position">
+        <input type="hidden" name="referral_mode" id="rm_referralMode" value="">
+
+        <!-- ── STEP 1: Select Package ── -->
+        <div class="auth-body" id="rm_step1">
+          <p class="text-muted mb-3" style="font-size:.85rem;">Choose payment method and package for the new member.</p>
+
+          <!-- Payment Method Toggle -->
+          <div class="mb-3">
+            <label class="form-label">Payment Method <span class="text-danger">*</span></label>
+            <div class="position-toggle" style="grid-template-columns:1fr 1fr 1fr;">
+              <div class="position-option">
+                <input type="radio" id="rm_pay_free" name="payment_method" value="free" checked required>
+                <label class="position-label" for="rm_pay_free">🎁 Free</label>
+              </div>
+              <div class="position-option">
+                <input type="radio" id="rm_pay_code" name="payment_method" value="code">
+                <label class="position-label" for="rm_pay_code">🎫 Code</label>
+              </div>
+              <div class="position-option">
+                <input type="radio" id="rm_pay_ewallet" name="payment_method" value="ewallet">
+                <label class="position-label" for="rm_pay_ewallet">💳 E-Wallet</label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Code Input -->
+          <div id="rm_codeSection">
+            <div class="mb-3">
+              <label class="form-label">Registration Code <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <input type="text" id="rm_reg_code" name="reg_code" class="form-control font-mono"
+                  placeholder="XXXX-XXXX-XXXX or CD-XXXX-XXXX-XXXX" maxlength="18"
+                  style="text-transform:uppercase;letter-spacing:2px;font-size:1rem;" required>
+                <button type="button" class="btn btn-outline-primary" id="rm_validateCodeBtn">Validate</button>
+              </div>
+              <div class="form-text" id="rm_codeHint"></div>
+            </div>
+          </div>
+
+          <!-- Package Selector (E-Wallet) -->
+          <div id="rm_packageSection" style="display:none;">
+            <div class="mb-3">
+              <label class="form-label">Package <span class="text-danger">*</span></label>
+              <?php if (count($packages ?? []) === 1): ?>
+                <?php $mp = ($packages ?? [])[0]; ?>
+                <input type="hidden" name="package_id" id="rm_packageId" value="<?= (int)$mp['id'] ?>">
+                <div class="card border-primary">
+                  <div class="card-body">
+                    <div class="fw-bold text-primary"><?= e($mp['name']) ?></div>
+                    <div style="font-size:.8rem;color:var(--muted);">
+                      Entry: <?= fmt_money((float)$mp['entry_fee']) ?> ·
+                      Bonus: <?= fmt_money((float)$mp['pairing_bonus']) ?> ·
+                      Cap: <?= (int)$mp['daily_pair_cap'] ?> pairs/day
+                    </div>
+                  </div>
+                </div>
+                <div class="form-text text-success">✓ Package auto-selected.</div>
+              <?php else: ?>
+                <select class="form-select" id="rm_packageSelect" name="package_id">
+                  <option value="">Select a package…</option>
+                  <?php foreach ($packages ?? [] as $pkg): ?>
+                    <option value="<?= (int)$pkg['id'] ?>"
+                      data-name="<?= e($pkg['name']) ?>"
+                      data-fee="<?= fmt_money((float)$pkg['entry_fee']) ?>"
+                      data-bonus="<?= fmt_money((float)$pkg['pairing_bonus']) ?>"
+                      data-cap="<?= (int)$pkg['daily_pair_cap'] ?>">
+                      <?= e($pkg['name']) ?> — <?= fmt_money((float)$pkg['entry_fee']) ?>
+                    </option>
+                  <?php endforeach; ?>
+                </select>
+                <div class="form-text" id="rm_packageHint"></div>
+                <div id="rm_packageCard" class="code-verified d-none mt-2">
+                  <span style="font-size:1.2rem;">📦</span>
+                  <div>
+                    <div class="fw-bold" id="rm_pkgCardName"></div>
+                    <div style="font-size:.75rem;margin-top:2px;" id="rm_pkgCardDetails"></div>
+                  </div>
+                </div>
+              <?php endif; ?>
+            </div>
+          </div>
+
+          <!-- Code-verified banner -->
+          <div id="rm_packageInfo" class="code-verified d-none">
+            <span style="font-size:1.2rem;">✅</span>
+            <div>
+              <div class="fw-bold" id="rm_pkgName"></div>
+              <div style="font-size:.75rem;margin-top:2px;" id="rm_pkgDetails"></div>
+            </div>
+          </div>
+
+          <!-- Pre-filled tree placement info -->
+          <div class="slot-status" style="margin-bottom:1rem;">
+            <span>↙ Upline: <strong id="rm_upline_display">—</strong></span>
+            <span>Position: <strong id="rm_position_display">—</strong></span>
+          </div>
+          <div style="font-size:.78rem;color:var(--muted);margin-bottom:1rem;">
+            Sponsor: <strong id="rm_sponsor_display">—</strong>
+          </div>
+
+          <button type="button" class="btn btn-primary w-100 btn-lg" id="rm_toStep2Btn" disabled>Continue →</button>
+        </div>
+
+        <!-- ── STEP 2: Account Setup ── -->
+        <div class="auth-body" id="rm_step2" style="display:none;">
+          <div id="rm_referralAlert" class="alert alert-info py-2 mb-3" style="font-size:.85rem;display:none;">
+            🔗 No payment is required now — the member can activate their account later with a registration code or e-wallet.
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Username <span class="text-danger">*</span></label>
+            <input type="text" id="rm_username" name="username" class="form-control"
+              placeholder="3–40 chars, letters/numbers/_" minlength="3" maxlength="40"
+              autocomplete="off" required>
+            <div class="form-text" id="rm_usernameHint"></div>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Password <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <input type="password" id="rm_password" name="password" class="form-control"
+                  placeholder="Min. 8 characters" minlength="8" required>
+                <button type="button" class="btn btn-outline-secondary" onclick="rmTogglePw('rm_password',this)">👁</button>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Confirm Password <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <input type="password" id="rm_password_confirm" name="password_confirm"
+                  class="form-control" placeholder="Repeat password" required>
+                <button type="button" class="btn btn-outline-secondary" onclick="rmTogglePw('rm_password_confirm',this)">👁</button>
+              </div>
+              <div class="form-text" id="rm_pwMatchHint"></div>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Sponsor Username <span class="text-danger">*</span></label>
+            <input type="text" id="rm_sponsorInput" class="form-control"
+              placeholder="Sponsor's username" autocomplete="off" required>
+            <div class="form-text" id="rm_sponsorHint"></div>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary" onclick="rmBackToStep1()">← Back</button>
+            <button type="button" class="btn btn-primary flex-grow-1" id="rm_toStep3Btn">Review →</button>
+          </div>
+        </div>
+
+        <!-- ── STEP 3: Confirm ── -->
+        <div class="auth-body" id="rm_step3" style="display:none;">
+          <p class="text-muted mb-3" style="font-size:.85rem;">Review before completing registration.</p>
+          <div class="card mb-3">
+            <div class="card-header"><span class="card-title">📋 Registration Summary</span></div>
+            <div class="card-body">
+              <table class="info-table">
+                <tr id="rm_revFreeRow" style="display:none;">
+                  <td>Activation</td>
+                  <td><span class="badge bg-warning text-dark">Pending</span></td>
+                </tr>
+                <tr id="rm_revPayRow">
+                  <td>Payment</td>
+                  <td id="rm_rev_payment">—</td>
+                </tr>
+                <tr id="rm_revCodeRow">
+                  <td>Code</td>
+                  <td><span class="reg-code" id="rm_rev_code">—</span></td>
+                </tr>
+                <tr id="rm_revPkgRow">
+                  <td>Package</td>
+                  <td id="rm_rev_package">—</td>
+                </tr>
+                <tr>
+                  <td>Username</td>
+                  <td id="rm_rev_username" class="fw-bold">—</td>
+                </tr>
+                <tr>
+                  <td>Sponsor</td>
+                  <td id="rm_rev_sponsor">—</td>
+                </tr>
+                <tr>
+                  <td>Upline</td>
+                  <td id="rm_rev_upline">—</td>
+                </tr>
+                <tr>
+                  <td>Position</td>
+                  <td id="rm_rev_position">—</td>
+                </tr>
+              </table>
+            </div>
+          </div>
+          <div class="alert alert-warning py-2 mb-3" style="font-size:.8rem;">
+            ⚠️ Binary position cannot be changed after registration.
+          </div>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary" onclick="regGoStep(2)">← Back</button>
+            <button type="submit" class="btn btn-primary flex-grow-1 btn-lg" id="rm_submitBtn">
+              ✓ Complete Registration
+            </button>
+          </div>
+        </div>
+
+      </form>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
 
 <?php require 'views/partials/footer.php'; ?>
