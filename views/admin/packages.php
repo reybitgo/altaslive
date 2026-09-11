@@ -13,6 +13,33 @@
   <div class="page-content">
     <?= render_flash() ?>
 
+    <!-- Toggle badge styles: OFF badges get a red diagonal slash overlay -->
+    <style>
+      .toggle-badge {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 28px;
+        padding: 3px 7px;
+        font-size: .8rem;
+      }
+      .toggle-badge.toggle-off {
+        opacity: .6;
+        filter: grayscale(.4);
+      }
+      .toggle-badge.toggle-off::after {
+        content: '';
+        position: absolute;
+        inset: 2px;
+        background: linear-gradient(40deg,
+          transparent  calc(50% - 1px),
+          rgba(244,63,94,.85) calc(50% - 1px),
+          rgba(244,63,94,.85) calc(50% + 1px),
+          transparent  calc(50% + 1px));
+      }
+    </style>
+
     <!-- Header -->
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
       <div>
@@ -113,9 +140,9 @@
                   </td>
                   <td class="text-center">
                     <div style="display:flex;gap:5px;flex-wrap:nowrap;justify-content:center;">
-                      <span class="badge <?= (int)$pkg['pairing_enabled'] === 1 ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary' ?>" title="Binary Network: <?= (int)$pkg['pairing_enabled'] === 1 ? 'ON' : 'OFF' ?>">🌳</span>
-                      <span class="badge <?= (int)$pkg['indirect_referral_enabled'] === 1 ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary' ?>" title="Indirect Referral: <?= (int)$pkg['indirect_referral_enabled'] === 1 ? 'ON' : 'OFF' ?>">🔗</span>
-                      <span class="badge <?= (int)$pkg['dfi_enabled'] === 1 ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary' ?>" title="Daily Fixed Income: <?= (int)$pkg['dfi_enabled'] === 1 ? 'ON' : 'OFF' ?>">📅</span>
+                      <span class="badge toggle-badge <?= (int)$pkg['pairing_enabled'] === 1 ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary toggle-off' ?>" title="Binary Network: <?= (int)$pkg['pairing_enabled'] === 1 ? 'ON' : 'OFF' ?>">🌳</span>
+                      <span class="badge toggle-badge <?= (int)$pkg['indirect_referral_enabled'] === 1 ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary toggle-off' ?>" title="Indirect Referral: <?= (int)$pkg['indirect_referral_enabled'] === 1 ? 'ON' : 'OFF' ?>">🔗</span>
+                      <span class="badge toggle-badge <?= (int)$pkg['dfi_enabled'] === 1 ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary toggle-off' ?>" title="Daily Fixed Income: <?= (int)$pkg['dfi_enabled'] === 1 ? 'ON' : 'OFF' ?>">📅</span>
                     </div>
                   </td>
                   <td class="text-center">
@@ -336,9 +363,9 @@
               <span class="badge bg-secondary-subtle text-secondary" style="font-size:.72rem;">○ Inactive</span>
             <?php endif; ?>
             <div style="display:flex;gap:5px;flex-wrap:nowrap;justify-content:center;">
-              <span class="badge <?= (int)$viewPkg['pairing_enabled'] === 1 ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary' ?>" title="Binary Network: <?= (int)$viewPkg['pairing_enabled'] === 1 ? 'ON' : 'OFF' ?>">🌳</span>
-              <span class="badge <?= (int)$viewPkg['indirect_referral_enabled'] === 1 ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary' ?>" title="Indirect Referral: <?= (int)$viewPkg['indirect_referral_enabled'] === 1 ? 'ON' : 'OFF' ?>">🔗</span>
-              <span class="badge <?= (int)$viewPkg['dfi_enabled'] === 1 ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary' ?>" title="Daily Fixed Income: <?= (int)$viewPkg['dfi_enabled'] === 1 ? 'ON' : 'OFF' ?>">📅</span>
+              <span class="badge toggle-badge <?= (int)$viewPkg['pairing_enabled'] === 1 ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary toggle-off' ?>" title="Binary Network: <?= (int)$viewPkg['pairing_enabled'] === 1 ? 'ON' : 'OFF' ?>">🌳</span>
+              <span class="badge toggle-badge <?= (int)$viewPkg['indirect_referral_enabled'] === 1 ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary toggle-off' ?>" title="Indirect Referral: <?= (int)$viewPkg['indirect_referral_enabled'] === 1 ? 'ON' : 'OFF' ?>">🔗</span>
+              <span class="badge toggle-badge <?= (int)$viewPkg['dfi_enabled'] === 1 ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary toggle-off' ?>" title="Daily Fixed Income: <?= (int)$viewPkg['dfi_enabled'] === 1 ? 'ON' : 'OFF' ?>">📅</span>
             </div>
           </div>
         </div>
