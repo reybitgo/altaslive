@@ -136,6 +136,7 @@ class MemberController
         $user     = Auth::user();
         $view     = $_GET['view'] ?? 'binary'; // 'binary' | 'referral'
         $packages = Package::all(true);
+        $binaryPackages = array_values(array_filter($packages, fn($p) => (int)($p['pairing_enabled'] ?? 1) === 1));
         $pairingEnabled = Package::hasPairing((int)$user['package_id']);
 
         // Admins may always view the binary tree; non-binary members never see it

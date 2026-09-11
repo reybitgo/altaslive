@@ -988,7 +988,7 @@
   let regCodeData={},regSelectedPkg={},regUsernameOk=false,regSlotData={};
   let regCurrentStep=1;
   let regBinaryEnabled=true;
-  const PACKAGES=<?= json_encode(array_map(fn($p)=>['id'=>$p['id'],'name'=>$p['name'],'entry_fee'=>fmt_money((float)$p['entry_fee']),'pairing_bonus'=>fmt_money((float)$p['pairing_bonus']),'daily_pair_cap'=>(int)$p['daily_pair_cap'],'pairing_enabled'=>(int)($p['pairing_enabled'] ?? 1) === 1], $packages ?? [])) ?>;
+  const PACKAGES=<?= json_encode(array_map(fn($p)=>['id'=>$p['id'],'name'=>$p['name'],'entry_fee'=>fmt_money((float)$p['entry_fee']),'pairing_bonus'=>fmt_money((float)$p['pairing_bonus']),'daily_pair_cap'=>(int)$p['daily_pair_cap'],'pairing_enabled'=>(int)($p['pairing_enabled'] ?? 1) === 1], $binaryPackages ?? [])) ?>;
   const CSRF_TOKEN='<?= csrf_token() ?>';
   const APP_URL_JS='<?= APP_URL ?>';
   const CURRENT_USER='<?= e($user["username"]) ?>';
@@ -1254,15 +1254,15 @@ document.querySelectorAll('[name="payment_method"]').forEach(r=>{
           <div id="rm_packageSection" style="display:none;">
             <div class="mb-3">
               <label class="form-label">Package <span class="text-danger">*</span></label>
-              <?php if (count($packages ?? []) === 1): ?>
-                <?php $mp = ($packages ?? [])[0]; ?>
+              <?php if (count($binaryPackages ?? []) === 1): ?>
+                <?php $mp = ($binaryPackages ?? [])[0]; ?>
                 <input type="hidden" name="package_id" id="rm_packageId" value="<?= (int)$mp['id'] ?>">
                 <div class="card border-primary"><div class="card-body"><div class="fw-bold text-primary"><?= e($mp['name']) ?></div><div style="font-size:.8rem;color:var(--muted);">Entry: <?= fmt_money((float)$mp['entry_fee']) ?> · Bonus: <?= fmt_money((float)$mp['pairing_bonus']) ?> · Cap: <?= (int)$mp['daily_pair_cap'] ?> pairs/day</div></div></div>
                 <div class="form-text text-success">✓ Package auto-selected.</div>
               <?php else: ?>
                 <select class="form-select" id="rm_packageSelect" name="package_id">
                   <option value="">Select a package…</option>
-                  <?php foreach ($packages ?? [] as $pkg): ?>
+                  <?php foreach ($binaryPackages ?? [] as $pkg): ?>
                     <option value="<?= (int)$pkg['id'] ?>" data-name="<?= e($pkg['name']) ?>" data-fee="<?= fmt_money((float)$pkg['entry_fee']) ?>" data-bonus="<?= fmt_money((float)$pkg['pairing_bonus']) ?>" data-cap="<?= (int)$pkg['daily_pair_cap'] ?>" data-pairing="<?= (int)($pkg['pairing_enabled'] ?? 1) === 1 ? '1' : '0' ?>"><?= e($pkg['name']) ?> — <?= fmt_money((float)$pkg['entry_fee']) ?></option>
                   <?php endforeach; ?>
                 </select>
