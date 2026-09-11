@@ -196,8 +196,8 @@
                         <div class="fw-bold text-primary"><?= e($pkg['name']) ?></div>
                         <div style="font-size:.8rem;color:var(--muted);">
                           Entry: <?= fmt_money((float)$pkg['entry_fee']) ?> ·
-                          Bonus: <?= fmt_money((float)$pkg['pairing_bonus']) ?> ·
-                          Cap: <?= (int)$pkg['daily_pair_cap'] ?> pairs/day
+                          Pair volume: <?= fmt_money((float)$pkg['pairing_bonus']) ?> ·
+                          Cap: <?= fmt_money((float)$pkg['daily_pair_cap'] * (float)$pkg['pairing_bonus']) ?>/day
                         </div>
                       </div>
                     </div>
@@ -334,7 +334,7 @@
         codeData = data;
         document.getElementById('pkgName').textContent = data.package_name;
         document.getElementById('pkgDetails').textContent =
-          'Entry: ' + data.entry_fee + ' · Bonus: ' + data.pairing_bonus + ' · Cap: ' + data.daily_cap + ' pairs/day';
+          'Entry: ' + data.entry_fee + ' · Pair volume: ' + data.volume + ' · Cap: ' + data.cap_pesos + '/day';
         document.getElementById('packageInfo').classList.remove('d-none');
         document.getElementById('validatedCode').value = code;
         setHint('codeHint', '✓ Code is valid!', true);

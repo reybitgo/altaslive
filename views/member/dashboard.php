@@ -167,7 +167,7 @@
       }
       $cards = [
         [$user['ewallet_balance'], 'E-Wallet Balance',   '💰', 'primary', 'primary', $balanceSub, '/?page=payout'],
-        [$summary['total_pairing'],  'Pairing Earnings', '🤝', 'success', 'success', number_format($user['pairs_paid']) . ' pairs lifetime', null],
+        [$summary['total_pairing'],  'Pairing Earnings', '🤝', 'success', 'success', fmt_money($status['matched_volume']) . ' matched lifetime', null],
         [$summary['total_direct'],   'Direct Referral',  '👥', 'orange',  'warning', null, '/?page=genealogy&view=referral'],
         ...(Package::hasIndirectReferral((int)$user['package_id']) ? [
           [$summary['total_indirect'], 'Indirect Referral', '🔗', 'purple',  'purple',  'Up to 10 levels', null],
@@ -287,8 +287,8 @@
               <div class="cap-bar-fill <?= $pct >= 100 ? 'full' : '' ?>" style="width:<?= $pct ?>%"></div>
             </div>
             <div class="d-flex justify-content-between" style="font-size:.78rem;color:var(--muted);">
-              <span><strong><?= $status['pairs_paid_today'] ?></strong> earned today</span>
-              <span><strong><?= $status['cap_remaining'] ?></strong> / <?= $status['daily_cap'] ?> remaining</span>
+              <span><strong><?= fmt_money($status['pairs_volume_today']) ?></strong> matched today</span>
+              <span><strong><?= fmt_money($status['cap_remaining']) ?></strong> / <?= fmt_money($status['daily_cap_pesos']) ?> remaining</span>
             </div>
             <div class="cap-earned mt-2">
               <span>Earned today</span>
@@ -317,23 +317,23 @@
               <div class="col-6">
                 <div class="leg-box text-center">
                   <div class="leg-label">↙ Left Leg</div>
-                  <div class="leg-count"><?= number_format($status['left_count']) ?></div>
-                  <div style="font-size:.72rem;color:var(--muted);">members</div>
+                  <div class="leg-count"><?= number_format($status['left_pair_volume']) ?></div>
+                  <div style="font-size:.72rem;color:var(--muted);"><?= $status['left_count'] ?> <?= $status['left_count'] == 1 ? 'head' : 'heads' ?></div>
                 </div>
               </div>
               <div class="col-6">
                 <div class="leg-box text-center">
                   <div class="leg-label">↘ Right Leg</div>
-                  <div class="leg-count"><?= number_format($status['right_count']) ?></div>
-                  <div style="font-size:.72rem;color:var(--muted);">members</div>
+                  <div class="leg-count"><?= number_format($status['right_pair_volume']) ?></div>
+                  <div style="font-size:.72rem;color:var(--muted);"><?= $status['right_count'] ?> <?= $status['right_count'] == 1 ? 'head' : 'heads' ?></div>
                 </div>
               </div>
             </div>
             <?php foreach (
               [
-                ['Lifetime pairs paid', number_format($status['pairs_paid']), ''],
-                ['Pairs flushed',       number_format($status['pairs_flushed']), 'color:var(--warning)'],
-                ['Bonus / pair',        fmt_money($status['pairing_bonus']),  'color:var(--success)'],
+                ['Lifetime matched volume',  fmt_money($status['matched_volume']), ''],
+                ['Matched volume flushed',   fmt_money($status['pairs_volume_flushed']), 'color:var(--warning)'],
+                ['Unmatched volume (carryover)', fmt_money($status['unpaired_volume']), 'color:var(--success)'],
               ] as [$k, $v, $s]
             ): ?>
               <div class="d-flex justify-content-between py-1 border-bottom" style="font-size:.8rem;">

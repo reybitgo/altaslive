@@ -985,7 +985,7 @@
 
 <?php if ($view !== 'referral'): ?>
 <script>
-  let regCodeData={},regSelectedPkg={},regUsernameOk=false,regSlotData={};
+  let regCodeData={},regSelectedPkg={},regUsernameOk=false,regSlotData={},regSponsorOk=false;
   let regCurrentStep=1;
   let regBinaryEnabled=true;
   const PACKAGES=<?= json_encode(array_map(fn($p)=>['id'=>$p['id'],'name'=>$p['name'],'entry_fee'=>fmt_money((float)$p['entry_fee']),'pairing_bonus'=>fmt_money((float)$p['pairing_bonus']),'daily_pair_cap'=>(int)$p['daily_pair_cap'],'pairing_enabled'=>(int)($p['pairing_enabled'] ?? 1) === 1], $binaryPackages ?? [])) ?>;
@@ -1016,6 +1016,8 @@
     document.getElementById('rm_sponsor_username').value=CURRENT_USER;
     document.getElementById('rm_sponsor_display').textContent='@'+CURRENT_USER;
     document.getElementById('rm_sponsorInput').value=CURRENT_USER;
+    regSponsorOk=true;
+    regSetHint('rm_sponsorHint','Sponsor is valid.',true);
     document.getElementById('rm_codeSection').style.display='none';
     document.getElementById('rm_packageSection').style.display='none';
     document.getElementById('rm_packageInfo').classList.add('d-none');
@@ -1107,7 +1109,7 @@ document.querySelectorAll('[name="payment_method"]').forEach(r=>{
       try{
         const fd=new FormData();fd.append('code',code);fd.append('csrf_token',CSRF_TOKEN);
         const d=await(await fetch(APP_URL_JS+'/?page=validate_code',{method:'POST',body:fd})).json();
-        if(d.valid){regCodeData=d;rmSetBinaryEnabled(d.pairing_enabled!==false);document.getElementById('rm_pkgName').textContent=d.package_name;document.getElementById('rm_pkgDetails').textContent='Entry: '+d.entry_fee+' · Bonus: '+d.pairing_bonus+' · Cap: '+d.daily_cap+' pairs/day';document.getElementById('rm_packageInfo').classList.remove('d-none');document.getElementById('rm_validatedCode').value=code;document.getElementById('rm_toStep2Btn').disabled=false;regSetHint('rm_codeHint','✓ Code is valid!',true);}
+        if(d.valid){regCodeData=d;rmSetBinaryEnabled(d.pairing_enabled!==false);document.getElementById('rm_pkgName').textContent=d.package_name;document.getElementById('rm_pkgDetails').textContent='Entry: '+d.entry_fee+' · Pair volume: '+d.volume+' · Cap: '+d.cap_pesos+'/day';document.getElementById('rm_packageInfo').classList.remove('d-none');document.getElementById('rm_validatedCode').value=code;document.getElementById('rm_toStep2Btn').disabled=false;regSetHint('rm_codeHint','✓ Code is valid!',true);}
         else{regSetHint('rm_codeHint',d.message||'Invalid code.',false);}
       }catch(e){regSetHint('rm_codeHint','Network error.',false);}
       this.disabled=false;this.textContent='Validate';
@@ -1143,6 +1145,14 @@ document.querySelectorAll('[name="payment_method"]').forEach(r=>{
       rmUTimer=setTimeout(async()=>{const d=await(await fetch(APP_URL_JS+'/?page=check_username&username='+encodeURIComponent(v))).json();regUsernameOk=d.available;regSetHint('rm_usernameHint',d.message,d.available);},600);
     });
 
+    let rmSTimer;
+    document.getElementById('rm_sponsorInput').addEventListener('input',function(){
+      regSponsorOk=false;clearTimeout(rmSTimer);const v=this.value.trim();
+      if(!v){regSetHint('rm_sponsorHint','',null);return;}
+      regSetHint('rm_sponsorHint','Checking…',null);
+      rmSTimer=setTimeout(async()=>{const d=await(await fetch(APP_URL_JS+'/?page=check_username&username='+encodeURIComponent(v))).json();regSponsorOk=!d.available;regSetHint('rm_sponsorHint',regSponsorOk?'Sponsor is valid.':'Sponsor not found.',regSponsorOk);},600);
+    });
+
     document.getElementById('rm_password_confirm').addEventListener('input',function(){
       const ok=document.getElementById('rm_password').value===this.value;
       regSetHint('rm_pwMatchHint',this.value?(ok?'✓ Passwords match.':'✗ Passwords do not match.'):'',this.value?ok:null);
@@ -1152,6 +1162,8 @@ document.querySelectorAll('[name="payment_method"]').forEach(r=>{
       const pw=document.getElementById('rm_password').value,pwc=document.getElementById('rm_password_confirm').value,username=document.getElementById('rm_username').value.trim();
       if(!username){regSetHint('rm_usernameHint','Username is required.',false);return;}
       if(!regUsernameOk){regSetHint('rm_usernameHint','Please choose a valid, available username.',false);return;}
+      const sponsorVal=document.getElementById('rm_sponsorInput').value.trim()||CURRENT_USER;
+      if(!regSponsorOk&&sponsorVal!==CURRENT_USER){regSetHint('rm_sponsorHint','Please enter a valid sponsor.',false);return;}
       if(pw.length<8){alert('Password must be at least 8 characters.');return;}
       if(pw!==pwc){regSetHint('rm_pwMatchHint','Passwords do not match.',false);return;}
       const pos=document.getElementById('rm_binary_position').value;
@@ -1257,7 +1269,7 @@ document.querySelectorAll('[name="payment_method"]').forEach(r=>{
               <?php if (count($binaryPackages ?? []) === 1): ?>
                 <?php $mp = ($binaryPackages ?? [])[0]; ?>
                 <input type="hidden" name="package_id" id="rm_packageId" value="<?= (int)$mp['id'] ?>">
-                <div class="card border-primary"><div class="card-body"><div class="fw-bold text-primary"><?= e($mp['name']) ?></div><div style="font-size:.8rem;color:var(--muted);">Entry: <?= fmt_money((float)$mp['entry_fee']) ?> · Bonus: <?= fmt_money((float)$mp['pairing_bonus']) ?> · Cap: <?= (int)$mp['daily_pair_cap'] ?> pairs/day</div></div></div>
+                <div class="card border-primary"><div class="card-body"><div class="fw-bold text-primary"><?= e($mp['name']) ?></div><div style="font-size:.8rem;color:var(--muted);">Entry: <?= fmt_money((float)$mp['entry_fee']) ?> · Pair volume: <?= fmt_money((float)$mp['pairing_bonus']) ?> · Cap: <?= fmt_money((float)$mp['daily_pair_cap'] * (float)$mp['pairing_bonus']) ?>/day</div></div></div>
                 <div class="form-text text-success">✓ Package auto-selected.</div>
               <?php else: ?>
                 <select class="form-select" id="rm_packageSelect" name="package_id">

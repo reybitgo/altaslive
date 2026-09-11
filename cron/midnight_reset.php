@@ -121,22 +121,27 @@ try {
     $activeMembers   = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role = 'member' AND status = 'active'")->fetchColumn();
     $nonZeroMembers  = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role = 'member' AND pairs_paid_today > 0")->fetchColumn();
     $totalPairsToday = (int)$pdo->query("SELECT COALESCE(SUM(pairs_paid_today), 0) FROM users WHERE role = 'member'")->fetchColumn();
+    $nonZeroVol     = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role = 'member' AND pairs_volume_today > 0")->fetchColumn();
+    $totalVolToday  = (float)$pdo->query("SELECT COALESCE(SUM(pairs_volume_today), 0) FROM users WHERE role = 'member'")->fetchColumn();
 
     log_info("Members (total)         : {$totalMembers}", $logFile);
     log_info("Members (active)        : {$activeMembers}", $logFile);
     log_info("Members with pairs today  : {$nonZeroMembers}", $logFile);
     log_info("Total pairs today       : {$totalPairsToday}", $logFile);
+    log_info("Members with volume today : {$nonZeroVol}", $logFile);
+    log_info("Total matched volume today: " . number_format($totalVolToday, 2), $logFile);
 
-    // ── 3. Perform pairs_paid_today reset ───────────────────────────────────
-    $affected = $pdo->exec("UPDATE users SET pairs_paid_today = 0 WHERE role = 'member'");
-    log_ok("pairs_paid_today reset to 0. Rows updated: {$affected}", $logFile);
+    // ── 3. Perform pairs_paid_today reset (count + volume) ──────────────────
+    $affected = $pdo->exec("UPDATE users SET pairs_paid_today = 0, pairs_volume_today = 0 WHERE role = 'member'");
+    log_ok("pairs_paid_today / pairs_volume_today reset to 0. Rows updated: {$affected}", $logFile);
 
     // ── 4. Verify reset applied ───────────────────────────────────────────────
     $remaining = (int)$pdo->query("SELECT COALESCE(SUM(pairs_paid_today), 0) FROM users WHERE role = 'member'")->fetchColumn();
-    if ($remaining === 0) {
-        log_ok('Verification passed — all pairs_paid_today confirmed at 0.', $logFile);
+    $remainingVol = (float)$pdo->query("SELECT COALESCE(SUM(pairs_volume_today), 0) FROM users WHERE role = 'member'")->fetchColumn();
+    if ($remaining === 0 && $remainingVol == 0) {
+        log_ok('Verification passed — all daily pairing counters confirmed at 0.', $logFile);
     } else {
-        log_warn("Verification warning — {$remaining} total pairs_paid_today remain non-zero after reset.", $logFile);
+        log_warn("Verification warning — {$remaining} total pairs and " . number_format($remainingVol, 2) . " matched volume remain non-zero after reset.", $logFile);
     }
 
     // ── 5. Update last_reset timestamp ────────────────────────────────────────

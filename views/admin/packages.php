@@ -97,7 +97,7 @@
             <tr>
               <th style="padding-left:1.25rem;">Package</th>
               <th class="text-end">Entry</th>
-              <th class="text-end">Pair</th>
+              <th class="text-end">Volume</th>
               <th class="text-end">Cap</th>
               <th class="text-center">DFI</th>
               <th class="text-center">Toggles</th>

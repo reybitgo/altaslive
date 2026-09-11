@@ -170,8 +170,8 @@ if ($isLoggedIn && !$prefillSponsor) {
                                 <div class="fw-bold text-primary"><?= e($pkg['name']) ?></div>
                                 <div style="font-size:.8rem;color:var(--muted);">
                                   Entry: <?= fmt_money((float)$pkg['entry_fee']) ?> ·
-                                  Bonus: <?= fmt_money((float)$pkg['pairing_bonus']) ?> ·
-                                  Cap: <?= (int)$pkg['daily_pair_cap'] ?> pairs/day
+                                  Pair volume: <?= fmt_money((float)$pkg['pairing_bonus']) ?> ·
+                                  Cap: <?= fmt_money((float)$pkg['daily_pair_cap'] * (float)$pkg['pairing_bonus']) ?>/day
                                 </div>
                               </div>
                             </div>
@@ -621,7 +621,7 @@ if ($isLoggedIn && !$prefillSponsor) {
         setBinaryEnabled(data.pairing_enabled !== false);
         document.getElementById('pkgName').textContent = data.package_name;
         document.getElementById('pkgDetails').textContent =
-          'Entry: ' + data.entry_fee + ' · Bonus: ' + data.pairing_bonus + ' · Cap: ' + data.daily_cap + ' pairs/day';
+          'Entry: ' + data.entry_fee + ' · Pair volume: ' + data.volume + ' · Cap: ' + data.cap_pesos + '/day';
         document.getElementById('packageInfo').classList.remove('d-none');
         document.getElementById('validatedCode').value = code;
         document.getElementById('toStep2Btn').disabled = false;
@@ -707,7 +707,7 @@ if ($isLoggedIn && !$prefillSponsor) {
   async function checkSponsor(v) {
     const data = await (await fetch(API + '/?page=check_username&username=' + encodeURIComponent(v))).json();
     sponsorOk = !data.available;
-    setHint('sponsorHint', sponsorOk ? '✓ Sponsor @' + v + ' found.' : '✗ Sponsor not found.', sponsorOk);
+    setHint('sponsorHint', sponsorOk ? 'Sponsor is valid.' : 'Sponsor not found.', sponsorOk);
   }
 
   // ── Upline + slot ─────────────────────────────────────────────

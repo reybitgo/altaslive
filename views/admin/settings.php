@@ -226,7 +226,7 @@
           <div class="card-header"><span class="card-title">⏱️ Daily Pair Cap Reset</span></div>
           <div class="card-body">
             <p class="text-muted mb-3" style="font-size:.85rem;line-height:1.7;">
-              The midnight cron resets <code>pairs_paid_today = 0</code> for all members, clearing the daily pairing cap so they can earn again tomorrow.
+              The midnight cron resets <code>pairs_paid_today = 0</code> and <code>pairs_volume_today = 0</code> for all members, clearing the daily pairing (matched volume) cap so they can earn again tomorrow.
             </p>
             <div class="rounded p-3 mb-3" style="background:#f4f6fb;">
               <div class="text-muted mb-1" style="font-size:.68rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;">Last Reset</div>

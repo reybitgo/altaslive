@@ -186,8 +186,8 @@
           ['E-Wallet Balance', fmt_money($user['ewallet_balance']),              'primary', 'primary',
            fmt_money((float)($user['withdrawable_balance'] ?? 0)) . ' withdrawable · ' . fmt_money(max(0, (float)$user['ewallet_balance'] - (float)($user['withdrawable_balance'] ?? 0))) . ' internal'],
           ['Total Earned',     fmt_money($summary['total_earned']),              'success', 'success'],
-          ['Pairs Paid / Today', $pairingStatus['pairs_paid'] . ' / ' . $pairingStatus['pairs_paid_today'], 'orange', 'warning'],
-          ['Pairs Flushed',    number_format($pairingStatus['pairs_flushed']),   'danger', 'danger'],
+          ['Matched ₱ / Today', fmt_money($pairingStatus['pairs_volume_paid']) . ' / ' . fmt_money($pairingStatus['pairs_volume_today']), 'orange', 'warning'],
+          ['Matched ₱ Flushed',  fmt_money($pairingStatus['pairs_volume_flushed']),   'danger', 'danger'],
         ] as $card
       ): ?>
         <?php [$label, $val, $accent, $color] = $card; $subText = $card[4] ?? null; ?>
@@ -201,7 +201,7 @@
               </div>
               <div class="mt-auto">
                 <?php if ($subText): ?><div class="stat-sub"><?= $subText ?></div><?php endif; ?>
-                <?php if ($label === 'Pairs Paid / Today'): ?><div class="stat-sub">Cap: <?= $pairingStatus['daily_cap'] ?> / day</div><?php endif; ?>
+                <?php if ($label === 'Matched ₱ / Today'): ?><div class="stat-sub">Cap: <?= fmt_money($pairingStatus['daily_cap_pesos']) ?> / day</div><?php endif; ?>
               </div>
             </div>
           </div>
@@ -272,11 +272,11 @@
               </tr>
               <tr>
                 <td>Pairing Bonus</td>
-                <td><?= fmt_money($user['pairing_bonus'] ?? 0) ?> / pair</td>
+                <td><?= fmt_money($user['pairing_bonus'] ?? 0) ?> / member pair volume</td>
               </tr>
               <tr>
                 <td>Daily Cap</td>
-                <td><?= $user['daily_pair_cap'] ?? 0 ?> pairs / day</td>
+                <td><?= fmt_money(((float)($user['daily_pair_cap'] ?? 0) * (float)($user['pairing_bonus'] ?? 0))) ?> / day</td>
               </tr>
             </table>
             <div class="row g-2 mt-2">
@@ -284,12 +284,14 @@
                 <div class="leg-box text-center">
                   <div class="leg-label">↙ Left</div>
                   <div class="leg-count"><?= number_format($user['left_count']) ?></div>
+                  <div style="font-size:.72rem;color:var(--muted);"><?= fmt_money($user['left_pair_volume'] ?? 0) ?> volume</div>
                 </div>
               </div>
               <div class="col-6">
                 <div class="leg-box text-center">
                   <div class="leg-label">↘ Right</div>
                   <div class="leg-count"><?= number_format($user['right_count']) ?></div>
+                  <div style="font-size:.72rem;color:var(--muted);"><?= fmt_money($user['right_pair_volume'] ?? 0) ?> volume</div>
                 </div>
               </div>
             </div>

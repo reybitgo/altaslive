@@ -67,7 +67,7 @@
               <th>Full Name</th>
               <th>Package</th>
               <th>Balance</th>
-              <th>Pairs</th>
+              <th>Matched ₱</th>
               <th>Joined</th>
               <th>Status</th>
               <th>Actions</th>
@@ -85,7 +85,7 @@
                   <td style="font-size:.825rem;"><?= e($m['full_name'] ?? '—') ?></td>
                   <td><span class="badge bg-primary-subtle text-primary"><?= e($m['package_name'] ?? '—') ?></span></td>
                   <td class="td-green font-mono fw-bold"><?= fmt_money($m['ewallet_balance']) ?></td>
-                  <td class="td-muted font-mono"><?= number_format($m['pairs_paid']) ?></td>
+                  <td class="td-muted font-mono"><?= fmt_money((float)($m['pairs_volume_paid'] ?? 0)) ?></td>
                   <td class="td-muted" style="font-size:.75rem;"><?= fmt_date($m['joined_at']) ?></td>
                   <td>
                     <?php $b = match($m['status']) { 'active' => 'bg-success-subtle text-success', 'suspended' => 'bg-danger-subtle text-danger', 'deactivated' => 'bg-dark-subtle text-dark', default => 'bg-warning-subtle text-warning' }; ?>

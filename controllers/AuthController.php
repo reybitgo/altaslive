@@ -314,7 +314,9 @@ class AuthController
             'package_name'     => $row['package_name'],
             'entry_fee'        => fmt_money((float)$row['entry_fee']),
             'pairing_bonus'    => fmt_money((float)$row['pairing_bonus']),
+            'volume'           => fmt_money((float)$row['pairing_bonus']),
             'daily_cap'        => $row['daily_pair_cap'],
+            'cap_pesos'        => fmt_money((float)$row['daily_pair_cap'] * (float)$row['pairing_bonus']),
             'code_type'        => $row['code_type'] ?? 'registration',
             'pairing_enabled'  => Package::hasPairing((int)$row['package_id']),
         ]);

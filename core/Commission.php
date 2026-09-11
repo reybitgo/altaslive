@@ -9,8 +9,18 @@ class Commission
     // ══════════════════════════════════════════════════════════════════════════
     //  BINARY PLACEMENT ENGINE
     //  Called immediately after a new member is inserted.
-    //  Walks the binary tree upward, updating leg counts on every ancestor and
-    //  firing pairing bonuses in real time for each ancestor that earns one.
+    //  Walks the binary tree upward, updating leg counts AND leg pair volume on
+    //  every ancestor, firing volume-based pairing bonuses in real time for each
+    //  ancestor that earns one.
+    //
+    //  v3 (VOLUME-BASED): Each paid member contributes pair volume equal to their
+    //  own package pairing_bonus. An ancestor earns the MINIMUM of its two legs'
+    //  accumulated volume, settled incrementally so unmatched volume carries over
+    //  for future placements. Daily cap is daily_pair_cap × own pairing_bonus
+    //  pesos/day. Legacy count columns (pairs_paid / pairs_flushed /
+    //  pairs_paid_today) are frozen for audit — money now flows through the
+    //  pairs_volume_* columns.
+    //
     //  v2: Capped/perminact members are SKIPPED — they earn no pairs themselves,
     //      but active ancestors above them continue to earn normally.
     // ══════════════════════════════════════════════════════════════════════════
@@ -26,31 +36,49 @@ class Commission
         $cur  = $parentId;
         $side = $position;
 
-        // Pending/deactivated users increment leg counts but do NOT trigger pairing bonuses.
+        // Pending/deactivated users increment leg counts but do NOT trigger
+        // pairing bonuses or contribute pair volume.
         $newUserStatus = $pdo->prepare('SELECT status FROM users WHERE id = ?');
         $newUserStatus->execute([$newUserId]);
         $newUserStatusVal = $newUserStatus->fetchColumn() ?? '';
         $newUserIsActive = $newUserStatusVal === 'active';
         $newUserIsPaid = $newUserIsActive && User::isPaidMember($newUserId);
 
+        // v3: Pair volume contributed by this placement = the new member's own
+        // package pairing_bonus (0.00 for non-paid / CD-sourced / pending bodies).
+        $newVolume = 0.00;
+        if ($newUserIsPaid) {
+            $nv = $pdo->prepare("
+                SELECT COALESCE(p.pairing_bonus, 0.00)
+                FROM   users u
+                LEFT JOIN packages p ON p.id = u.package_id
+                WHERE  u.id = ?
+            ");
+            $nv->execute([$newUserId]);
+            $newVolume = (float)$nv->fetchColumn();
+        }
+
         while ($cur !== null) {
 
-            // 1. Increment the correct leg count on this ancestor.
+            // 1. Increment the correct leg count AND leg pair volume on this ancestor.
             //    Paid leg counts (left_count_paid/right_count_paid) only increment
             //    for non-CD-sourced members, preventing CD bodies from contributing
-            //    to future pairing bonuses.
+            //    to future pairing bonuses. Volume only accumulates for those members.
             if ($incrementCounts) {
                 $col = ($side === 'left') ? 'left_count' : 'right_count';
                 $pdo->prepare("UPDATE users SET {$col} = {$col} + 1 WHERE id = ?")
                     ->execute([$cur]);
                 if ($newUserIsPaid) {
                     $paidCol = ($side === 'left') ? 'left_count_paid' : 'right_count_paid';
-                    $pdo->prepare("UPDATE users SET {$paidCol} = {$paidCol} + 1 WHERE id = ?")
-                        ->execute([$cur]);
+                    $volCol  = ($side === 'left') ? 'left_pair_volume' : 'right_pair_volume';
+                    $pdo->prepare("UPDATE users SET {$paidCol} = {$paidCol} + 1, {$volCol} = {$volCol} + ? WHERE id = ?")
+                        ->execute([$newVolume, $cur]);
                 }
             }
 
-            // v2: Skip capped/perminact members entirely — no pairing bonuses for them
+            // v2: Skip capped/perminact members entirely — no pairing bonuses for them.
+            //     Their leg volume still accumulates while capped (parity with counts);
+            //     earnings resume on reactivation.
             if (!CapEngine::isActiveForPairs($cur)) {
                 // Move to parent but do NOT process pairs for this capped ancestor
                 $upRow = $pdo->prepare(
@@ -65,53 +93,58 @@ class Commission
             }
 
             // 2. Read fresh state (after increment) with package info
+            //    v3: Only members whose package actually pairs (pairing_enabled,
+            //    pairing_bonus > 0) can be settled.
             $st = $pdo->prepare("
                 SELECT u.id, u.left_count, u.right_count,
                        u.left_count_paid, u.right_count_paid,
                        u.pairs_paid, u.pairs_flushed, u.pairs_paid_today,
+                       u.left_pair_volume, u.right_pair_volume,
+                       u.pairs_volume_paid, u.pairs_volume_flushed, u.pairs_volume_today,
                        u.daily_cap_bypass,
                        p.pairing_bonus, p.daily_pair_cap
                 FROM   users u
                 LEFT JOIN packages p ON p.id = u.package_id
                 WHERE  u.id = ? AND u.status = 'active'
-                  AND  p.pairing_bonus IS NOT NULL
+                  AND  p.pairing_bonus IS NOT NULL AND p.pairing_bonus > 0
+                  AND  COALESCE(p.pairing_enabled, 1) = 1
             ");
             $st->execute([$cur]);
             $ancestor = $st->fetch();
 
             // Only fire pairing bonuses if the NEW user is a paid member.
             // CD-sourced and pending users increment leg counts but don't trigger payouts.
-            if ($newUserIsPaid && $ancestor) {
-                $processed = $ancestor['pairs_paid'] + $ancestor['pairs_flushed'];
-                $available = min($ancestor['left_count_paid'], $ancestor['right_count_paid']);
-                $newPairs  = $available - $processed;
+            if ($newUserIsPaid && $ancestor && $newVolume > 0) {
+                $available = min((float)$ancestor['left_pair_volume'], (float)$ancestor['right_pair_volume']);
+                $processed = (float)$ancestor['pairs_volume_paid'] + (float)$ancestor['pairs_volume_flushed'];
+                $newSettle = $available - $processed;
 
-                if ($newPairs > 0) {
+                if ($newSettle > 0) {
                     if (!empty($ancestor['daily_cap_bypass'])) {
-                        $capRemaining = $newPairs; // unlimited daily cap
+                        $capRemaining = $newSettle; // unlimited daily cap
                     } else {
-                        $capRemaining = (int)$ancestor['daily_pair_cap'] - (int)$ancestor['pairs_paid_today'];
+                        $dailyCapPesos = (float)$ancestor['daily_pair_cap'] * (float)$ancestor['pairing_bonus'];
+                        $capRemaining  = $dailyCapPesos - (float)$ancestor['pairs_volume_today'];
                     }
-                    $payNow       = min($newPairs, max(0, $capRemaining));
-                    $flushNow     = $newPairs - $payNow;
+                    $payNow   = min($newSettle, max(0, $capRemaining));
+                    $flushNow = $newSettle - $payNow;
 
-                    // Credit earned pairs immediately — v2: cap-aware
+                    // Credit the matched volume immediately — v3: cap-aware pesos
                     if ($payNow > 0) {
-                        $bonus = $payNow * (float)$ancestor['pairing_bonus'];
-                        self::creditPairing($cur, $bonus, $payNow, $newUserId);
+                        self::creditPairing($cur, $payNow, 1, $newUserId);
                     }
 
-                    // Record flushed pairs (money permanently lost)
+                    // Record flushed volume (money permanently lost)
                     if ($flushNow > 0) {
                         self::recordFlush($cur, $flushNow, $newUserId);
                     }
 
-                    // Update counters in one atomic statement
+                    // Update volume counters in one atomic statement
                     $pdo->prepare("
                         UPDATE users
-                        SET pairs_paid       = pairs_paid       + :pay,
-                            pairs_flushed    = pairs_flushed    + :flush,
-                            pairs_paid_today = pairs_paid_today + :pay2
+                        SET pairs_volume_paid    = pairs_volume_paid    + :pay,
+                            pairs_volume_flushed = pairs_volume_flushed + :flush,
+                            pairs_volume_today   = pairs_volume_today   + :pay2
                         WHERE id = :id
                     ")->execute([
                         ':pay'   => $payNow,
@@ -380,7 +413,6 @@ class Commission
         int $sourceId
     ): void {
         $pdo = db();
-        $perPair = $pairs > 0 ? fmt_money($amount / $pairs) : '₱0.00';
 
         // 1. CD split happens BEFORE lifetime cap
         $cdSplit = CdStatus::fillBucket($userId, $amount);
@@ -397,8 +429,8 @@ class Commission
             $capBlocked = $capCheck['blocked'];
         }
 
-        // 3. Build description
-        $desc = "{$pairs} pair(s) × {$perPair}";
+        // 3. Build description (v3: matched volume in pesos)
+        $desc = 'Matched volume ' . fmt_money($amount);
         if ($cdPortion > 0) {
             $desc .= sprintf(' — %s to CD', fmt_money($cdPortion));
             if ($actualWallet > 0) {
@@ -424,7 +456,7 @@ class Commission
 
         // 5. Credit e-wallet + cap blocked
         if ($actualWallet > 0) {
-            Ewallet::credit($userId, $actualWallet, $commId, 'commission', "Pairing bonus — {$pairs} pair(s)");
+            Ewallet::credit($userId, $actualWallet, $commId, 'commission', 'Pairing bonus — matched volume ' . fmt_money($amount));
         }
         if ($capBlocked > 0) {
             self::recordCapBlocked($userId, $capBlocked, 'pairing', $sourceId, null, $pairs);
@@ -444,7 +476,7 @@ class Commission
         }
     }
 
-    private static function recordFlush(int $userId, int $pairs, int $sourceId): void
+    private static function recordFlush(int $userId, float $matchedVolume, int $sourceId): void
     {
         db()->prepare("
             INSERT INTO commissions
@@ -453,8 +485,8 @@ class Commission
         ")->execute([
             $userId,
             $sourceId,
-            $pairs,
-            "{$pairs} pair(s) flushed — daily cap reached"
+            1,
+            'Matched volume ' . fmt_money($matchedVolume) . ' flushed — daily cap reached'
         ]);
     }
 
@@ -470,7 +502,7 @@ class Commission
         ?int $pairs = null
     ): void {
         $desc = match ($type) {
-            'pairing' => ($pairs ?? 0) . " pair(s) blocked — lifetime cap reached",
+            'pairing' => 'Matched volume ' . fmt_money((float)($pairs ?? 0)) . ' blocked — lifetime cap reached',
             'direct_referral' => "Direct referral blocked — lifetime cap reached",
             'indirect_referral' => "Unilevel L{$level} blocked — lifetime cap reached",
             default => "Commission blocked — lifetime cap reached",

@@ -521,7 +521,7 @@ class AdminController
         Auth::guard('admin');
         csrf_verify();
 
-        $affected = db()->exec("UPDATE users SET pairs_paid_today = 0 WHERE role = 'member'");
+        $affected = db()->exec("UPDATE users SET pairs_paid_today = 0, pairs_volume_today = 0 WHERE role = 'member'");
         db()->prepare("UPDATE settings SET value = ? WHERE key_name = 'last_reset'")
             ->execute([date('Y-m-d H:i:s')]);
 

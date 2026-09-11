@@ -148,9 +148,9 @@ class User
     {
         $pdo = db();
 
-        // Activate the user AND flush all binary pairs that formed while pending.
-        // This prevents retroactive pairing bonuses — only pairs formed AFTER
-        // activation will earn bonuses.
+        // Activate the user AND flush all binary volume that formed while pending.
+        // This prevents retroactive pairing bonuses — only volume formed AFTER
+        // activation will earn bonuses. Legacy count flush kept for audit.
         $pdo->prepare("
             UPDATE users
             SET status = 'active',
@@ -158,7 +158,8 @@ class User
                 reg_code_id = COALESCE(?, reg_code_id),
                 reg_payment_method = ?,
                 joined_at = NOW(),
-                pairs_flushed = LEAST(left_count, right_count)
+                pairs_flushed = LEAST(left_count, right_count),
+                pairs_volume_flushed = LEAST(left_pair_volume, right_pair_volume)
             WHERE id = ? AND status = 'pending'
         ")->execute([$packageId, $regCodeId, $paymentMethod, $userId]);
 
@@ -446,6 +447,11 @@ class User
                 u.pairs_flushed,
                 u.left_count,
                 u.right_count,
+                u.left_pair_volume,
+                u.right_pair_volume,
+                u.pairs_volume_paid,
+                u.pairs_volume_flushed,
+                u.pairs_volume_today,
                 p.pairing_bonus,
                 p.daily_pair_cap,
                 u.lifetime_earned,
@@ -460,43 +466,58 @@ class User
 
         if (!$row) {
             return [
-                'pairs_paid'       => 0,
-                'pairs_paid_today' => 0,
-                'pairs_flushed'    => 0,
-                'left_count'       => 0,
-                'right_count'      => 0,
-                'pairing_bonus'    => 0,
-                'daily_cap'        => 0,
-                'cap_percent'      => 0,
-                'cap_remaining'    => 0,
-                'earned_today'     => fmt_money(0),
-                'lifetime_earned'  => 0,
-                'lifetime_cap'     => 0,
-                'cap_status'       => 'perminact',
+                'pairs_paid'          => 0,
+                'pairs_paid_today'    => 0,
+                'pairs_flushed'       => 0,
+                'left_count'          => 0,
+                'right_count'         => 0,
+                'left_pair_volume'    => 0,
+                'right_pair_volume'   => 0,
+                'unpaired_volume'     => 0,
+                'pairs_volume_paid'   => 0,
+                'pairs_volume_flushed'=> 0,
+                'pairs_volume_today'  => 0,
+                'matched_volume'      => 0,
+                'pairing_bonus'       => 0,
+                'daily_cap'           => 0,
+                'daily_cap_pesos'     => 0,
+                'cap_percent'         => 0,
+                'cap_remaining'       => 0,
+                'earned_today'        => fmt_money(0),
+                'lifetime_earned'     => 0,
+                'lifetime_cap'        => 0,
+                'cap_status'          => 'perminact',
             ];
         }
 
-        $paidToday = (int)$row['pairs_paid_today'];
-        $dailyCap  = (int)$row['daily_pair_cap'];
-        $bonus     = (float)$row['pairing_bonus'];
-        $capPct    = $dailyCap > 0 ? min(100, ($paidToday / $dailyCap) * 100) : 0;
-        $capRem    = max(0, $dailyCap - $paidToday);
-        $earnedToday = $paidToday * $bonus;
+        $bonus        = (float)$row['pairing_bonus'];
+        $matchedToday = (float)$row['pairs_volume_today'];
+        $dailyCapPesos = (float)$row['daily_pair_cap'] * $bonus;
+        $capPct       = $dailyCapPesos > 0 ? min(100, ($matchedToday / $dailyCapPesos) * 100) : 0;
+        $capRem       = max(0, $dailyCapPesos - $matchedToday);
 
         return [
-            'pairs_paid'       => (int)$row['pairs_paid'],
-            'pairs_paid_today' => $paidToday,
-            'pairs_flushed'    => (int)$row['pairs_flushed'],
-            'left_count'       => (int)$row['left_count'],
-            'right_count'      => (int)$row['right_count'],
-            'pairing_bonus'    => $bonus,
-            'daily_cap'        => $dailyCap,
-            'cap_percent'      => round($capPct, 1),
-            'cap_remaining'    => $capRem,
-            'earned_today'     => $earnedToday,  // Raw float — view calls fmt_money()
-            'lifetime_earned'  => (float)$row['lifetime_earned'],
-            'lifetime_cap'     => (float)$row['lifetime_cap'],
-            'cap_status'       => $row['cap_status'],
+            'pairs_paid'          => (int)$row['pairs_paid'],
+            'pairs_paid_today'    => (int)$row['pairs_paid_today'],
+            'pairs_flushed'       => (int)$row['pairs_flushed'],
+            'left_count'          => (int)$row['left_count'],
+            'right_count'         => (int)$row['right_count'],
+            'left_pair_volume'    => (float)$row['left_pair_volume'],
+            'right_pair_volume'   => (float)$row['right_pair_volume'],
+            'unpaired_volume'     => abs((float)$row['left_pair_volume'] - (float)$row['right_pair_volume']),
+            'pairs_volume_paid'   => (float)$row['pairs_volume_paid'],
+            'pairs_volume_flushed'=> (float)$row['pairs_volume_flushed'],
+            'pairs_volume_today'  => $matchedToday,
+            'matched_volume'      => (float)$row['pairs_volume_paid'] + (float)$row['pairs_volume_flushed'],
+            'pairing_bonus'       => $bonus,
+            'daily_cap'           => (int)$row['daily_pair_cap'],
+            'daily_cap_pesos'     => $dailyCapPesos,
+            'cap_percent'         => round($capPct, 1),
+            'cap_remaining'       => $capRem,
+            'earned_today'        => $matchedToday,  // Raw float — view calls fmt_money()
+            'lifetime_earned'     => (float)$row['lifetime_earned'],
+            'lifetime_cap'        => (float)$row['lifetime_cap'],
+            'cap_status'          => $row['cap_status'],
         ];
     }
 
