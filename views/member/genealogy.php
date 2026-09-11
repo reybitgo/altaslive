@@ -1097,7 +1097,6 @@ document.querySelectorAll('[name="payment_method"]').forEach(r=>{
         else{document.getElementById('rm_codeSection').style.display='block';document.getElementById('rm_toStep2Btn').disabled=true;codeInput.setAttribute('required','');}
       });
     });
-    });
 
     document.getElementById('rm_validateCodeBtn').addEventListener('click',async function(){
       const code=document.getElementById('rm_reg_code').value.trim();
