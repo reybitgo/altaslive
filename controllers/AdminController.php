@@ -297,8 +297,12 @@ class AdminController
         Auth::guard('admin');
         $packages = Package::all();
         $editPkg  = null;
+        $viewPkg  = null;
         if (isset($_GET['edit'])) {
             $editPkg = Package::withLevels((int)$_GET['edit']);
+        }
+        if (isset($_GET['view'])) {
+            $viewPkg = Package::withLevels((int)$_GET['view']);
         }
         require 'views/admin/packages.php';
     }
@@ -323,6 +327,9 @@ class AdminController
             'reactivation_window_days' => (int)($_POST['reactivation_window_days']    ?? 15),
             'daily_fixed_income'       => (float)($_POST['daily_fixed_income']       ?? 0),
             'daily_fixed_income_days'  => (int)($_POST['daily_fixed_income_days']    ?? 90),
+            'indirect_referral_enabled' => !empty($_POST['indirect_referral_enabled']) ? 1 : 0,
+            'dfi_enabled'               => !empty($_POST['dfi_enabled']) ? 1 : 0,
+            'pairing_enabled'           => !empty($_POST['pairing_enabled']) ? 1 : 0,
         ];
 
         for ($lvl = 1; $lvl <= 10; $lvl++) {
@@ -386,15 +393,16 @@ class AdminController
         $qty      = min(500, max(1, (int)($_POST['quantity'] ?? 1)));
         $price    = (float)($_POST['price']    ?? 0);
         $expires  = trim($_POST['expires_at']  ?? '');
-        $isCd     = !empty($_POST['is_cd']);
+        $codeType = in_array($_POST['code_type'] ?? 'registration', ['registration', 'cd', 'upgrade'], true)
+            ? $_POST['code_type'] : 'registration';
 
         if (!$pkgId || $price <= 0) {
             flash('error', 'Package and price are required.');
             redirect('/?page=admin_codes');
         }
 
-        $generated = Code::generate($pkgId, $qty, $price, $expires ?: null, Auth::id(), $isCd);
-        flash('success', count($generated) . ' code(s) generated' . ($isCd ? ' (CD)' : '') . ' successfully.');
+        $generated = Code::generate($pkgId, $qty, $price, $expires ?: null, Auth::id(), $codeType);
+        flash('success', count($generated) . ' code(s) generated (' . $codeType . ') successfully.');
         redirect('/?page=admin_codes');
     }
 
@@ -477,7 +485,6 @@ class AdminController
             'usdt_bep20_gas_fee',
             'gcash_enabled',
             'maya_enabled',
-            'dfi_enabled',
             'gcash_number',
             'maya_number',
             'usdt_trc20_address',
@@ -485,7 +492,6 @@ class AdminController
             'default_cap_multiplier',
             'reactivation_ewallet_enabled',
             'reactivation_external_enabled',
-            'indirect_referral_enabled',
             'ewallet_transfer_fee',
             'ewallet_min_transfer',
             'ewallet_transfer_daily_limit',
@@ -498,7 +504,7 @@ class AdminController
         foreach ($allowed as $key) {
             // Checkbox toggles: when unchecked the field is absent from POST,
             // so we explicitly save '0' for these keys when not present.
-            if (in_array($key, ['gcash_enabled', 'maya_enabled', 'dfi_enabled', 'reactivation_ewallet_enabled', 'reactivation_external_enabled', 'indirect_referral_enabled'], true)) {
+            if (in_array($key, ['gcash_enabled', 'maya_enabled', 'reactivation_ewallet_enabled', 'reactivation_external_enabled'], true)) {
                 $value = isset($_POST[$key]) && $_POST[$key] === '1' ? '1' : '0';
                 $st->execute([$key, $value]);
             } elseif (isset($_POST[$key])) {

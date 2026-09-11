@@ -255,8 +255,10 @@
   <div class="page-content">
     <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
       <ul class="nav nav-pills mb-0">
-        <li class="nav-item"><a class="nav-link <?= $view !== 'referral' ? 'active' : '' ?>" href="<?= APP_URL ?>/?page=genealogy&view=binary">🌳 Binary Tree</a></li>
-        <li class="nav-item"><a class="nav-link <?= $view === 'referral' ? 'active' : '' ?>" href="<?= APP_URL ?>/?page=genealogy&view=referral">👥 Referral Network</a></li>
+        <?php if ($pairingEnabled ?? true): ?>
+          <li class="nav-item"><a class="nav-link <?= $view !== 'referral' ? 'active' : '' ?>" href="<?= APP_URL ?>/?page=genealogy&view=binary">🌳 Binary Tree</a></li>
+        <?php endif; ?>
+        <li class="nav-item"><a class="nav-link <?= $view === 'referral' || !($pairingEnabled ?? true) ? 'active' : '' ?>" href="<?= APP_URL ?>/?page=genealogy&view=referral">👥 Referral Network</a></li>
       </ul>
       <div class="ms-auto" style="min-width:220px;max-width:360px;width:100%;">
         <div class="input-group input-group-sm">
@@ -330,7 +332,7 @@
         </div>
       </div>
 
-    <?php elseif (setting('indirect_referral_enabled', '1') === '1'): ?>
+    <?php elseif (Package::hasIndirectReferral((int)$user['package_id'])): ?>
       <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
           <span class="card-title">👥 Referral Network (10 Levels)</span>
@@ -985,12 +987,23 @@
 <script>
   let regCodeData={},regSelectedPkg={},regUsernameOk=false,regSlotData={};
   let regCurrentStep=1;
-  const PACKAGES=<?= json_encode(array_map(fn($p)=>['id'=>$p['id'],'name'=>$p['name'],'entry_fee'=>fmt_money((float)$p['entry_fee']),'pairing_bonus'=>fmt_money((float)$p['pairing_bonus']),'daily_pair_cap'=>(int)$p['daily_pair_cap']], $packages ?? [])) ?>;
+  let regBinaryEnabled=true;
+  const PACKAGES=<?= json_encode(array_map(fn($p)=>['id'=>$p['id'],'name'=>$p['name'],'entry_fee'=>fmt_money((float)$p['entry_fee']),'pairing_bonus'=>fmt_money((float)$p['pairing_bonus']),'daily_pair_cap'=>(int)$p['daily_pair_cap'],'pairing_enabled'=>(int)($p['pairing_enabled'] ?? 1) === 1], $packages ?? [])) ?>;
   const CSRF_TOKEN='<?= csrf_token() ?>';
   const APP_URL_JS='<?= APP_URL ?>';
   const CURRENT_USER='<?= e($user["username"]) ?>';
 
   function rmTogglePw(id,btn){const el=document.getElementById(id);el.type=el.type==='password'?'text':'password';btn.textContent=el.type==='password'?'👁':'🙈';}
+
+  function rmSetBinaryEnabled(on){
+    regBinaryEnabled=!!on;
+    const sec=document.getElementById('rm_binarySection');
+    if(sec)sec.style.display=regBinaryEnabled?'block':'none';
+    const left=document.getElementById('rm_pos_left'),right=document.getElementById('rm_pos_right');
+    if(left)left.required=regBinaryEnabled;
+    if(right)right.required=regBinaryEnabled;
+    if(!regBinaryEnabled&&left&&right){left.checked=false;right.checked=false;document.getElementById('rm_binary_position').value='';document.getElementById('rm_position_display').textContent='N/A';}
+  }
 
   function openRegisterModal(data){
     const modal=document.getElementById('regModal');
@@ -1069,18 +1082,21 @@
       });
     });
 
-    document.querySelectorAll('[name="payment_method"]').forEach(r=>{
+document.querySelectorAll('[name="payment_method"]').forEach(r=>{
       r.addEventListener('change',function(){
         regResetCodeState();
         const v=this.value,isFree=v==='free';
         document.getElementById('rm_codeSection').style.display='none';
         document.getElementById('rm_packageSection').style.display='none';
-        document.getElementById('rm_referralMode').value=isFree?'1':'';
+        document.getElementById('rm_referralMode').value=isFree?'':'';
         const codeInput=document.getElementById('rm_reg_code');
         if(isFree){document.getElementById('rm_toStep2Btn').disabled=false;codeInput.removeAttribute('required');}
-        else if(v==='ewallet'){document.getElementById('rm_packageSection').style.display='block';document.getElementById('rm_toStep2Btn').disabled=PACKAGES.length!==1;codeInput.removeAttribute('required');}
+        else if(v==='ewallet'){document.getElementById('rm_packageSection').style.display='block';document.getElementById('rm_toStep2Btn').disabled=PACKAGES.length!==1;codeInput.removeAttribute('required');
+          if(PACKAGES.length===1){rmSetBinaryEnabled(PACKAGES[0].pairing_enabled);}
+        }
         else{document.getElementById('rm_codeSection').style.display='block';document.getElementById('rm_toStep2Btn').disabled=true;codeInput.setAttribute('required','');}
       });
+    });
     });
 
     document.getElementById('rm_validateCodeBtn').addEventListener('click',async function(){
@@ -1092,7 +1108,7 @@
       try{
         const fd=new FormData();fd.append('code',code);fd.append('csrf_token',CSRF_TOKEN);
         const d=await(await fetch(APP_URL_JS+'/?page=validate_code',{method:'POST',body:fd})).json();
-        if(d.valid){regCodeData=d;document.getElementById('rm_pkgName').textContent=d.package_name;document.getElementById('rm_pkgDetails').textContent='Entry: '+d.entry_fee+' · Bonus: '+d.pairing_bonus+' · Cap: '+d.daily_cap+' pairs/day';document.getElementById('rm_packageInfo').classList.remove('d-none');document.getElementById('rm_validatedCode').value=code;document.getElementById('rm_toStep2Btn').disabled=false;regSetHint('rm_codeHint','✓ Code is valid!',true);}
+        if(d.valid){regCodeData=d;rmSetBinaryEnabled(d.pairing_enabled!==false);document.getElementById('rm_pkgName').textContent=d.package_name;document.getElementById('rm_pkgDetails').textContent='Entry: '+d.entry_fee+' · Bonus: '+d.pairing_bonus+' · Cap: '+d.daily_cap+' pairs/day';document.getElementById('rm_packageInfo').classList.remove('d-none');document.getElementById('rm_validatedCode').value=code;document.getElementById('rm_toStep2Btn').disabled=false;regSetHint('rm_codeHint','✓ Code is valid!',true);}
         else{regSetHint('rm_codeHint',d.message||'Invalid code.',false);}
       }catch(e){regSetHint('rm_codeHint','Network error.',false);}
       this.disabled=false;this.textContent='Validate';
@@ -1108,7 +1124,8 @@
     const rmPackageSelect=document.getElementById('rm_packageSelect');
     if(rmPackageSelect){rmPackageSelect.addEventListener('change',function(){
       if(!this.value){document.getElementById('rm_packageCard')?.classList.add('d-none');document.getElementById('rm_toStep2Btn').disabled=true;return;}
-      const opt=this.options[this.selectedIndex];regSelectedPkg={id:this.value,name:opt.dataset.name,fee:opt.dataset.fee,bonus:opt.dataset.bonus,cap:opt.dataset.cap};
+      const opt=this.options[this.selectedIndex];regSelectedPkg={id:this.value,name:opt.dataset.name,fee:opt.dataset.fee,bonus:opt.dataset.bonus,cap:opt.dataset.cap,pairing_enabled:opt.dataset.pairing==='1'};
+      rmSetBinaryEnabled(regSelectedPkg.pairing_enabled);
       const card=document.getElementById('rm_packageCard');if(card){document.getElementById('rm_pkgCardName').textContent=regSelectedPkg.name;document.getElementById('rm_pkgCardDetails').textContent='Entry: '+regSelectedPkg.fee+' · Bonus: '+regSelectedPkg.bonus+' · Cap: '+regSelectedPkg.cap+' pairs/day';card.classList.remove('d-none');}
       regSetHint('rm_packageHint','✓ Package selected.',true);document.getElementById('rm_toStep2Btn').disabled=false;
     });}
@@ -1139,7 +1156,7 @@
       if(pw.length<8){alert('Password must be at least 8 characters.');return;}
       if(pw!==pwc){regSetHint('rm_pwMatchHint','Passwords do not match.',false);return;}
       const pos=document.getElementById('rm_binary_position').value;
-      if(!pos){alert('Please select a binary position (Left or Right).');return;}
+      if(regBinaryEnabled&&!pos){alert('Please select a binary position (Left or Right).');return;}
       const method=document.querySelector('[name="payment_method"]:checked').value,isFree=method==='free';
       document.getElementById('rm_revFreeRow').style.display=isFree?'':'none';
       document.getElementById('rm_revPayRow').style.display=isFree?'none':'';
@@ -1152,7 +1169,9 @@
       }
       document.getElementById('rm_rev_username').textContent='@'+username;
       document.getElementById('rm_rev_sponsor').textContent='@'+(document.getElementById('rm_sponsorInput').value.trim()||CURRENT_USER);
+      const uRow=document.getElementById('rm_rev_uplineRow');if(uRow)uRow.style.display=regBinaryEnabled?'':'none';
       document.getElementById('rm_rev_upline').textContent='@'+(document.getElementById('rm_upline_username').value||'—');
+      const pRow=document.getElementById('rm_rev_positionRow');if(pRow)pRow.style.display=regBinaryEnabled?'':'none';
       document.getElementById('rm_rev_position').textContent=document.getElementById('rm_position_display').textContent;
       regGoStep(3);
     });
@@ -1245,7 +1264,7 @@
                 <select class="form-select" id="rm_packageSelect" name="package_id">
                   <option value="">Select a package…</option>
                   <?php foreach ($packages ?? [] as $pkg): ?>
-                    <option value="<?= (int)$pkg['id'] ?>" data-name="<?= e($pkg['name']) ?>" data-fee="<?= fmt_money((float)$pkg['entry_fee']) ?>" data-bonus="<?= fmt_money((float)$pkg['pairing_bonus']) ?>" data-cap="<?= (int)$pkg['daily_pair_cap'] ?>"><?= e($pkg['name']) ?> — <?= fmt_money((float)$pkg['entry_fee']) ?></option>
+                    <option value="<?= (int)$pkg['id'] ?>" data-name="<?= e($pkg['name']) ?>" data-fee="<?= fmt_money((float)$pkg['entry_fee']) ?>" data-bonus="<?= fmt_money((float)$pkg['pairing_bonus']) ?>" data-cap="<?= (int)$pkg['daily_pair_cap'] ?>" data-pairing="<?= (int)($pkg['pairing_enabled'] ?? 1) === 1 ? '1' : '0' ?>"><?= e($pkg['name']) ?> — <?= fmt_money((float)$pkg['entry_fee']) ?></option>
                   <?php endforeach; ?>
                 </select>
                 <div class="form-text" id="rm_packageHint"></div>
@@ -1255,18 +1274,20 @@
           </div>
           <div id="rm_packageInfo" class="code-verified d-none"><span style="font-size:1.2rem;">✅</span><div><div class="fw-bold" id="rm_pkgName"></div><div style="font-size:.75rem;margin-top:2px;" id="rm_pkgDetails"></div></div></div>
 
-          <div class="slot-status" style="margin-bottom:1rem;">
-            <span>↙ Upline: <strong id="rm_upline_display">—</strong></span>
-            <span>Position: <strong id="rm_position_display">—</strong></span>
-          </div>
-          <div style="font-size:.78rem;color:var(--muted);margin-bottom:1rem;">Sponsor: <strong id="rm_sponsor_display">—</strong></div>
+          <div id="rm_binarySection">
+            <div class="slot-status" style="margin-bottom:1rem;">
+              <span>↙ Upline: <strong id="rm_upline_display">—</strong></span>
+              <span>Position: <strong id="rm_position_display">—</strong></span>
+            </div>
+            <div style="font-size:.78rem;color:var(--muted);margin-bottom:1rem;">Sponsor: <strong id="rm_sponsor_display">—</strong></div>
 
-          <!-- Position Selection -->
-          <div class="mb-3">
-            <label class="form-label">Binary Position <span class="text-danger">*</span></label>
-            <div class="position-toggle" style="grid-template-columns:1fr 1fr;">
-              <div class="position-option"><input type="radio" id="rm_pos_left" name="binary_position_radio" value="left" required><label class="position-label" id="rm_pos_label_left" for="rm_pos_left">↙ Left</label></div>
-              <div class="position-option"><input type="radio" id="rm_pos_right" name="binary_position_radio" value="right"><label class="position-label" id="rm_pos_label_right" for="rm_pos_right">↘ Right</label></div>
+            <!-- Position Selection -->
+            <div class="mb-3">
+              <label class="form-label">Binary Position <span class="text-danger">*</span></label>
+              <div class="position-toggle" style="grid-template-columns:1fr 1fr;">
+                <div class="position-option"><input type="radio" id="rm_pos_left" name="binary_position_radio" value="left" required><label class="position-label" id="rm_pos_label_left" for="rm_pos_left">↙ Left</label></div>
+                <div class="position-option"><input type="radio" id="rm_pos_right" name="binary_position_radio" value="right"><label class="position-label" id="rm_pos_label_right" for="rm_pos_right">↘ Right</label></div>
+              </div>
             </div>
           </div>
 
@@ -1322,8 +1343,8 @@
                 <tr id="rm_revPkgRow"><td>Package</td><td id="rm_rev_package">—</td></tr>
                 <tr><td>Username</td><td id="rm_rev_username" class="fw-bold">—</td></tr>
                 <tr><td>Sponsor</td><td id="rm_rev_sponsor">—</td></tr>
-                <tr><td>Upline</td><td id="rm_rev_upline">—</td></tr>
-                <tr><td>Position</td><td id="rm_rev_position">—</td></tr>
+                <tr id="rm_rev_uplineRow"><td>Upline</td><td id="rm_rev_upline">—</td></tr>
+                <tr id="rm_rev_positionRow"><td>Position</td><td id="rm_rev_position">—</td></tr>
               </table>
             </div>
           </div>

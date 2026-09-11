@@ -16,12 +16,12 @@ class Code
         float $price,
         ?string $expiresAt,
         int $adminId,
-        bool $isCd = false
+        string $codeType = 'registration'
     ): array {
         $pdo   = db();
         $codes = [];
         $st    = $pdo->prepare("
-            INSERT INTO reg_codes (code, package_id, price, expires_at, created_by, is_cd)
+            INSERT INTO reg_codes (code, package_id, price, expires_at, created_by, code_type)
             VALUES (?, ?, ?, ?, ?, ?)
         ");
 
@@ -29,13 +29,15 @@ class Code
             // Guarantee uniqueness
             do {
                 $code = generate_code();
-                if ($isCd) {
+                if ($codeType === 'cd') {
                     $code = 'CD-' . $code;
+                } elseif ($codeType === 'upgrade') {
+                    $code = 'UP-' . $code;
                 }
                 $exists = $pdo->query("SELECT COUNT(*) FROM reg_codes WHERE code = '{$code}'")->fetchColumn();
             } while ($exists);
 
-            $st->execute([$code, $packageId, $price, $expiresAt ?: null, $adminId, $isCd ? 1 : 0]);
+            $st->execute([$code, $packageId, $price, $expiresAt ?: null, $adminId, $codeType]);
             $codes[] = $code;
         }
 
@@ -134,7 +136,7 @@ class Code
 
         $st = db()->prepare("
             SELECT r.code, p.name AS package, r.price,
-                   r.status, r.is_cd, r.created_at, r.expires_at,
+                   r.status, r.code_type, r.created_at, r.expires_at,
                    u.username AS used_by
             FROM   reg_codes r
             JOIN   packages  p ON p.id = r.package_id
@@ -147,14 +149,14 @@ class Code
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="reg_codes_' . date('Y-m-d') . '.csv"');
         $f = fopen('php://output', 'w');
-        fputcsv($f, ['Code', 'Package', 'Price', 'Status', 'CD', 'Created', 'Expires', 'Used By']);
+        fputcsv($f, ['Code', 'Package', 'Price', 'Status', 'Type', 'Created', 'Expires', 'Used By']);
         while ($row = $st->fetch()) {
             fputcsv($f, [
                 $row['code'],
                 $row['package'],
                 number_format($row['price'], 2),
                 $row['status'],
-                $row['is_cd'] ? 'Yes' : 'No',
+                $row['code_type'],
                 $row['created_at'],
                 $row['expires_at'] ?? '',
                 $row['used_by'] ?? '',

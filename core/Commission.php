@@ -238,7 +238,7 @@ class Commission
         int $newUserId,
         int $packageId
     ): void {
-        if (setting('indirect_referral_enabled', '1') !== '1') {
+        if (!Package::hasIndirectReferral($packageId)) {
             return;
         }
 

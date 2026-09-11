@@ -25,16 +25,6 @@ class DailyFixedIncome
      */
     public static function processDailyPayout(): array
     {
-        // ── 1. Global DFI toggle ──────────────────────────────────────────────
-        if (setting('dfi_enabled', '1') !== '1') {
-            return [
-                'processed' => 0,
-                'paid'      => 0.00,
-                'skipped'   => 0,
-                'reason'    => 'disabled',
-            ];
-        }
-
         $pdo = db();
 
         $processed = 0;
@@ -48,6 +38,7 @@ class DailyFixedIncome
         //   - dfi_active = 1                 (reset on reactivation)
         //   - dfi_days_used < max days       (under day limit)
         //   - package.daily_fixed_income > 0 (DFI-enabled package)
+        //   - package.dfi_enabled = 1        (package-level DFI toggle)
         $st = $pdo->query("
             SELECT
                 u.id,
@@ -66,6 +57,7 @@ class DailyFixedIncome
               AND u.cd_active = 0
               AND u.dfi_days_used < p.daily_fixed_income_days
               AND p.daily_fixed_income > 0
+              AND p.dfi_enabled = 1
             ORDER BY u.id
         ");
 
@@ -181,7 +173,8 @@ class DailyFixedIncome
                 u.dfi_active,
                 u.cap_status,
                 p.daily_fixed_income,
-                p.daily_fixed_income_days
+                p.daily_fixed_income_days,
+                p.dfi_enabled
             FROM users u
             LEFT JOIN packages p ON p.id = u.package_id
             WHERE u.id = ?
@@ -217,7 +210,9 @@ class DailyFixedIncome
 
         // Determine visual status
         $status = 'disabled';
-        if ($dailyRate <= 0) {
+        if ((int)$row['dfi_enabled'] !== 1) {
+            $status = 'disabled';
+        } elseif ($dailyRate <= 0) {
             $status = 'disabled';
         } elseif ($capStatus === 'capped') {
             $status = 'capped';
@@ -233,7 +228,7 @@ class DailyFixedIncome
 
         // Next payout is tomorrow at midnight (Manila)
         $nextPayout = null;
-        if ($status === 'active' && setting('dfi_enabled', '1') === '1') {
+        if ($status === 'active' && (int)$row['dfi_enabled'] === 1) {
             $nextPayout = date('Y-m-d 00:00:00', strtotime('+1 day'));
         }
 

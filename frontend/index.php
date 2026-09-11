@@ -9,8 +9,6 @@ $frontend = $base . '/frontend';
 // ── Load live settings ──
 $siteName        = setting('site_name', 'AltasFarm');
 $siteTagline     = setting('site_tagline', 'Build Your Network. Grow Your Income.');
-$indirectEnabled = setting('indirect_referral_enabled', '1') === '1';
-$dfiEnabled      = setting('dfi_enabled', '1') === '1';
 $gcashEnabled    = setting('gcash_enabled', '1') === '1';
 $mayaEnabled     = setting('maya_enabled', '1') === '1';
 $minPayout       = (float) setting('min_payout', '500');
@@ -22,6 +20,10 @@ $mayaFee         = (float) setting('service_fee_maya', '0');
 $packages   = Package::all(true);
 $pkgCount   = count($packages);
 $featuredPkg = $packages[0] ?? null;
+
+// Commission toggles are per-package; base landing copy on the featured package
+$indirectEnabled = $featuredPkg ? Package::hasIndirectReferral((int)$featuredPkg['id']) : true;
+$dfiEnabled      = $featuredPkg ? Package::hasDfiToggle((int)$featuredPkg['id']) : true;
 
 // Registration gate (system-enforced seat limit, not a marketing claim)
 $isFull = (int) db()->query("SELECT COUNT(*) FROM users WHERE role = 'member'")->fetchColumn()

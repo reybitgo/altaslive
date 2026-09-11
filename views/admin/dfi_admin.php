@@ -54,20 +54,17 @@
       </div>
     </div>
 
-    <!-- Global toggle info -->
+    <!-- Per-package control note -->
     <div class="card">
-      <div class="card-header"><span class="card-title">⚙️ DFI Global Setting</span></div>
+      <div class="card-header"><span class="card-title">📊 DFI Package Control</span></div>
       <div class="card-body">
         <div class="d-flex align-items-center gap-3">
-          <div class="form-check form-switch mb-0">
-            <input class="form-check-input" type="checkbox" disabled <?= setting('dfi_enabled', '1') === '1' ? 'checked' : '' ?>>
-          </div>
           <div>
-            <div class="fw-semibold">DFI is <?= setting('dfi_enabled', '1') === '1' ? 'Enabled' : 'Disabled' ?></div>
+            <div class="fw-semibold">DFI is controlled per package</div>
             <div class="text-muted" style="font-size:.8rem;">
-              <?= setting('dfi_enabled', '1') === '1'
-                  ? 'Daily Fixed Income payouts are processed automatically at midnight.'
-                  : 'Daily Fixed Income payouts are currently paused. Enable in System Settings.' ?>
+              Enable or disable Daily Fixed Income for each package from
+              <a href="<?= APP_URL ?>/?page=admin_packages">Packages &rarr; Commission Toggles</a>.
+              The nightly payout only credits members whose package has DFI enabled.
             </div>
           </div>
         </div>

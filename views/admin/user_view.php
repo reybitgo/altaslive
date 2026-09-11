@@ -343,7 +343,7 @@
                     $tn = match ($c['type']) {
                       'pairing' => '🤝 Pairing',
                       'direct_referral' => '👥 Direct',
-                      'indirect_referral' => setting('indirect_referral_enabled', '1') === '1' ? '🔗 Indirect Lvl ' . $c['level'] : '🔗 Indirect (disabled)',
+                      'indirect_referral' => Package::hasIndirectReferral((int)$user['package_id']) ? '🔗 Indirect Lvl ' . $c['level'] : '🔗 Indirect (disabled)',
                       default => $c['type']
                     };
                   ?>
@@ -442,7 +442,11 @@
             </div>
             <div class="col-12 col-md-6">
               <div class="card h-100">
-                <div class="card-header"><span class="card-title">📅 DFI Status</span></div>
+                <div class="card-header d-flex justify-content-between align-items-center">
+                  <span class="card-title">📅 DFI Status</span>
+                  <?php $dfiToggleOn = Package::hasDfiToggle((int)$user['package_id']); ?>
+                  <span class="badge <?= $dfiToggleOn ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary' ?>"><?= $dfiToggleOn ? 'DFI Enabled' : 'DFI Disabled' ?></span>
+                </div>
                 <div class="card-body">
                   <div class="row g-2">
                     <div class="col-6">
@@ -515,7 +519,7 @@
                       $tn = match ($c['type']) {
                         'pairing' => '🤝 Pairing',
                         'direct_referral' => '👥 Direct',
-                        'indirect_referral' => setting('indirect_referral_enabled', '1') === '1' ? '🔗 Indirect Lvl ' . $c['level'] : '🔗 Indirect (disabled)',
+'indirect_referral' => Package::hasIndirectReferral((int)$user['package_id']) ? '🔗 Indirect Lvl ' . $c['level'] : '🔗 Indirect (disabled)',
                         'daily_fixed_income' => '📅 DFI',
                         default => $c['type']
                       };

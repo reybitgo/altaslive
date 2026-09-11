@@ -136,10 +136,17 @@ class MemberController
         $user     = Auth::user();
         $view     = $_GET['view'] ?? 'binary'; // 'binary' | 'referral'
         $packages = Package::all(true);
+        $pairingEnabled = Package::hasPairing((int)$user['package_id']);
+
+        // Non-binary members never see the binary tree
+        if ($view === 'binary' && !$pairingEnabled) {
+            redirect('/?page=genealogy&view=referral');
+        }
+
         $indirect = [];
         $direct   = [];
         if ($view === 'referral') {
-            if (setting('indirect_referral_enabled', '1') === '1') {
+            if (Package::hasIndirectReferral((int)$user['package_id'])) {
                 $indirect = User::indirectReferralTree($user['id']);
             } else {
                 $page    = max(1, (int)($_GET['pg'] ?? 1));
@@ -538,6 +545,139 @@ class MemberController
         }
 
         redirect('/?page=dashboard');
+    }
+
+    // ── Package Upgrade ─────────────────────────────────────────────────────
+
+    public function showUpgrade(): void
+    {
+        Auth::guard('member');
+        $user    = Auth::user();
+        $current = Package::find((int)$user['package_id']);
+        $curFee  = $current ? (float)$current['entry_fee'] : 0.0;
+
+        $targets = [];
+        foreach (Package::all(true) as $pkg) {
+            if ((int)$pkg['id'] !== (int)$user['package_id'] && (float)$pkg['entry_fee'] > $curFee) {
+                $pkg['diff'] = (float)$pkg['entry_fee'] - $curFee;
+                $targets[]   = $pkg;
+            }
+        }
+
+        $balance     = Ewallet::balance((int)$user['id']);
+        $curPairing  = Package::hasPairing((int)$user['package_id']);
+        require 'views/member/upgrade.php';
+    }
+
+    public function doUpgrade(): void
+    {
+        Auth::guard('member');
+        csrf_verify();
+
+        $user   = Auth::user();
+        $userId = (int)$user['id'];
+
+        $paymentMethod = $_POST['payment_method'] ?? 'code';
+        $code          = strtoupper(trim($_POST['upgrade_code'] ?? ''));
+        $newPackageId  = (int)($_POST['package_id'] ?? 0);
+
+        $upgradeCodeId = null;
+
+        if ($paymentMethod === 'code') {
+            if (empty($code)) {
+                flash('error', 'Upgrade code is required.');
+                redirect('/?page=upgrade');
+            }
+            $codeRow = Code::validate($code);
+            if (!$codeRow || ($codeRow['code_type'] ?? 'registration') !== 'upgrade') {
+                flash('error', 'Invalid or already-used upgrade code.');
+                redirect('/?page=upgrade');
+            }
+            $newPackageId  = (int)$codeRow['package_id'];
+            $upgradeCodeId = (int)$codeRow['id'];
+        } else {
+            if ($newPackageId <= 0) {
+                flash('error', 'Please select a package.');
+                redirect('/?page=upgrade');
+            }
+        }
+
+        $curPkg   = Package::find((int)$user['package_id']);
+        $targetPkg = Package::find($newPackageId);
+        if (!$curPkg || !$targetPkg) {
+            flash('error', 'Invalid package selection.');
+            redirect('/?page=upgrade');
+        }
+
+        $binaryParentId = null;
+        $binaryPosition = null;
+        $curPairing     = Package::hasPairing((int)$user['package_id']);
+        $newPairing     = Package::hasPairing($newPackageId);
+
+        if (!$curPairing && $newPairing) {
+            $binaryParentId = (int)($_POST['binary_upline_id'] ?? 0);
+            $binaryPosition = $_POST['binary_position'] ?? '';
+        }
+
+        if ($paymentMethod === 'ewallet') {
+            $diff = max(0, (float)$targetPkg['entry_fee'] - (float)$curPkg['entry_fee']);
+            if ($diff > 0 && Ewallet::balance($userId) < $diff) {
+                flash('error', 'Insufficient e-wallet balance. Required: ' . fmt_money($diff));
+                redirect('/?page=upgrade');
+            }
+        }
+
+        try {
+            User::upgrade(
+                $userId,
+                $newPackageId,
+                $paymentMethod,
+                $binaryParentId ?: null,
+                in_array($binaryPosition, ['left', 'right'], true) ? $binaryPosition : null,
+                $upgradeCodeId
+            );
+            flash('success', '🎉 Package upgraded successfully!');
+        } catch (\Exception $e) {
+            flash('error', 'Upgrade failed: ' . $e->getMessage());
+        }
+
+        redirect('/?page=upgrade');
+    }
+
+    /** AJAX: search pair-enabled active members with an available binary slot */
+    public function ajaxBinaryUplines(): void
+    {
+        Auth::guard('member');
+        $q  = trim($_GET['q'] ?? '');
+        $st = db()->prepare("
+            SELECT u.id, u.username, u.full_name, p.name AS package_name
+            FROM users u
+            JOIN packages p ON p.id = u.package_id
+            WHERE u.role = 'member'
+              AND u.status = 'active'
+              AND p.pairing_enabled = 1
+              AND (u.username LIKE ? OR u.full_name LIKE ?)
+            ORDER BY u.username ASC
+            LIMIT 20
+        ");
+        $like = '%' . $q . '%';
+        $st->execute([$like, $like]);
+
+        $candidates = [];
+        foreach ($st->fetchAll() as $u) {
+            $leftFree  = User::isSlotFree((int)$u['id'], 'left');
+            $rightFree = User::isSlotFree((int)$u['id'], 'right');
+            if (!$leftFree && !$rightFree) continue;
+            $candidates[] = [
+                'id'         => (int)$u['id'],
+                'username'   => $u['username'],
+                'full_name'  => $u['full_name'] ?: $u['username'],
+                'package'    => $u['package_name'],
+                'left_free'  => $leftFree,
+                'right_free' => $rightFree,
+            ];
+        }
+        json_response(['candidates' => $candidates]);
     }
 
     // ── E-Wallet Transfer ──────────────────────────────────────────────────

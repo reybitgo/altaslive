@@ -177,7 +177,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'reset
         if (!$pkgExists) $newCodePkg = (int)$pdo->query("SELECT id FROM packages LIMIT 1")->fetchColumn();
 
         $pkgName = $pdo->query("SELECT name FROM packages WHERE id={$newCodePkg}")->fetchColumn();
-        $st = $pdo->prepare("INSERT INTO reg_codes (code, package_id, price, created_by, is_cd) VALUES (?,?,?,?,0)");
+        $st = $pdo->prepare("INSERT INTO reg_codes (code, package_id, price, created_by, code_type) VALUES (?,?,?,?,'registration')");
 
         for ($i = 0; $i < $newCodeQty; $i++) {
             do {

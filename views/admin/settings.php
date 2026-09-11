@@ -129,13 +129,6 @@
               <hr class="my-3">
               <p class="fw-bold mb-2" style="font-size:.82rem;">📋 Compensation Plan Defaults</p>
               <div class="form-text mb-3">Default values applied to new packages. Can be overridden per package.</div>
-              <div class="form-check form-switch mb-3">
-                <input class="form-check-input" type="checkbox" name="indirect_referral_enabled" id="indirectRefEnabled" value="1" <?= setting('indirect_referral_enabled', '1') === '1' ? 'checked' : '' ?>>
-                <label class="form-check-label" for="indirectRefEnabled" style="font-weight:600;font-size:.8rem;">
-                  Enable Indirect Referral (Unilevel) Bonuses
-                </label>
-              </div>
-              <div class="form-text mb-3">When disabled, no unilevel bonuses are paid and all indirect referral UI is hidden from members.</div>
               <div class="mb-3">
                 <label class="form-label">Default Lifetime Cap Multiplier</label>
                 <input type="number" name="default_cap_multiplier" class="form-control" min="0" step="0.01" value="<?= e(setting('default_cap_multiplier', '3.00')) ?>">
@@ -177,16 +170,6 @@
                 <label class="form-label" style="color:#f0b90b;font-weight:700;font-size:.75rem;">₮ USDT BEP20 Address</label>
                 <input type="text" name="usdt_bep20_address" class="form-control font-mono" placeholder="0x..." value="<?= e(setting('usdt_bep20_address', '')) ?>">
                 <div class="form-text">BEP20 addresses start with 0x and are 42 characters.</div>
-              </div>
-
-              <hr class="my-3">
-              <p class="fw-bold mb-2" style="font-size:.82rem;">📅 Daily Fixed Income (DFI)</p>
-              <div class="form-text mb-3">Controls the Daily Fixed Income payout system.</div>
-              <div class="form-check form-switch mb-3">
-                <input class="form-check-input" type="checkbox" name="dfi_enabled" id="dfiEnabled" value="1" <?= setting('dfi_enabled', '1') === '1' ? 'checked' : '' ?>>
-                <label class="form-check-label" for="dfiEnabled" style="font-weight:600;font-size:.8rem;">
-                  Enable DFI payouts
-                </label>
               </div>
 
               <hr class="my-3">

@@ -19,7 +19,7 @@ class Ewallet
         string $note = '',
         bool $withdrawable = true
     ): void {
-        $valid = ['commission', 'payout', 'reactivation', 'transfer', 'topup', 'registration'];
+        $valid = ['commission', 'payout', 'reactivation', 'transfer', 'topup', 'registration', 'upgrade'];
         if (!in_array($refType, $valid, true)) {
             throw new InvalidArgumentException("Invalid ref_type: {$refType}");
         }

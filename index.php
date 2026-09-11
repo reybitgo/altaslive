@@ -291,6 +291,11 @@ $routes = [
     'api_cap_status'     => ['MemberController', 'apiCapStatus',      'member'],
     'api_dfi_status'     => ['MemberController', 'apiDfiStatus',      'member'],
 
+    // Package upgrade
+    'upgrade'            => ['MemberController', 'showUpgrade',       'member'],
+    'do_upgrade'         => ['MemberController', 'doUpgrade',         'member'],
+    'api_binary_uplines' => ['MemberController', 'ajaxBinaryUplines', 'member'],
+
     // ── Admin ─────────────────────────────────────────
     'admin'              => ['AdminController',  'dashboard',       'admin'],
     'admin_users'        => ['AdminController',  'users',           'admin'],

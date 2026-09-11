@@ -102,10 +102,9 @@ class User
                 ")->execute([$newId, $data['reg_code_id']]);
 
                 // Auto-assign CD if the registration code was a CD code
-                $isCd = (int)$pdo->query(
-                    "SELECT is_cd FROM reg_codes WHERE id = {$data['reg_code_id']}"
-                )->fetchColumn();
-                if ($isCd) {
+                $codeType = $pdo->prepare("SELECT code_type FROM reg_codes WHERE id = ?");
+                $codeType->execute([$data['reg_code_id']]);
+                if ($codeType->fetchColumn() === 'cd') {
                     $pkg = Package::find((int)$data['package_id']);
                     try {
                         CdStatus::assign($newId, (float)($pkg['entry_fee'] ?? 0), 1);
@@ -133,7 +132,7 @@ class User
             Commission::processDirectReferral($data['sponsor_id'], $newId, $data['package_id']);
 
             // 3. Indirect referral bonuses → up to 10 levels in sponsor chain
-            if (setting('indirect_referral_enabled', '1') === '1') {
+            if (Package::hasIndirectReferral((int)$data['package_id'])) {
                 Commission::processIndirectReferral($data['sponsor_id'], $newId, $data['package_id']);
             }
         }
@@ -170,8 +169,9 @@ class User
 
         // Auto-assign CD if activation uses a CD code
         if ($regCodeId) {
-            $isCd = (int)$pdo->query("SELECT is_cd FROM reg_codes WHERE id = {$regCodeId}")->fetchColumn();
-            if ($isCd) {
+            $cType = $pdo->prepare("SELECT code_type FROM reg_codes WHERE id = ?");
+            $cType->execute([$regCodeId]);
+            if ($cType->fetchColumn() === 'cd') {
                 $pkg = Package::find($packageId);
                 if ($pkg) {
                     CdStatus::assign($userId, (float)$pkg['entry_fee'], 1);
@@ -188,7 +188,7 @@ class User
         Commission::processDirectReferral((int)$user['sponsor_id'], $userId, $packageId);
 
         // 3. Indirect referral bonuses
-        if (setting('indirect_referral_enabled', '1') === '1') {
+        if (Package::hasIndirectReferral($packageId)) {
             Commission::processIndirectReferral((int)$user['sponsor_id'], $userId, $packageId);
         }
 
@@ -270,7 +270,7 @@ class User
     public static function isPaidMember(int $userId): bool
     {
         $st = db()->prepare("
-            SELECT u.reg_payment_method, COALESCE(c.is_cd, 0) AS is_cd
+            SELECT u.reg_payment_method, COALESCE(c.code_type, 'registration') AS code_type
             FROM users u
             LEFT JOIN reg_codes c ON c.id = u.reg_code_id
             WHERE u.id = ?
@@ -279,7 +279,140 @@ class User
         $row = $st->fetch();
         if (!$row) return false;
         return $row['reg_payment_method'] !== 'pending'
-            && !($row['reg_payment_method'] === 'code' && (int)$row['is_cd'] === 1);
+            && !($row['reg_payment_method'] === 'code' && $row['code_type'] === 'cd');
+    }
+
+    // ── Package Upgrade ──────────────────────────────────────────────────────
+
+    /**
+     * Upgrade a member to a more expensive package.
+     * Only the price difference is charged (ewallet debit or upgrade code).
+     *
+     * When moving from a non-binary package to a pairing-enabled package, the
+     * member is placed as a new binary leg under the supplied upline.
+     *
+     * @return array Updated user row after upgrade
+     */
+    public static function upgrade(
+        int $userId,
+        int $newPackageId,
+        string $paymentMethod,
+        ?int $binaryParentId = null,
+        ?string $binaryPosition = null,
+        ?int $upgradeCodeId = null
+    ): array {
+        $pdo = db();
+
+        $user = self::find($userId);
+        if (!$user) {
+            throw new RuntimeException('User not found.');
+        }
+
+        $curPkg = Package::find((int)$user['package_id']);
+        $newPkg = Package::find($newPackageId);
+        if (!$curPkg || !$newPkg) {
+            throw new RuntimeException('Invalid package.');
+        }
+        if ($newPackageId === (int)$user['package_id']) {
+            throw new RuntimeException('You already have this package.');
+        }
+        if ((float)$newPkg['entry_fee'] < (float)$curPkg['entry_fee']) {
+            throw new RuntimeException('Downgrading is not allowed.');
+        }
+
+        $diff = (float)$newPkg['entry_fee'] - (float)$curPkg['entry_fee'];
+
+        $curPairing = Package::hasPairing((int)$user['package_id']);
+        $newPairing = Package::hasPairing($newPackageId);
+
+        $pdo->beginTransaction();
+        try {
+            // ── Payment: diff only ──
+            if ($paymentMethod === 'code' && $upgradeCodeId) {
+                $codeRow = $pdo->prepare(
+                    "SELECT * FROM reg_codes WHERE id = ? AND status = 'unused' AND code_type = 'upgrade'"
+                );
+                $codeRow->execute([$upgradeCodeId]);
+                $codeRow = $codeRow->fetch();
+                if (!$codeRow) {
+                    throw new RuntimeException('Invalid upgrade code.');
+                }
+                if ((int)$codeRow['package_id'] !== $newPackageId) {
+                    throw new RuntimeException('This upgrade code does not match the selected package.');
+                }
+                $pdo->prepare("UPDATE reg_codes SET status = 'used', used_by = ?, used_at = NOW() WHERE id = ?")
+                    ->execute([$userId, $upgradeCodeId]);
+            } elseif ($paymentMethod === 'ewallet') {
+                if ($diff > 0) {
+                    $debitOk = Ewallet::debitInternal(
+                        $userId,
+                        $diff,
+                        0,
+                        'upgrade',
+                        "Package upgrade fee (@{$user['username']}) to " . $newPkg['name']
+                    );
+                    if (!$debitOk) {
+                        throw new RuntimeException('Insufficient e-wallet balance for the upgrade fee.');
+                    }
+                    $adminId = (int)$pdo->query("SELECT id FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1")
+                        ->fetchColumn();
+                    if ($adminId) {
+                        Ewallet::credit(
+                            $adminId,
+                            $diff,
+                            $userId,
+                            'upgrade',
+                            "Upgrade fee from @{$user['username']} to " . $newPkg['name'],
+                            false
+                        );
+                    }
+                }
+            } else {
+                throw new RuntimeException('Invalid payment method.');
+            }
+
+            // ── Binary placement transition: non-binary → pairing ──
+            if (!$curPairing && $newPairing) {
+                if (!$binaryParentId || !in_array($binaryPosition, ['left', 'right'], true)) {
+                    throw new RuntimeException('A binary position is required for this package.');
+                }
+                if ((int)$binaryParentId === $userId) {
+                    throw new RuntimeException('Cannot place a member under themselves.');
+                }
+                $upl = self::find((int)$binaryParentId);
+                if (!$upl || !Package::hasPairing((int)$upl['package_id'])) {
+                    throw new RuntimeException('Selected binary upline is not available.');
+                }
+                if ($upl['status'] !== 'active') {
+                    throw new RuntimeException('The binary upline must be an active member.');
+                }
+                if (!User::isSlotFree((int)$binaryParentId, $binaryPosition)) {
+                    throw new RuntimeException('That binary position is already taken.');
+                }
+            }
+
+            // ── Apply package + binary placement ──
+            if (!$curPairing && $newPairing) {
+                $pdo->prepare(
+                    "UPDATE users SET package_id = ?, binary_parent_id = ?, binary_position = ? WHERE id = ?"
+                )->execute([$newPackageId, $binaryParentId, $binaryPosition, $userId]);
+            } else {
+                $pdo->prepare("UPDATE users SET package_id = ? WHERE id = ?")
+                    ->execute([$newPackageId, $userId]);
+            }
+
+            $pdo->commit();
+        } catch (\Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+
+        // ── Fire binary placement when joining the binary network (outside txn) ──
+        if (!$curPairing && $newPairing) {
+            Commission::processBinaryPlacement($userId, (int)$binaryParentId, $binaryPosition, true);
+        }
+
+        return self::find($userId);
     }
 
     /**

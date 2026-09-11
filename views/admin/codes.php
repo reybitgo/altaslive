@@ -69,11 +69,13 @@
                 <input type="date" name="expires_at" class="form-control" min="<?= date('Y-m-d', strtotime('+1 day')) ?>">
               </div>
               <div class="mb-3">
-                <div class="form-check form-switch">
-                  <input class="form-check-input" type="checkbox" name="is_cd" id="isCdToggle" value="1">
-                  <label class="form-check-label" for="isCdToggle">⏳ CD Code — auto-assigns Commission-Deduct on registration</label>
-                </div>
-                <div class="form-text">CD codes are prefixed with <code>CD-</code>. Example: <code>CD-3JW9-KBHK-AXPJ</code></div>
+                <label class="form-label">Code Type</label>
+                <select name="code_type" id="genCodeType" class="form-select">
+                  <option value="registration">🎟️ Registration Code</option>
+                  <option value="cd">⏳ CD Code — auto-assigns Commission-Deduct</option>
+                  <option value="upgrade">⬆️ Upgrade Code — pays package upgrade diff</option>
+                </select>
+                <div class="form-text">CD codes are prefixed <code>CD-</code>, upgrade codes <code>UP-</code>. Registration rejects upgrade codes.</div>
               </div>
               <!-- Trigger modal confirm INSTEAD of direct submit -->
               <button type="button" class="btn btn-primary w-100" onclick="confirmGenerate()">
@@ -182,8 +184,11 @@
                     </div>
                   </td>
                   <td>
-                    <?php if (!empty($c['is_cd'])): ?>
+                    <?php $ct = $c['code_type'] ?? 'registration';
+                    if ($ct === 'cd'): ?>
                       <span class="badge bg-warning-subtle text-warning" style="font-size:.65rem;">⏳ CD</span>
+                    <?php elseif ($ct === 'upgrade'): ?>
+                      <span class="badge bg-info-subtle text-info" style="font-size:.65rem;">⬆️ Upgrade</span>
                     <?php else: ?>
                       <span class="badge bg-secondary-subtle text-secondary" style="font-size:.65rem;">Regular</span>
                     <?php endif; ?>
@@ -265,9 +270,11 @@
       return;
     }
 
-    const isCd = document.getElementById('isCdToggle').checked;
+    const codeType = document.getElementById('genCodeType').value;
+    const typeLabel = codeType === 'cd' ? '<span class=\'text-warning\'>CD</span>'
+      : codeType === 'upgrade' ? '<span class=\'text-info\'>Upgrade</span>' : 'Registration';
     document.getElementById('genSummary').innerHTML =
-      `Generate <strong>${qty}</strong> ${isCd ? '<span class=\'text-warning\'>CD</span>' : ''} code(s) for package <strong>${pkgName}</strong> at <strong>₱${parseFloat(price).toLocaleString('en-PH',{minimumFractionDigits:2})}</strong> each.<br>
+      `Generate <strong>${qty}</strong> <strong>${typeLabel}</strong> code(s) for package <strong>${pkgName}</strong> at <strong>₱${parseFloat(price).toLocaleString('en-PH',{minimumFractionDigits:2})}</strong> each.<br>
      <span class="text-muted" style="font-size:.8rem;">Total value: ₱${(qty * parseFloat(price)).toLocaleString('en-PH',{minimumFractionDigits:2})}</span>`;
 
     const modal = new bootstrap.Modal(document.getElementById('genConfirmModal'));

@@ -21,6 +21,9 @@ CREATE TABLE packages (
   daily_fixed_income        DECIMAL(12,2)    NOT NULL DEFAULT 0.00,
   daily_fixed_income_days   INT              NOT NULL DEFAULT 90,
   status                    ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  indirect_referral_enabled TINYINT(1)       NOT NULL DEFAULT 1,
+  dfi_enabled               TINYINT(1)       NOT NULL DEFAULT 1,
+  pairing_enabled           TINYINT(1)       NOT NULL DEFAULT 1,
   created_at                TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
@@ -101,7 +104,7 @@ CREATE TABLE reg_codes (
   package_id  INT UNSIGNED  NOT NULL,
   price       DECIMAL(12,2) NOT NULL,
   status      ENUM('unused','used','expired') NOT NULL DEFAULT 'unused',
-  is_cd       TINYINT(1)    NOT NULL DEFAULT 0,
+  code_type   ENUM('registration','cd','upgrade') NOT NULL DEFAULT 'registration',
   used_by     INT UNSIGNED  NULL,
   created_by  INT UNSIGNED  NOT NULL,
   used_at     TIMESTAMP     NULL,
@@ -347,7 +350,6 @@ INSERT INTO settings (key_name, value) VALUES
   ('usdt_bep20_gas_fee',      '0.05'),
   ('gcash_enabled',     '1'),
   ('maya_enabled',      '1'),
-  ('dfi_enabled',       '1'),
   ('gcash_number',      ''),
   ('maya_number',       ''),
   ('usdt_trc20_address',''),
@@ -359,7 +361,6 @@ INSERT INTO settings (key_name, value) VALUES
   ('ewallet_min_transfer',        '50.00'),
   ('ewallet_transfer_daily_limit',  '5000.00'),
   ('ewallet_transfer_weekly_limit', '20000.00'),
-  ('indirect_referral_enabled',   '1'),
   ('seat_limit',                  '0');
 
 -- Demo registration code (package 1, price 10500)

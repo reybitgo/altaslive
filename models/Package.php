@@ -70,6 +70,9 @@ class Package
             'daily_fixed_income'       => (float)($data['daily_fixed_income'] ?? 0),
             'daily_fixed_income_days'  => (int)($data['daily_fixed_income_days'] ?? 90),
             'status'                   => $data['status'] ?? 'active',
+            'indirect_referral_enabled' => (int)($data['indirect_referral_enabled'] ?? 1),
+            'dfi_enabled'               => (int)($data['dfi_enabled'] ?? 1),
+            'pairing_enabled'           => (int)($data['pairing_enabled'] ?? 1),
         ];
 
         if ($id) {
@@ -159,5 +162,32 @@ class Package
             'fee'    => (float)$pkg['reactivation_fee'],
             'window' => (int)$pkg['reactivation_window_days'],
         ];
+    }
+
+    /**
+     * Check if members on this package earn indirect-referral commissions.
+     */
+    public static function hasIndirectReferral(int $packageId): bool
+    {
+        $pkg = self::find($packageId);
+        return $pkg ? (int)$pkg['indirect_referral_enabled'] === 1 : false;
+    }
+
+    /**
+     * Check if members on this package earn Daily Fixed Income.
+     */
+    public static function hasDfiToggle(int $packageId): bool
+    {
+        $pkg = self::find($packageId);
+        return $pkg ? (int)$pkg['dfi_enabled'] === 1 : false;
+    }
+
+    /**
+     * Check if members on this package participate in the binary network.
+     */
+    public static function hasPairing(int $packageId): bool
+    {
+        $pkg = self::find($packageId);
+        return $pkg ? (int)$pkg['pairing_enabled'] === 1 : false;
     }
 }

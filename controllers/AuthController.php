@@ -176,6 +176,10 @@ class AuthController
                     flash('error', 'Invalid or already-used registration code.');
                     redirect('/?page=register');
                 }
+                if (($codeRow['code_type'] ?? 'registration') === 'upgrade') {
+                    flash('error', 'Upgrade codes cannot be used for registration.');
+                    redirect('/?page=register');
+                }
                 $packageId = (int)$codeRow['package_id'];
                 $regCodeId = (int)$codeRow['id'];
             } else {
@@ -225,19 +229,33 @@ class AuthController
             redirect('/?page=register');
         }
 
-        $upline = User::findByUsername($uplineU);
-        if (!$upline) {
-            flash('error', 'Binary upline username not found.');
-            redirect('/?page=register');
+        // ── Binary placement (skipped for non-binary packages) ──
+        $upline         = null;
+        $pairingEnabled = true;
+        if (!$isReferralMode && $packageId > 0) {
+            $pkg = Package::find($packageId);
+            $pairingEnabled = $pkg ? Package::hasPairing($packageId) : true;
         }
 
-        if (!in_array($position, ['left', 'right'])) {
-            flash('error', 'Invalid binary position.');
-            redirect('/?page=register');
-        }
-        if (!User::isSlotFree((int)$upline['id'], $position)) {
-            flash('error', "The {$position} position under @{$uplineU} is already occupied.");
-            redirect('/?page=register');
+        if ($isReferralMode || $pairingEnabled) {
+            $upline = User::findByUsername($uplineU);
+            if (!$upline) {
+                flash('error', 'Binary upline username not found.');
+                redirect('/?page=register');
+            }
+            if (!Package::hasPairing((int)$upline['package_id'])) {
+                flash('error', 'The selected binary upline is not part of the binary network.');
+                redirect('/?page=register');
+            }
+
+            if (!in_array($position, ['left', 'right'])) {
+                flash('error', 'Invalid binary position.');
+                redirect('/?page=register');
+            }
+            if (!User::isSlotFree((int)$upline['id'], $position)) {
+                flash('error', "The {$position} position under @{$uplineU} is already occupied.");
+                redirect('/?page=register');
+            }
         }
 
         // ── Register ──
@@ -251,8 +269,8 @@ class AuthController
                 'reg_paid_by'        => $regPaidBy,
                 'paid_by_username'   => $wasLoggedIn ? (Auth::user()['username'] ?? '') : '',
                 'sponsor_id'         => (int)$sponsor['id'],
-                'binary_parent_id'   => (int)$upline['id'],
-                'binary_position'    => $position,
+                'binary_parent_id'   => $upline ? (int)$upline['id'] : null,
+                'binary_position'    => $upline ? $position : null,
                 'pending'            => $isReferralMode,
             ]);
 
@@ -292,11 +310,13 @@ class AuthController
         }
 
         json_response([
-            'valid'        => true,
-            'package_name' => $row['package_name'],
-            'entry_fee'    => fmt_money((float)$row['entry_fee']),
-            'pairing_bonus' => fmt_money((float)$row['pairing_bonus']),
-            'daily_cap'    => $row['daily_pair_cap'],
+            'valid'            => true,
+            'package_name'     => $row['package_name'],
+            'entry_fee'        => fmt_money((float)$row['entry_fee']),
+            'pairing_bonus'    => fmt_money((float)$row['pairing_bonus']),
+            'daily_cap'        => $row['daily_pair_cap'],
+            'code_type'        => $row['code_type'] ?? 'registration',
+            'pairing_enabled'  => Package::hasPairing((int)$row['package_id']),
         ]);
     }
 
@@ -312,6 +332,7 @@ class AuthController
                 'entry_fee'     => (float)$p['entry_fee'],
                 'pairing_bonus' => (float)$p['pairing_bonus'],
                 'daily_cap'     => (int)$p['daily_pair_cap'],
+                'pairing_enabled' => (int)$p['pairing_enabled'] === 1,
             ];
         }
         json_response(['packages' => $out]);
@@ -337,10 +358,13 @@ class AuthController
         $username = strtolower(trim($_GET['username'] ?? ''));
         $position = $_GET['position'] ?? '';
 
-        // Any existing user (member OR admin) can be a binary upline
+        // Only pairing-enabled members can host binary placements
         $user = User::findByUsername($username);
         if (!$user) {
             json_response(['valid' => false, 'message' => 'User not found.']);
+        }
+        if (!Package::hasPairing((int)$user['package_id'])) {
+            json_response(['valid' => false, 'message' => 'That member is not part of the binary network.']);
         }
 
         $leftFree  = User::isSlotFree((int)$user['id'], 'left');

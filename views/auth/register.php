@@ -184,7 +184,8 @@ if ($isLoggedIn && !$prefillSponsor) {
                                   data-name="<?= e($pkg['name']) ?>"
                                   data-fee="<?= fmt_money((float)$pkg['entry_fee']) ?>"
                                   data-bonus="<?= fmt_money((float)$pkg['pairing_bonus']) ?>"
-                                  data-cap="<?= (int)$pkg['daily_pair_cap'] ?>">
+                                  data-cap="<?= (int)$pkg['daily_pair_cap'] ?>"
+                                  data-pairing="<?= (int)$pkg['pairing_enabled'] === 1 ? '1' : '0' ?>">
                                   <?= e($pkg['name']) ?> — <?= fmt_money((float)$pkg['entry_fee']) ?>
                                 </option>
                               <?php endforeach; ?>
@@ -279,34 +280,36 @@ if ($isLoggedIn && !$prefillSponsor) {
                       <?= $lockSponsor ? 'readonly' : 'autocomplete="off"' ?> required>
                     <div class="form-text" id="sponsorHint"></div>
                   </div>
-                  <div class="mb-3">
-                    <label class="form-label">Binary Upline Username <span class="text-danger">*</span></label>
-                    <input type="text" id="upline_username" name="upline_username"
-                      class="form-control"
-                      placeholder="Upline in the binary tree"
-                      value="<?= e($prefillUpline) ?>"
-                      autocomplete="off" required>
-                    <div class="form-text" id="uplineHint"></div>
-                    <div id="slotStatus" class="slot-status d-none">
-                      <span id="leftSlot">↙ Left: —</span>
-                      <span id="rightSlot">↘ Right: —</span>
-                    </div>
-                  </div>
-                  <div class="mb-4">
-                    <label class="form-label">Binary Position <span class="text-danger">*</span></label>
-                    <div class="position-toggle">
-                      <div class="position-option">
-                        <input type="radio" id="pos_left" name="binary_position" value="left"
-                          <?= $prefillPosition === 'left' ? 'checked' : '' ?> required>
-                        <label class="position-label" for="pos_left">↙ Left</label>
-                      </div>
-                      <div class="position-option">
-                        <input type="radio" id="pos_right" name="binary_position" value="right"
-                          <?= $prefillPosition === 'right' ? 'checked' : '' ?>>
-                        <label class="position-label" for="pos_right">↘ Right</label>
+                  <div id="binarySection">
+                    <div class="mb-3">
+                      <label class="form-label">Binary Upline Username <span class="text-danger">*</span></label>
+                      <input type="text" id="upline_username" name="upline_username"
+                        class="form-control"
+                        placeholder="Upline in the binary tree"
+                        value="<?= e($prefillUpline) ?>"
+                        autocomplete="off" required>
+                      <div class="form-text" id="uplineHint"></div>
+                      <div id="slotStatus" class="slot-status d-none">
+                        <span id="leftSlot">↙ Left: —</span>
+                        <span id="rightSlot">↘ Right: —</span>
                       </div>
                     </div>
-                    <div class="form-text" id="positionHint"></div>
+                    <div class="mb-4">
+                      <label class="form-label">Binary Position <span class="text-danger">*</span></label>
+                      <div class="position-toggle">
+                        <div class="position-option">
+                          <input type="radio" id="pos_left" name="binary_position" value="left"
+                            <?= $prefillPosition === 'left' ? 'checked' : '' ?> required>
+                          <label class="position-label" for="pos_left">↙ Left</label>
+                        </div>
+                        <div class="position-option">
+                          <input type="radio" id="pos_right" name="binary_position" value="right"
+                            <?= $prefillPosition === 'right' ? 'checked' : '' ?>>
+                          <label class="position-label" for="pos_right">↘ Right</label>
+                        </div>
+                      </div>
+                      <div class="form-text" id="positionHint"></div>
+                    </div>
                   </div>
                   <div class="d-flex gap-2">
                     <button type="button" class="btn btn-outline-secondary" onclick="goStep(1); document.getElementById('referralAlert').style.display='none';">← Back</button>
@@ -351,11 +354,11 @@ if ($isLoggedIn && !$prefillSponsor) {
                           <td>Sponsor</td>
                           <td id="rev_sponsor">—</td>
                         </tr>
-                        <tr>
+                        <tr id="revUplineRow">
                           <td>Upline</td>
                           <td id="rev_upline">—</td>
                         </tr>
-                        <tr>
+                        <tr id="revPositionRow">
                           <td>Position</td>
                           <td id="rev_position">—</td>
                         </tr>
@@ -415,7 +418,29 @@ if ($isLoggedIn && !$prefillSponsor) {
     usernameOk = false,
     sponsorOk = false,
     uplineOk = false,
-    slotData = {};
+    slotData = {},
+    binaryEnabled = true;
+
+  // Show/hide the binary placement sections based on the selected package.
+  function setBinaryEnabled(on) {
+    binaryEnabled = !!on;
+    const section = document.getElementById('binarySection');
+    if (!section || IS_REFERRAL_MODE) return;
+    section.style.display = binaryEnabled ? 'block' : 'none';
+    const upEl = document.getElementById('upline_username');
+    const left = document.getElementById('pos_left');
+    const right = document.getElementById('pos_right');
+    if (upEl) upEl.required = binaryEnabled;
+    if (left) left.required = binaryEnabled;
+    if (right) right.required = binaryEnabled;
+    uplineOk = binaryEnabled;
+    if (!binaryEnabled) {
+      if (upEl) upEl.value = '';
+      if (left) left.checked = false;
+      if (right) right.checked = false;
+      setHint('uplineHint', 'Not required for this package.', null);
+    }
+  }
 
   function goStep(n) {
     const steps = IS_REFERRAL_MODE ? [2, 3] : [1, 2, 3];
@@ -480,8 +505,11 @@ if ($isLoggedIn && !$prefillSponsor) {
         toBtn.disabled = true;
         return;
       }
-      if (PKG_COUNT === 1) {
+      if (PKG_COUNT === 1 && pkgSel) {
         toBtn.disabled = false;
+        const single = pkgSel.options[0];
+        if (single) setBinaryEnabled(single.dataset.pairing === '1');
+        if (pkgSel.value) setBinaryEnabled(pkgSel.options[pkgSel.selectedIndex].dataset.pairing === '1');
       } else {
         toBtn.disabled = !(pkgSel && pkgSel.value);
       }
@@ -517,8 +545,10 @@ if ($isLoggedIn && !$prefillSponsor) {
         name: opt.dataset.name,
         fee: opt.dataset.fee,
         bonus: opt.dataset.bonus,
-        cap: opt.dataset.cap
+        cap: opt.dataset.cap,
+        pairing: opt.dataset.pairing === '1'
       };
+      setBinaryEnabled(selectedPkg.pairing);
       document.getElementById('pkgCardName').textContent = selectedPkg.name;
       document.getElementById('pkgCardDetails').textContent =
         'Entry: ' + selectedPkg.fee + ' · Bonus: ' + selectedPkg.bonus + ' · Cap: ' + selectedPkg.cap + ' pairs/day';
@@ -530,6 +560,7 @@ if ($isLoggedIn && !$prefillSponsor) {
 
   function resetPackageState() {
     selectedPkg = {};
+    setBinaryEnabled(true);
     if (packageSelect) {
       packageSelect.selectedIndex = 0;
       document.getElementById('packageCard')?.classList.add('d-none');
@@ -561,6 +592,7 @@ if ($isLoggedIn && !$prefillSponsor) {
     document.getElementById('validatedCode').value = '';
     setHint('codeHint', '', null);
     codeData = {};
+    setBinaryEnabled(true);
     if (getPaymentMethod() === 'code') {
       document.getElementById('toStep2Btn').disabled = true;
     }
@@ -586,6 +618,7 @@ if ($isLoggedIn && !$prefillSponsor) {
       })).json();
       if (data.valid) {
         codeData = data;
+        setBinaryEnabled(data.pairing_enabled !== false);
         document.getElementById('pkgName').textContent = data.package_name;
         document.getElementById('pkgDetails').textContent =
           'Entry: ' + data.entry_fee + ' · Bonus: ' + data.pairing_bonus + ' · Cap: ' + data.daily_cap + ' pairs/day';
@@ -779,18 +812,20 @@ if ($isLoggedIn && !$prefillSponsor) {
       return;
     }
     if (LOCKED_SPONSOR) sponsorOk = true;
-    if (!uplineOk) {
-      setHint('uplineHint', 'Please enter a valid upline.', false);
-      return;
-    }
-    if (!pos) {
-      setHint('positionHint', 'Please select a position.', false);
-      return;
-    }
-    const free = pos === 'left' ? slotData.left_free : slotData.right_free;
-    if (!free) {
-      setHint('positionHint', 'Selected position is taken. Choose another.', false);
-      return;
+    if (binaryEnabled) {
+      if (!uplineOk) {
+        setHint('uplineHint', 'Please enter a valid upline.', false);
+        return;
+      }
+      if (!pos) {
+        setHint('positionHint', 'Please select a position.', false);
+        return;
+      }
+      const free = pos === 'left' ? slotData.left_free : slotData.right_free;
+      if (!free) {
+        setHint('positionHint', 'Selected position is taken. Choose another.', false);
+        return;
+      }
     }
 
     // Populate review
@@ -816,8 +851,12 @@ if ($isLoggedIn && !$prefillSponsor) {
     if (revUser) revUser.textContent = '@' + document.getElementById('username').value;
     const revSponsor = document.getElementById('rev_sponsor');
     if (revSponsor) revSponsor.textContent = '@' + sponsorVal;
+    const uRow = document.getElementById('revUplineRow');
+    if (uRow) uRow.style.display = binaryEnabled ? '' : 'none';
     const revUpline = document.getElementById('rev_upline');
     if (revUpline) revUpline.textContent = '@' + document.getElementById('upline_username').value;
+    const pRow = document.getElementById('revPositionRow');
+    if (pRow) pRow.style.display = binaryEnabled ? '' : 'none';
     const revPos = document.getElementById('rev_position');
     if (revPos) revPos.textContent = pos.charAt(0).toUpperCase() + pos.slice(1);
     goStep(3);
