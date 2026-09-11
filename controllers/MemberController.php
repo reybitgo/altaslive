@@ -138,8 +138,8 @@ class MemberController
         $packages = Package::all(true);
         $pairingEnabled = Package::hasPairing((int)$user['package_id']);
 
-        // Non-binary members never see the binary tree
-        if ($view === 'binary' && !$pairingEnabled) {
+        // Admins may always view the binary tree; non-binary members never see it
+        if ($view === 'binary' && !$pairingEnabled && !Auth::isAdmin()) {
             redirect('/?page=genealogy&view=referral');
         }
 
