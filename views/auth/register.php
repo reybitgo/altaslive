@@ -854,11 +854,11 @@ if ($isLoggedIn && !$prefillSponsor) {
     const uRow = document.getElementById('revUplineRow');
     if (uRow) uRow.style.display = binaryEnabled ? '' : 'none';
     const revUpline = document.getElementById('rev_upline');
-    if (revUpline) revUpline.textContent = '@' + document.getElementById('upline_username').value;
+    if (revUpline) revUpline.textContent = binaryEnabled ? '@' + document.getElementById('upline_username').value : 'N/A';
     const pRow = document.getElementById('revPositionRow');
     if (pRow) pRow.style.display = binaryEnabled ? '' : 'none';
     const revPos = document.getElementById('rev_position');
-    if (revPos) revPos.textContent = pos.charAt(0).toUpperCase() + pos.slice(1);
+    if (revPos) revPos.textContent = binaryEnabled ? pos.charAt(0).toUpperCase() + pos.slice(1) : 'N/A';
     goStep(3);
   });
 
