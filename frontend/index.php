@@ -19,18 +19,88 @@ $mayaFee         = (float) setting('service_fee_maya', '0');
 // ── Load active packages ──
 $packages   = Package::all(true);
 $pkgCount   = count($packages);
-$featuredPkg = $packages[0] ?? null;
 
-// Commission toggles are per-package; base landing copy on the featured package
-$indirectEnabled = $featuredPkg ? Package::hasIndirectReferral((int)$featuredPkg['id']) : true;
-$dfiEnabled      = $featuredPkg ? Package::hasDfiToggle((int)$featuredPkg['id']) : true;
+// Per-package capability map — the package is the unit of truth.
+// Everything a member earns hinges on the package an account carries.
+$planFacts = [];
+$minEntry  = PHP_INT_MAX;
+foreach ($packages as $p) {
+    $id   = (int)$p['id'];
+    $fee  = (float)$p['entry_fee'];
+    if ($fee < $minEntry) $minEntry = $fee;
+    $planFacts[$id] = [
+        'name'        => (string)$p['name'],
+        'entry'       => $fee,
+        'binary'      => (int)$p['pairing_enabled'] === 1 && (float)$p['pairing_bonus'] > 0,
+        'pair_amount' => (float)$p['pairing_bonus'],
+        'pair_cap'    => (int)$p['daily_pair_cap'],
+        'indirect'    => (int)$p['indirect_referral_enabled'] === 1,
+        'direct_ref'  => (float)$p['direct_ref_bonus'],
+        'dfi'         => (int)$p['dfi_enabled'] === 1 && (float)$p['daily_fixed_income'] > 0,
+        'dfi_amount'  => (float)$p['daily_fixed_income'],
+        'dfi_days'    => (int)$p['daily_fixed_income_days'],
+        'cap_mult'    => (float)$p['lifetime_cap_multiplier'],
+    ];
+}
+if ($minEntry === PHP_INT_MAX) $minEntry = 0;
+
+// Aggregate facts for framing copy
+$binaryCount   = 0; $indirectCount = 0; $dfiCount = 0;
+$maxDirectRef  = 0; $maxIndirect   = 0; $indirectBreakdown = '';
+$minPairAmt = PHP_INT_MAX; $maxPairAmt = 0;
+$minDfiAmt  = PHP_INT_MAX; $maxDfiAmt  = 0; $minDfiDays = PHP_INT_MAX; $maxDfiDays = 0;
+$minCapMult = PHP_INT_MAX; $maxCapMult = 0;
+foreach ($planFacts as $id => $f) {
+    if ($f['binary']) {
+        $binaryCount++;
+        $minPairAmt = min($minPairAmt, $f['pair_amount']);
+        $maxPairAmt = max($maxPairAmt, $f['pair_amount']);
+    }
+    if ($f['indirect']) {
+        $indirectCount++;
+        $lvls = Package::getIndirectLevels($id);
+        $thisMax = !empty($lvls) ? (float)max($lvls) : 0;
+        if ($thisMax > $maxIndirect) {
+            $maxIndirect = $thisMax;
+            $parts = [];
+            foreach ($lvls as $lv => $amt) if ((float)$amt > 0) $parts[] = "Level $lv " . fmt_money($amt);
+            $indirectBreakdown = implode(' · ', $parts);
+        }
+    }
+    if ($f['dfi']) {
+        $dfiCount++;
+        $minDfiAmt  = min($minDfiAmt, $f['dfi_amount']);
+        $maxDfiAmt  = max($maxDfiAmt, $f['dfi_amount']);
+        $minDfiDays = min($minDfiDays, $f['dfi_days']);
+        $maxDfiDays = max($maxDfiDays, $f['dfi_days']);
+    }
+    $maxDirectRef = max($maxDirectRef, $f['direct_ref']);
+    $minCapMult   = min($minCapMult, $f['cap_mult']);
+    $maxCapMult   = max($maxCapMult, $f['cap_mult']);
+}
+$anyBinary   = $binaryCount   > 0;
+$anyIndirect = $indirectCount > 0;
+$anyDfi      = $dfiCount      > 0;
+$minPairAmt  = $minPairAmt === PHP_INT_MAX ? 0 : $minPairAmt;
+$minDfiAmt   = $minDfiAmt  === PHP_INT_MAX ? 0 : $minDfiAmt;
+$minDfiDays  = $minDfiDays === PHP_INT_MAX ? 0 : $minDfiDays;
+$minCapMult  = $minCapMult === PHP_INT_MAX ? 0 : $minCapMult;
+
+// Feature bullets for any package (single source of truth for cards & matrix)
+function pkg_features(array $f): array
+{
+    return [
+        ['Binary pairing', $f['binary'], $f['binary'] ? fmt_money($f['pair_amount']) . ' per pair · cap ' . number_format($f['pair_cap']) . '/day' : ''],
+        ['Unilevel referral', $f['indirect'], $f['indirect'] ? 'generational bonuses through your sponsor chain' : ''],
+        ['Daily fixed income', $f['dfi'], $f['dfi'] ? fmt_money($f['dfi_amount']) . '/day for ' . number_format($f['dfi_days']) . ' days' : ''],
+        ['Direct referral bonus', $f['direct_ref'] > 0, $f['direct_ref'] > 0 ? fmt_money($f['direct_ref']) . ' per recruit' : ''],
+        ['Lifetime income cap', true, fmt_money($f['cap_mult']) . '× entry fee'],
+    ];
+}
 
 // Registration gate (system-enforced seat limit, not a marketing claim)
 $isFull = (int) db()->query("SELECT COUNT(*) FROM users WHERE role = 'member'")->fetchColumn()
         >= (int) setting('seat_limit', '1000');
-
-// Commission stream count for copywriting
-$streamCount = 2 + ($indirectEnabled ? 1 : 0) + ($dfiEnabled ? 1 : 0);
 
 // Build payout methods list
 $payoutMethods = ['USDT TRC20', 'USDT BEP20'];
@@ -43,9 +113,11 @@ $payoutMethodsText = implode(', ', $payoutMethods);
 $telegramUrl = '';  // e.g. 'https://t.me/yourchannel' or ''
 
 // SEO description helper
-$streamWords = ['binary pairing', 'direct referral'];
-if ($indirectEnabled) $streamWords[] = 'unilevel';
-if ($dfiEnabled)      $streamWords[] = 'daily fixed income';
+$streamWords = [];
+if ($anyBinary) $streamWords[] = 'binary pairing';
+$streamWords[] = 'direct referral';
+if ($anyIndirect) $streamWords[] = 'unilevel referral';
+if ($anyDfi)      $streamWords[] = 'daily fixed income';
 $streamText = implode(', ', $streamWords);
 $streamOxford = count($streamWords) > 2
   ? implode(', ', array_slice($streamWords, 0, -1)) . ', and ' . end($streamWords)
@@ -60,8 +132,8 @@ $streamOxford = count($streamWords) > 2
 
   <!-- ── Primary SEO ── -->
   <title><?= e($siteName) ?> — Philippine Poultry Network</title>
-  <meta name="description" content="<?= e($siteName) ?> is a Philippine poultry binary network. <?= $streamCount ?> income streams (<?= $streamText ?>). <?= $payoutMethodsText ?> payouts. Members may hold multiple accounts as their network grows.">
-  <meta name="keywords" content="<?= e($siteName) ?>, Philippine poultry network, binary MLM Philippines, USDT payout, USDT TRC20, USDT BEP20, farm investment Philippines, poultry farming community, bayanihan network<?= $indirectEnabled ? ', unilevel' : '' ?>">
+  <meta name="description" content="<?= e($siteName) ?> is a Philippine poultry network with multiple entry packages. Each package opens its own earning streams (<?= $streamOxford ?>), paid out via <?= $payoutMethodsText ?>.">
+  <meta name="keywords" content="<?= e($siteName) ?>, Philippine poultry network, poultry MLM Philippines, entry packages, binary pairing package, unilevel referral, daily fixed income, USDT payout, USDT TRC20, USDT BEP20, farm investment Philippines, poultry farming community, bayanihan network">
   <meta name="robots" content="index, follow">
   <meta name="author" content="<?= e($siteName) ?>">
   <link rel="canonical" href="<?= $base ?>/">
@@ -69,7 +141,7 @@ $streamOxford = count($streamWords) > 2
   <!-- ── Open Graph (ScamAdviser reads this) ── -->
   <meta property="og:type" content="website">
   <meta property="og:title" content="<?= e($siteName) ?> — Philippine Poultry Network">
-  <meta property="og:description" content="A community of Filipino farmers and networkers backed by real Philippine poultry operations. Members may hold multiple accounts. <?= $streamCount ?> income streams. <?= $payoutMethodsText ?> payouts.">
+  <meta property="og:description" content="A community of Filipino farmers and networkers backed by real Philippine poultry operations. Multiple entry packages — binary pairing, unilevel referral, and daily fixed income. <?= $payoutMethodsText ?> payouts.">
   <meta property="og:url" content="<?= $base ?>/">
   <meta property="og:site_name" content="<?= e($siteName) ?>">
   <meta property="og:locale" content="en_PH">
@@ -78,7 +150,7 @@ $streamOxford = count($streamWords) > 2
   <!-- ── Twitter Card ── -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="<?= e($siteName) ?> — Philippine Poultry Network">
-  <meta name="twitter:description" content="Multiple accounts per member. Real farms. <?= $payoutMethodsText ?> payouts. Binary referral structure. Philippines.">
+  <meta name="twitter:description" content="Real farms. <?= $payoutMethodsText ?> payouts. Entry packages with binary, unilevel & daily income. Philippines.">
   <meta name="twitter:image" content="<?= $base ?>/hero-bg.jpg">
 
   <!-- ── PWA ── -->
@@ -98,7 +170,7 @@ $streamOxford = count($streamWords) > 2
       "name": "<?= e($siteName) ?>",
       "url": "<?= $base ?>",
       "logo": "<?= $base ?>/logo.png",
-      "description": "A Philippine poultry network connecting real farm investment with community-powered binary income, paying out via <?= $payoutMethodsText ?>. Members may hold multiple accounts as their network grows.",
+      "description": "A Philippine poultry network connecting real farm investment with multiple entry packages — binary pairing, unilevel referral, and daily fixed income — paying out via <?= $payoutMethodsText ?>.",
       "foundingDate": "2024",
       "foundingLocation": {
         "@type": "Place",
@@ -156,7 +228,7 @@ $streamOxford = count($streamWords) > 2
           "name": "What is <?= e($siteName) ?>?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "<?= e($siteName) ?> is a binary referral network backed by real Philippine poultry operations. Each member account earns through <?= $streamCount ?> commission streams (<?= $streamOxford ?>), and receives payouts via <?= $payoutMethodsText ?>. Members may register more than one account as their network grows."
+            "text": "<?= e($siteName) ?> is a poultry referral network backed by real Philippine operations. Members pick an entry package, and each package opens its own earning streams (<?= $streamOxford ?>). Payouts are made via <?= $payoutMethodsText ?>."
           }
         },
         {
@@ -164,7 +236,7 @@ $streamOxford = count($streamWords) > 2
           "name": "How do I join <?= e($siteName) ?>?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "You need a registration code from an existing member or from the <?= e($siteName) ?> admin. Once you have a code, register at altasfarm.com, choose your sponsor and binary position (left or right leg), and your account is confirmed."
+            "text": "You need a registration code from an existing member or from the <?= e($siteName) ?> admin. Once you have a code, register at altasfarm.com, pick your entry package and sponsor, and place your account — choosing a binary position when your package includes binary pairing."
           }
         },
         {
@@ -206,37 +278,33 @@ $streamOxford = count($streamWords) > 2
 
         <div class="faq-item">
           <button class="faq-q" onclick="toggleFaq(this)">What is <?= e($siteName) ?>?</button>
-          <div class="faq-a"><?= e($siteName) ?> is a binary referral network backed by real Philippine poultry operations. Each member account participates in <?= $streamCount ?> commission streams (<?= $streamOxford ?>), and receives payouts via <?= $payoutMethodsText ?>. Members are welcome to register more than one account — every position earns independently and feeds the same network.</div>
+          <div class="faq-a"><?= e($siteName) ?> is a poultry referral network backed by real Philippine operations. Members pick an entry package, and each package opens its own earning streams — <?= $streamOxford ?> — paid out via <?= $payoutMethodsText ?>.</div>
         </div>
 
         <div class="faq-item">
           <button class="faq-q" onclick="toggleFaq(this)">How do I join <?= e($siteName) ?>?</button>
-          <div class="faq-a">You need a valid registration code from an existing member (your sponsor) or from the <?= e($siteName) ?> admin team. Once you have a code, register at altasfarm.com, choose your sponsor, and select your binary position (left or right leg). Your account is confirmed immediately upon successful registration and payment.</div>
+          <div class="faq-a">You need a valid registration code from an existing member (your sponsor) or from the <?= e($siteName) ?> admin team. Once you have a code, register at altasfarm.com, pick your entry package and sponsor, and place your account — choosing a left or right binary position when the package includes binary pairing. Your account is confirmed immediately upon successful registration and payment.</div>
         </div>
 
         <div class="faq-item">
           <button class="faq-q" onclick="toggleFaq(this)">How much does it cost to join?</button>
-          <div class="faq-a">There are <?= $pkgCount ?> active package<?= $pkgCount > 1 ? 's' : '' ?>.<?php if ($featuredPkg): ?> Entry starts at <?= fmt_money($featuredPkg['entry_fee']) ?> for the <?= e($featuredPkg['name']) ?> package.<?php endif; ?> There are no recurring fees, no upgrade tiers, and no hidden charges. Every member enters with access to the full earning structure from day one.</div>
+          <div class="faq-a">There are <?= $pkgCount ?> active packages, from <?= fmt_money($minEntry) ?>. There are no recurring fees and no hidden charges. Each package carries its own earning features — you pick the one that suits your goals.</div>
         </div>
 
         <div class="faq-item">
           <button class="faq-q" onclick="toggleFaq(this)">How are commissions earned?</button>
           <div class="faq-a">
-            There are <?= $streamCount ?> commission streams:
+            Your earning streams depend on the package you choose:
             <ul style="margin-top:.5rem;">
-              <li><strong>Binary Pairing Bonus (<?= $featuredPkg ? fmt_money($featuredPkg['pairing_bonus']) : '₱—' ?>):</strong> Earned each time a left-right pair forms anywhere in your binary downline. Capped at <?= $featuredPkg ? $featuredPkg['daily_pair_cap'] : '—' ?> pairs per day.</li>
-              <li><strong>Direct Referral Bonus (<?= $featuredPkg ? fmt_money($featuredPkg['direct_ref_bonus']) : '₱—' ?>):</strong> Credited instantly every time someone you personally referred registers with your code.</li>
-              <?php if ($indirectEnabled && $featuredPkg):
-                $lvls = Package::getIndirectLevels($featuredPkg['id']);
-                $lvlParts = [];
-                foreach ($lvls as $lvl => $amt) {
-                  if ($amt > 0) $lvlParts[] = "Level $lvl: " . fmt_money($amt);
-                }
-              ?>
-                <li><strong>Unilevel Bonus:</strong> Generational bonuses paid 10 levels deep — <?= implode(', ', $lvlParts) ?> per registration in that level.</li>
+              <?php if ($anyBinary): ?>
+                <li><strong>Binary Pairing Bonus:</strong> Packages with binary pairing pay <?= fmt_money($minPairAmt) ?>–<?= fmt_money($maxPairAmt) ?> each time a left-right pair forms in your binary downline, within each package's own daily cap.</li>
               <?php endif; ?>
-              <?php if ($dfiEnabled && $featuredPkg): ?>
-                <li><strong>Daily Fixed Income (<?= fmt_money($featuredPkg['daily_fixed_income']) ?>/day):</strong> A fixed daily payout credited for <?= $featuredPkg['daily_fixed_income_days'] ?> days after registration, on top of network earnings.</li>
+              <li><strong>Direct Referral Bonus:</strong> Credited instantly every time someone you personally referred registers — up to <?= fmt_money($maxDirectRef) ?> depending on your package.</li>
+              <?php if ($anyIndirect): ?>
+                <li><strong>Unilevel Bonus:</strong> Packages with unilevel referral pay generational bonuses through your sponsor chain.</li>
+              <?php endif; ?>
+              <?php if ($anyDfi): ?>
+                <li><strong>Daily Fixed Income:</strong> Packages that carry it pay a fixed daily amount for a set number of days.</li>
               <?php endif; ?>
             </ul>
             All commissions are credited to your e-wallet in real time on the triggering event (registration), not on a batch schedule.
@@ -255,7 +323,7 @@ $streamOxford = count($streamWords) > 2
 
         <div class="faq-item">
           <button class="faq-q" onclick="toggleFaq(this)">Can I hold more than one account?</button>
-          <div class="faq-a">Yes. The network allows a member to register multiple accounts, each placed independently in the binary structure. Every account carries its own entry fee, its own binary position, and earns through the same <?= $streamCount ?> commission streams from day one.</div>
+          <div class="faq-a">Yes. The network allows a member to register multiple accounts, each with its own entry package and binary position (where the package includes binary pairing). Every account carries its own entry fee and earns through the streams of its own package from day one.</div>
         </div>
 
         <div class="faq-item">
@@ -295,22 +363,13 @@ $streamOxford = count($streamWords) > 2
         <p>To register, you must: (a) be at least 18 years of age; (b) be a resident of the Philippines or a Filipino national abroad; (c) possess a valid USDT TRC20 or USDT BEP20 wallet address for receiving payouts; (d) have a valid registration code issued by an existing member or the admin team; and (e) agree to these Terms in full.</p>
 
         <h3>3. Membership and Multiple Accounts</h3>
-        <p>Each entry into <?= e($siteName) ?> is a single account with its own binary position. Members are permitted to register more than one account — every account carries its own entry fee and earns independently through the same commission streams. Registration must always be made with accurate personal information; accounts created to manipulate the binary structure, generate fraudulent referrals, or otherwise abuse the earning system are subject to suspension and forfeiture of balances.</p>
+        <p>Each entry into <?= e($siteName) ?> is a single account with its own package and binary position (where applicable). Members are permitted to register more than one account — every account carries its own entry fee and earns independently through the streams of its own package. Registration must always be made with accurate personal information; accounts created to manipulate the binary structure, generate fraudulent referrals, or otherwise abuse the earning system are subject to suspension and forfeiture of balances.</p>
 
         <h3>4. Entry Fee and Package</h3>
-        <p>There is one entry package (the Broiler Starter) at a one-time fee of ₱10,000. This fee is non-refundable upon confirmed registration and binary placement. The fee covers your platform account, access to all earning streams, and participation in the network's poultry-backed operations.</p>
+        <p>Members select from the entry packages offered at the time of registration. Each package has its own one-time entry fee, which is non-refundable upon confirmed registration and placement. The fee covers your platform account, access to the earning streams included in your chosen package, and participation in the network's poultry-backed operations.</p>
 
         <h3>5. Commissions and Earning Structure</h3>
-        <p>Members earn through <?= $streamCount ?> streams:
-          (a) Binary Pairing Bonus of <?= $featuredPkg ? fmt_money($featuredPkg['pairing_bonus']) : '₱—' ?> per confirmed pair, capped at <?= $featuredPkg ? $featuredPkg['daily_pair_cap'] : '—' ?> pairs per calendar day;
-          (b) Direct Referral Bonus of <?= $featuredPkg ? fmt_money($featuredPkg['direct_ref_bonus']) : '₱—' ?> per personally sponsored member;
-          <?php if ($indirectEnabled): ?>
-            (c) Unilevel Bonus as detailed in the Compensation Plan section of the website;
-          <?php endif; ?>
-          <?php if ($dfiEnabled && $featuredPkg): ?>
-            <?= $indirectEnabled ? '(d)' : '(c)' ?> Daily Fixed Income of <?= fmt_money($featuredPkg['daily_fixed_income']) ?> per day for <?= $featuredPkg['daily_fixed_income_days'] ?> days after registration;
-          <?php endif; ?>
-          Commissions are credited to your platform e-wallet in real time on the triggering event. <?= e($siteName) ?> reserves the right to verify and withhold commissions suspected of being generated through fraud, duplicate accounts, or system manipulation.</p>
+        <p>Members earn through the commission streams included in their chosen package, which may include a binary pairing bonus, direct and unilevel referral bonuses, and a daily fixed income. Fees, bonus amounts, and caps vary by package and are published in the Packages section of the website. Commissions are credited to your platform e-wallet in real time on the triggering event. <?= e($siteName) ?> reserves the right to verify and withhold commissions suspected of being generated through fraud, duplicate accounts, or system manipulation.</p>
 
         <h3>6. Payouts</h3>
         <p>All payouts are made via <?= $payoutMethodsText ?>. The minimum withdrawal amount is <?= fmt_money($minPayout) ?>. Withdrawals are processed within 24–72 business hours. <?= e($siteName) ?> is not liable for losses caused by incorrect wallet addresses or account details provided by the member. Ensure your payout details are correct before submitting a withdrawal request — blockchain transactions are irreversible.</p>
@@ -427,9 +486,9 @@ $streamOxford = count($streamWords) > 2
         <p><?= e($siteName) ?> is currently in the process of registering as a sole proprietorship with the Philippine Department of Trade and Industry (DTI). Business name registration application is pending as of January 2025. Upon approval, our DTI certificate number will be published here. <?= e($siteName) ?> operates from Santiago, Isabela, Philippines (postal code 3006).</p>
 
         <h3>2. Nature of the Network</h3>
-        <p><?= e($siteName) ?> is a direct referral network structured as a binary compensation plan. It is backed by a real poultry operation — meaning the entry fee is partially invested in Philippine broiler farming activities. The network is not a bank, not a lending institution, and not a securities issuer. It does not offer guaranteed returns.</p>
+        <p><?= e($siteName) ?> is a multi-package referral network. Each entry package carries its own set of earning features, which may include binary pairing bonuses, direct and unilevel referral bonuses, and a daily fixed income. It is backed by a real poultry operation — meaning the entry fee is partially invested in Philippine broiler farming activities. The network is not a bank, not a lending institution, and not a securities issuer. It does not offer guaranteed returns.</p>
 
-        <p>The compensation structure involves referral-based commissions that are dependent on new member registrations. Because the binary structure pays on left-right pairings, registrations placed later in a leg create fewer pairing opportunities than early ones. Members who join later in a mature leg will have fewer pairing opportunities than early members. This is a structural characteristic of binary networks that members must understand before joining.</p>
+        <p>The compensation structure involves referral-based commissions that are dependent on new member registrations. Where binary pairing is part of a package, registrations placed later in a leg create fewer pairing opportunities than early ones. Members who join later in a mature leg will have fewer pairing opportunities than early members. This is a structural characteristic of binary networks that members must understand before joining.</p>
 
         <div class="warn-box">
           <p><strong>Important:</strong> <?= e($siteName) ?> is not registered with the Philippine Securities and Exchange Commission (SEC) as an investment company or securities dealer. It operates as a referral-based community network, not as a registered investment vehicle. Participation is voluntary and carries financial risk.</p>
@@ -584,7 +643,7 @@ $streamOxford = count($streamWords) > 2
         <span>Shared Income.</span>
       </h1>
       <p class="hero-desc">
-        <?= e($siteName) ?> ties a real poultry operation to a binary referral network. You invest in a farm package, bring in your team, and earn commissions as your network grows — all tracked in real time on your dashboard.
+        <?= e($siteName) ?> ties a real poultry operation to a multi-package referral network. Pick the package that suits you, bring in your team, and earn through the streams your package includes — all tracked in real time on your dashboard.
       </p>
       <div class="hero-actions">
         <a href="<?= $base ?>/?page=register" class="btn-gold">🌱 Get Started</a>
@@ -592,15 +651,13 @@ $streamOxford = count($streamWords) > 2
       </div>
       <div class="hero-stats">
         <div>
-          <div class="hero-stat-val"><?= $featuredPkg ? fmt_money($featuredPkg['pairing_bonus']) : '₱—' ?></div>
-          <div class="hero-stat-label">Per Pair Bonus</div>
+          <div class="hero-stat-val"><?= $pkgCount ?></div>
+          <div class="hero-stat-label">Entry Packages</div>
         </div>
-        <?php if ($indirectEnabled): ?>
-          <div>
-            <div class="hero-stat-val">10</div>
-            <div class="hero-stat-label">Unilevel Levels</div>
-          </div>
-        <?php endif; ?>
+        <div>
+          <div class="hero-stat-val">Real-time</div>
+          <div class="hero-stat-label">Commissions</div>
+        </div>
         <div>
           <div class="hero-stat-val">Real</div>
           <div class="hero-stat-label">Farm Products</div>
@@ -609,14 +666,21 @@ $streamOxford = count($streamWords) > 2
     </div>
 
     <div class="hero-badge fade-up">
-      <div style="font-family:var(--serif);font-size:1.5rem;font-weight:700;color:#fff;margin-bottom:.5rem;"><?= $featuredPkg ? e($featuredPkg['name']) : 'Entry' ?></div>
-      <div style="font-family:var(--mono);font-size:2rem;font-weight:500;color:var(--gold);"><?= $featuredPkg ? fmt_money($featuredPkg['entry_fee']) : '₱—' ?></div>
+      <div style="font-family:var(--serif);font-size:1.4rem;font-weight:700;color:#fff;margin-bottom:.5rem;">Entry Packages From</div>
+      <div style="font-family:var(--mono);font-size:2rem;font-weight:500;color:var(--gold);"><?= fmt_money($minEntry) ?></div>
+      <?php $offerRows = [];
+        if ($anyBinary) $offerRows[] = 'Binary Pairing';
+        $offerRows[] = 'Direct Referral';
+        if ($anyIndirect) $offerRows[] = 'Unilevel Referral';
+        if ($anyDfi) $offerRows[] = 'Daily Fixed Income';
+      ?>
       <div style="height:1px;background:rgba(255,255,255,.1);margin:1rem 0;"></div>
-      <div style="font-family:var(--serif);font-size:1.5rem;font-weight:700;color:#fff;margin-bottom:.5rem;">Pair Earned</div>
-      <div style="font-family:var(--mono);font-size:2rem;font-weight:500;color:var(--gold);"><?= $featuredPkg ? fmt_money($featuredPkg['pairing_bonus']) : '₱—' ?></div>
-      <div style="height:1px;background:rgba(255,255,255,.1);margin:1rem 0;"></div>
-      <div style="font-family:var(--serif);font-size:1.5rem;font-weight:700;color:#fff;margin-bottom:.5rem;">Daily Cap</div>
-      <div style="font-family:var(--mono);font-size:2rem;font-weight:500;color:var(--gold);"><?= $featuredPkg ? $featuredPkg['daily_pair_cap'] . '×' : '—' ?></div>
+      <div style="font-family:var(--serif);font-size:1.4rem;font-weight:700;color:#fff;margin-bottom:.5rem;"><?= $anyBinary ? $binaryCount . ' Binary Packages' : $pkgCount . ' Packages' ?></div>
+      <div style="font-family:var(--mono);font-size:.85rem;font-weight:400;color:var(--gold);display:flex;flex-direction:column;gap:.25rem;margin-bottom:1rem;">
+        <div><?= implode(' · ', $offerRows) ?></div>
+      </div>
+      <div style="height:1px;background:rgba(255,255,255,.1);margin:0 0 1rem;"></div>
+      <a href="#packages" class="btn-outline" style="font-size:.8rem;padding:.5rem 1rem;border-color:rgba(255,255,255,.4);color:#fff;">Compare Packages →</a>
     </div>
 
     <div class="hero-illustration fade-up">
@@ -659,22 +723,18 @@ $streamOxford = count($streamWords) > 2
 ════════════════════════════════════════════════════════════ -->
   <?php
   $marqueeItems = [
-    'Multiple Accounts Per Member',
     'Real Poultry Products',
     'Instant Commissions',
     'USDT TRC20 & BEP20 Payouts',
     'Philippine Farms',
-    'Daily Pair Bonuses',
+    'Binary Pairing',
+    'Unilevel Referral',
+    'Daily Fixed Income',
+    'Direct Referral Bonus',
     'Bayanihan Network',
     'Open Community',
-    'Binary Structure',
+    $pkgCount . ' Entry Packages',
   ];
-  if ($indirectEnabled) {
-    $marqueeItems[] = '10-Level Unilevel';
-  }
-  if ($dfiEnabled) {
-    $marqueeItems[] = 'Daily Fixed Income';
-  }
   ?>
   <div class="marquee-wrap" aria-hidden="true">
     <div class="marquee-track">
@@ -703,15 +763,13 @@ $streamOxford = count($streamWords) > 2
           <div class="tag">Our Story</div>
           <h2 class="section-title">Small on Purpose. Solid by Design.</h2>
           <p class="section-lead">
-            Most networks dilute as they grow. <?= e($siteName) ?> chose a different path: keep the structure flat with <?= $pkgCount === 1 ? 'one package' : 'clear package tiers' ?>, let members hold as many accounts as they choose, and let bayanihan do the rest. A community that knows its people moves deliberately. It holds.
+            Most networks dilute as they grow. <?= e($siteName) ?> chose a different path: multiple entry packages, each with its own earning features, so you pick the one that fits the way you want to grow. A community that knows its people moves deliberately. It holds.
           </p>
           <ul class="about-features">
-            <li>Members may hold multiple accounts — one person, as many positions as they choose</li>
             <li>Backed by real, operating Philippine poultry farms in Isabela</li>
             <li>Commissions fire the instant a new member registers</li>
-            <li>One package tier — every member enters as an equal</li>
+            <li>Every package has its own earning features — binary pairing, referral, fixed income</li>
             <li>Payouts in GCash, Maya, USDT TRC20, or USDT BEP20 — borderless, no bank required</li>
-            <li>Full audit trail: every commission logged and traceable</li>
           </ul>
           <div style="margin-top:2rem;">
             <a href="<?= $base ?>/?page=register" class="btn-primary">Secure Your Place →</a>
@@ -728,7 +786,7 @@ $streamOxford = count($streamWords) > 2
     <div class="container">
       <div class="tag tag-green" style="background:rgba(76,175,80,.15);color:rgba(255,255,255,.7);">Simple Process</div>
       <h2 class="section-title">How <?= e($siteName) ?> Works</h2>
-      <p class="section-lead">Easy steps from your first registration to your first withdrawal. The structure is binary — your income grows as both sides of your tree fill, within a defined daily cap. Members are free to register more than one account as their network grows.</p>
+      <p class="section-lead">Easy steps from your first registration to your first withdrawal. Choose the package that suits you, build your network, and withdraw anytime.</p>
       <div class="steps-grid">
         <div class="step-card fade-up">
           <div class="step-num">01</div>
@@ -740,30 +798,32 @@ $streamOxford = count($streamWords) > 2
           <div class="step-num">02</div>
           <div class="step-icon">📝</div>
           <div class="step-title">Register &amp; Place</div>
-          <div class="step-desc">Create your account, choose your sponsor, and select your binary position — left or right leg. Your position is confirmed on registration, and you can open more accounts anytime.</div>
+          <div class="step-desc">Create your account, choose your package and sponsor, and place it — selecting a left or right position when your package includes binary pairing.</div>
         </div>
         <div class="step-card fade-up">
           <div class="step-num">03</div>
           <div class="step-icon">👥</div>
           <div class="step-title">Build Your Team</div>
-          <div class="step-desc">Share your referral link and bring in your network. Every direct referral earns you <?= $featuredPkg ? fmt_money($featuredPkg['direct_ref_bonus']) : '₱—' ?> — credited the moment they register.</div>
+          <div class="step-desc">Share your referral link and bring in your network. Every direct referral earns you up to <?= fmt_money($maxDirectRef) ?> — credited the moment they register.</div>
         </div>
-        <div class="step-card fade-up">
-          <div class="step-num">04</div>
-          <div class="step-icon">💸</div>
-          <div class="step-title">Earn Pair Bonuses</div>
-          <div class="step-desc">When a left-right pair forms anywhere beneath you, <?= $featuredPkg ? fmt_money($featuredPkg['pairing_bonus']) : '₱—' ?> fires to your wallet in real time. Daily pairs are capped at <?= $featuredPkg ? $featuredPkg['daily_pair_cap'] : '—' ?> to keep the system sustainable.</div>
-        </div>
-        <?php if ($indirectEnabled): ?>
+<?php if ($anyBinary): ?>
           <div class="step-card fade-up">
-            <div class="step-num">05</div>
+            <div class="step-num">04</div>
+            <div class="step-icon">👥</div>
+            <div class="step-title">Earn Pair Bonuses</div>
+            <div class="step-desc">On packages with binary pairing, a left-right pair forming anywhere beneath you fires <?= fmt_money($minPairAmt) ?>–<?= fmt_money($maxPairAmt) ?> to your wallet in real time, within each package's own daily cap.</div>
+          </div>
+        <?php endif; ?>
+        <?php if ($anyIndirect): ?>
+          <div class="step-card fade-up">
+            <div class="step-num"><?= $anyBinary ? '05' : '04' ?></div>
             <div class="step-icon">🔗</div>
             <div class="step-title">Unilevel Royalties</div>
-            <div class="step-desc">Generational bonuses paid 10 levels deep through your sponsor chain. Passive income that compounds as your wider network grows.</div>
+            <div class="step-desc">Packages with unilevel referral pay generational bonuses through your sponsor chain — passive income that compounds as your wider network grows.</div>
           </div>
         <?php endif; ?>
         <div class="step-card fade-up">
-          <div class="step-num"><?= $indirectEnabled ? '06' : '05' ?></div>
+          <div class="step-num"><?= ($anyBinary ? 1 : 0) + ($anyIndirect ? 1 : 0) + 4 ?></div>
           <div class="step-icon">₮</div>
           <div class="step-title">Withdraw Earnings</div>
           <div class="step-desc">All earnings settle via <?= $payoutMethodsText ?>. Whether you are in the Philippines or abroad, your wallet receives the same way — no remittance fees, no cut, no geography.</div>
@@ -779,53 +839,86 @@ $streamOxford = count($streamWords) > 2
     <div class="container">
       <div class="plan-header">
         <div class="tag">Compensation Plan</div>
-        <h2 class="section-title">Three Streams. One Entry.</h2>
-        <p class="section-lead">Every member enters at the same level and accesses all <?= $streamCount ?> income streams from day one. The binary, the referral<?= $indirectEnabled ? ', and the unilevel' : '' ?><?= $dfiEnabled ? ($indirectEnabled ? ', plus daily fixed income' : ', plus daily fixed income') : '' ?> — none of them locked behind a higher tier.</p>
+        <h2 class="section-title">Packages That Fit the Way You Play.</h2>
+        <p class="section-lead">No single path for everyone. Each package opens its own combination of earning streams — binary pairing, direct &amp; unilevel referral, and a daily fixed income. Pick the package that suits you.</p>
       </div>
       <div class="plan-grid">
         <div class="plan-card fade-up">
           <div class="plan-card-icon">🤝</div>
           <div class="plan-card-title">Binary Pairing Bonus</div>
-          <div class="plan-card-amount"><?= $featuredPkg ? fmt_money($featuredPkg['pairing_bonus']) : '₱—' ?></div>
-          <div class="plan-card-desc">Earned every time a left-right pair forms anywhere in your binary downline. Capped at <?= $featuredPkg ? $featuredPkg['daily_pair_cap'] : '—' ?> pairs per day — a ceiling that keeps payouts consistent and the network stable.</div>
+          <div class="plan-card-amount"><?= fmt_money($minPairAmt) ?> – <?= fmt_money($maxPairAmt) ?></div>
+          <div class="plan-card-desc">Available on packages with binary pairing. Earn <?= fmt_money($minPairAmt) ?>–<?= fmt_money($maxPairAmt) ?> every time a left-right pair forms anywhere in your binary downline, within each package's own daily cap — a ceiling that keeps payouts consistent and the network stable.</div>
         </div>
         <div class="plan-card featured fade-up">
           <div class="plan-card-icon">👥</div>
           <div class="plan-card-title">Direct Referral Bonus</div>
-          <div class="plan-card-amount"><?= $featuredPkg ? fmt_money($featuredPkg['direct_ref_bonus']) : '₱—' ?></div>
-          <div class="plan-card-desc">Credited instantly every time someone you referred registers. There is no artificial ceiling — your referrals, and your own additional accounts, keep your network growing.</div>
+          <div class="plan-card-amount">Up to <?= fmt_money($maxDirectRef) ?></div>
+          <div class="plan-card-desc">Credited instantly every time someone you referred registers. There is no artificial ceiling — your referrals keep your network growing.</div>
         </div>
-        <?php if ($indirectEnabled && $featuredPkg):
-          $lvls = Package::getIndirectLevels($featuredPkg['id']);
-          $maxIndirect = !empty($lvls) ? max($lvls) : 0;
-        ?>
+        <?php if ($anyIndirect): ?>
           <div class="plan-card fade-up">
             <div class="plan-card-icon">🔗</div>
             <div class="plan-card-title">Unilevel Bonus</div>
             <div class="plan-card-amount">Up to <?= fmt_money($maxIndirect) ?></div>
-            <div class="plan-card-desc">Generational bonuses 10 levels deep through your sponsor chain. Passive income that compounds as your wider network grows — with no ceiling on how far it can run.</div>
+            <div class="plan-card-desc">Packages with unilevel referral pay generational bonuses through your sponsor chain. Passive income that compounds as your wider network grows — with no ceiling on how far it can run.</div>
           </div>
         <?php endif; ?>
-        <?php if ($dfiEnabled && $featuredPkg): ?>
+        <?php if ($anyDfi): ?>
           <div class="plan-card fade-up">
             <div class="plan-card-icon">📅</div>
             <div class="plan-card-title">Daily Fixed Income</div>
-            <div class="plan-card-amount"><?= fmt_money($featuredPkg['daily_fixed_income']) ?><small style="font-size:.6em;display:block;color:var(--muted);">/ day</small></div>
-            <div class="plan-card-desc">A fixed daily payout for <?= $featuredPkg['daily_fixed_income_days'] ?> days after registration. A predictable baseline on top of your network earnings.</div>
+            <div class="plan-card-amount"><?= fmt_money($minDfiAmt) ?> – <?= fmt_money($maxDfiAmt) ?><small style="font-size:.6em;display:block;color:var(--muted);">/ day</small></div>
+            <div class="plan-card-desc">Packages that carry it pay a fixed daily amount for <?= number_format($minDfiDays) ?>–<?= number_format($maxDfiDays) ?> days. A predictable baseline on top of your network earnings.</div>
           </div>
         <?php endif; ?>
       </div>
-      <?php if ($indirectEnabled && $featuredPkg):
-        $lvls = Package::getIndirectLevels($featuredPkg['id']);
-        $parts = [];
-        foreach ($lvls as $lvl => $amt) {
-          if ($amt > 0) $parts[] = "Level $lvl " . fmt_money($amt);
-        }
-      ?>
+      <?php if ($anyIndirect && $indirectBreakdown !== ''): ?>
         <div class="plan-note">
-          <strong>Unilevel Breakdown:</strong> <?= implode(' · ', $parts) ?> per member registration.
+          <strong>Unilevel Breakdown:</strong> <?= $indirectBreakdown ?> per member registration.
         </div>
       <?php endif; ?>
+
+      <!-- Package × stream matrix -->
+      <div class="plan-matrix" style="margin-top:2.5rem;overflow-x:auto;border:1px solid rgba(255,255,255,.12);border-radius:var(--radius);">
+        <table style="width:100%;border-collapse:collapse;font-size:.82rem;min-width:760px;background:rgba(255,255,255,.02);">
+          <thead>
+            <tr style="text-align:left;background:rgba(255,255,255,.04);">
+              <th style="padding:.85rem 1rem;border-bottom:2px solid var(--gold);color:#6b4c2a;font-weight:600;">Package</th>
+              <th style="padding:.85rem 1rem;border-bottom:2px solid var(--gold);text-align:center;color:#6b4c2a;font-weight:600;">Entry</th>
+              <th style="padding:.85rem 1rem;border-bottom:2px solid var(--gold);text-align:center;color:#6b4c2a;font-weight:600;">Binary Pairing</th>
+              <th style="padding:.85rem 1rem;border-bottom:2px solid var(--gold);text-align:center;color:#6b4c2a;font-weight:600;">Unilevel</th>
+              <th style="padding:.85rem 1rem;border-bottom:2px solid var(--gold);text-align:center;color:#6b4c2a;font-weight:600;">Daily Fixed Income</th>
+              <th style="padding:.85rem 1rem;border-bottom:2px solid var(--gold);text-align:center;color:#6b4c2a;font-weight:600;">Direct Ref</th>
+              <th style="padding:.85rem 1rem;border-bottom:2px solid var(--gold);text-align:right;color:#6b4c2a;font-weight:600;">Lifetime Cap</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($planFacts as $f): ?>
+              <tr>
+                <td style="padding:.7rem 1rem;border-bottom:1px solid var(--border-color);font-weight:600;"><?= e($f['name']) ?></td>
+                <td style="padding:.7rem 1rem;border-bottom:1px solid var(--border-color);text-align:center;font-family:var(--mono);"><?= fmt_money($f['entry']) ?></td>
+                <td style="padding:.7rem 1rem;border-bottom:1px solid var(--border-color);text-align:center;font-family:var(--mono);">
+                  <?php if ($f['binary']): ?>
+                    <?= fmt_money($f['pair_amount']) ?><br><small style="color:var(--muted);">cap <?= number_format($f['pair_cap']) ?>/day</small>
+                  <?php else: ?>
+                    <span style="color:var(--muted);">—</span>
+                  <?php endif; ?>
+                </td>
+                <td style="padding:.7rem 1rem;border-bottom:1px solid var(--border-color);text-align:center;"><?= $f['indirect'] ? '✓' : '<span style="color:var(--muted);">—</span>' ?></td>
+                <td style="padding:.7rem 1rem;border-bottom:1px solid var(--border-color);text-align:center;font-family:var(--mono);">
+                  <?php if ($f['dfi']): ?>
+                    <?= fmt_money($f['dfi_amount']) ?>/day<br><small style="color:var(--muted);"><?= number_format($f['dfi_days']) ?> days</small>
+                  <?php else: ?>
+                    <span style="color:var(--muted);">—</span>
+                  <?php endif; ?>
+                </td>
+                <td style="padding:.7rem 1rem;border-bottom:1px solid var(--border-color);text-align:center;font-family:var(--mono);"><?= $f['direct_ref'] > 0 ? fmt_money($f['direct_ref']) : '<span style="color:var(--muted);">—</span>' ?></td>
+                <td style="padding:.7rem 1rem;border-bottom:1px solid var(--border-color);text-align:right;font-family:var(--mono);"><?= fmt_money($f['cap_mult']) ?>×</td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
     </div>
   </section>
 
@@ -835,13 +928,10 @@ $streamOxford = count($streamWords) > 2
   <section class="packages" id="packages">
     <div class="container">
       <div class="packages-header">
-        <div class="tag"><?= $pkgCount === 1 ? 'The Package' : 'Packages' ?></div>
-        <h2 class="section-title"><?= $pkgCount === 1 ? 'One Entry. No Tiers.' : 'Choose Your Entry' ?></h2>
+        <div class="tag">Packages</div>
+        <h2 class="section-title">Choose the Package That Suits You</h2>
         <p class="section-lead" style="margin:0 auto;">
-          <?= $pkgCount === 1
-            ? e($siteName) . ' runs a single package. No premium tiers, no VIP upgrades. Everyone enters the same way — and everyone accesses the same earning structure from the same starting point.'
-            : e($siteName) . ' offers ' . $pkgCount . ' packages. Pick the entry that matches your goals — every package includes the full earning structure, with higher tiers unlocking larger bonuses and longer income periods.';
-          ?>
+          <?= e($siteName) ?> offers <?= $pkgCount ?> entry packages, from <?= fmt_money($minEntry) ?>. Pick the one that fits your goals — each package carries its own earning features.
         </p>
       </div>
 
@@ -849,80 +939,42 @@ $streamOxford = count($streamWords) > 2
         <div class="closed-banner-icon">➕</div>
         <div class="closed-banner-text">
           <strong>One community. As many accounts as you like.</strong>
-          <span>Every account is a fresh position in the binary structure — its own entry fee, its own earnings. There is no ceiling on how many accounts a member may hold.</span>
+          <span>Every account carries a package of your choosing — its own entry fee, its own earning features. There is no ceiling on how many accounts a member may hold.</span>
         </div>
       </div>
 
-      <?php if ($pkgCount === 1): ?>
-        <div class="pkg-single-wrap">
-          <?php $pkg = $packages[0]; ?>
-          <div class="pkg-single fade-up">
+      <div class="pkg-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:2rem;margin-top:2rem;">
+        <?php foreach ($planFacts as $f): ?>
+          <div class="pkg-single fade-up" style="display:flex;flex-direction:column;border:2px solid var(--border-color);border-radius:var(--radius);overflow:hidden;">
             <div class="pkg-img">
-              <img src="<?= $frontend ?>/pkg-starter.jpg" alt="<?= e($pkg['name']) ?>" loading="lazy">
+              <img src="<?= $frontend ?>/pkg-starter.jpg" alt="<?= e($f['name']) ?>" loading="lazy">
             </div>
-            <div class="pkg-body">
-              <div class="pkg-badge">🐣 <?= e($pkg['name']) ?></div>
-              <div class="pkg-title">The <?= e($siteName) ?> Account</div>
-              <p class="pkg-desc">Your entry into the network. One account, one package, backed by a real Philippine poultry operation. All earning streams are active from the moment you register — and you can add more accounts anytime.</p>
-              <ul class="pkg-features">
-                <li>Full binary tree placement — left or right leg of your choice</li>
-                <li><?= fmt_money($pkg['pairing_bonus']) ?> per binary pair · capped at <?= $pkg['daily_pair_cap'] ?> pairs per day</li>
-                <li><?= fmt_money($pkg['direct_ref_bonus']) ?> direct referral bonus per recruit</li>
-                <?php if ($indirectEnabled): ?><li>10-level unilevel generational bonuses</li><?php endif; ?>
-                <?php if ($dfiEnabled): ?><li><?= fmt_money($pkg['daily_fixed_income']) ?> daily fixed income for <?= $pkg['daily_fixed_income_days'] ?> days</li><?php endif; ?>
-                <li>Lifetime income cap: <?= $pkg['lifetime_cap_multiplier'] ?>× entry fee</li>
-                <li>Real-time dashboard — binary tree, wallet, full history</li>
+            <div class="pkg-body" style="display:flex;flex-direction:column;flex:1;padding:1.5rem;">
+              <div class="pkg-badge">🐣 <?= e($f['name']) ?></div>
+              <div class="pkg-price" style="font-size:1.75rem;margin:.5rem 0;"><?= fmt_money($f['entry']) ?> <small style="font-size:.5em;">one-time</small></div>
+              <ul class="pkg-features" style="margin:1rem 0;padding-left:1.2rem;font-size:.85rem;">
+                <?php foreach (pkg_features($f) as [$lbl, $isOn, $detail]): ?>
+                  <li style="<?= $isOn ? '' : 'opacity:.55;' ?>">
+                    <span style="<?= $isOn ? '' : 'text-decoration:line-through;' ?>"><?= $lbl ?></span>
+                    <?php if ($isOn): ?> — <?= $detail ?><?php else: ?> — not included<?php endif; ?>
+                  </li>
+                <?php endforeach; ?>
               </ul>
-              <div class="payout-methods">
-                <span style="font-size:.75rem;color:var(--muted);margin-right:.5rem;">Payouts:</span>
-                <?php if ($gcashEnabled): ?><span class="badge-payout" style="background:#0070d820;color:#0070d8;">GCash</span><?php endif; ?>
-                <?php if ($mayaEnabled): ?><span class="badge-payout" style="background:#48b0db20;color:#48b0db;">Maya</span><?php endif; ?>
-                <span class="badge-payout" style="background:#26a17b20;color:#26a17b;">₮ USDT TRC20</span>
-                <span class="badge-payout" style="background:#f0b90b20;color:#f0b90b;">₮ USDT BEP20</span>
+              <div class="payout-methods" style="margin-bottom:1rem;">
+                <?php if ($gcashEnabled): ?><span class="badge-payout" style="background:#0070d820;color:#0070d8;font-size:.7rem;padding:.2rem .5rem;border-radius:4px;">GCash</span><?php endif; ?>
+                <?php if ($mayaEnabled): ?><span class="badge-payout" style="background:#48b0db20;color:#48b0db;font-size:.7rem;padding:.2rem .5rem;border-radius:4px;">Maya</span><?php endif; ?>
+                <span class="badge-payout" style="background:#26a17b20;color:#26a17b;font-size:.7rem;padding:.2rem .5rem;border-radius:4px;">USDT TRC20</span>
+                <span class="badge-payout" style="background:#f0b90b20;color:#f0b90b;font-size:.7rem;padding:.2rem .5rem;border-radius:4px;">USDT BEP20</span>
               </div>
-              <div class="pkg-price"><?= fmt_money($pkg['entry_fee']) ?> <small>one-time entry fee</small></div>
               <?php if (!$isFull): ?>
-                <a href="<?= $base ?>/?page=register" class="btn-primary" style="width:100%;font-size:.95rem;">Register Now →</a>
+                <a href="<?= $base ?>/?page=register" class="btn-primary" style="width:100%;font-size:.9rem;margin-top:auto;flex-shrink:0;">Register Now →</a>
               <?php else: ?>
-                <span class="btn btn-secondary" style="width:100%;font-size:.95rem;cursor:not-allowed;opacity:.6;">🔒 Registration Closed</span>
+                <span class="btn btn-secondary" style="width:100%;font-size:.9rem;cursor:not-allowed;opacity:.6;margin-top:auto;flex-shrink:0;">🔒 Closed</span>
               <?php endif; ?>
             </div>
           </div>
-        </div>
-      <?php else: ?>
-        <div class="pkg-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:2rem;margin-top:2rem;">
-          <?php foreach ($packages as $idx => $pkg): ?>
-            <div class="pkg-single fade-up" style="border:2px solid <?= $idx === 0 ? 'var(--gold)' : 'var(--border-color)' ?>;border-radius:var(--radius);overflow:hidden;">
-              <div class="pkg-img">
-                <img src="<?= $frontend ?>/pkg-starter.jpg" alt="<?= e($pkg['name']) ?>" loading="lazy">
-              </div>
-              <div class="pkg-body" style="padding:1.5rem;">
-                <div class="pkg-badge">🐣 <?= e($pkg['name']) ?></div>
-                <div class="pkg-price" style="font-size:1.75rem;margin:.5rem 0;"><?= fmt_money($pkg['entry_fee']) ?> <small style="font-size:.5em;">one-time</small></div>
-                <ul class="pkg-features" style="margin:1rem 0;padding-left:1.2rem;font-size:.85rem;">
-                  <li><?= fmt_money($pkg['pairing_bonus']) ?> per pair · cap <?= $pkg['daily_pair_cap'] ?>/day</li>
-                  <li><?= fmt_money($pkg['direct_ref_bonus']) ?> direct referral</li>
-                  <?php if ($indirectEnabled): ?><li>10-level unilevel bonuses</li><?php endif; ?>
-                  <?php if ($dfiEnabled): ?><li><?= fmt_money($pkg['daily_fixed_income']) ?>/day DFI · <?= $pkg['daily_fixed_income_days'] ?> days</li><?php endif; ?>
-                  <li>Lifetime cap <?= $pkg['lifetime_cap_multiplier'] ?>× fee</li>
-                </ul>
-                <div class="payout-methods" style="margin-bottom:1rem;">
-                  <?php if ($gcashEnabled): ?><span class="badge-payout" style="background:#0070d820;color:#0070d8;font-size:.7rem;padding:.2rem .5rem;border-radius:4px;">GCash</span><?php endif; ?>
-                  <?php if ($mayaEnabled): ?><span class="badge-payout" style="background:#48b0db20;color:#48b0db;font-size:.7rem;padding:.2rem .5rem;border-radius:4px;">Maya</span><?php endif; ?>
-                  <span class="badge-payout" style="background:#26a17b20;color:#26a17b;font-size:.7rem;padding:.2rem .5rem;border-radius:4px;">USDT TRC20</span>
-                  <span class="badge-payout" style="background:#f0b90b20;color:#f0b90b;font-size:.7rem;padding:.2rem .5rem;border-radius:4px;">USDT BEP20</span>
-                </div>
-                <?php if (!$isFull): ?>
-                  <a href="<?= $base ?>/?page=register" class="btn-primary" style="width:100%;font-size:.9rem;">Register Now →</a>
-                <?php else: ?>
-                  <span class="btn btn-secondary" style="width:100%;font-size:.9rem;cursor:not-allowed;opacity:.6;">🔒 Closed</span>
-                <?php endif; ?>
-              </div>
-            </div>
-          <?php endforeach; ?>
-        </div>
-      <?php endif; ?>
-      <p style="text-align:center;margin-top:2rem;font-size:.82rem;color:var(--muted);">A registration code from your sponsor is required to join. Contact your sponsor or the admin team to get started.</p>
+        <?php endforeach; ?>
+      </div>
     </div>
   </section>
 
@@ -938,7 +990,7 @@ $streamOxford = count($streamWords) > 2
         <div class="fade-up">
           <div class="tag">Why <?= e($siteName) ?></div>
           <h2 class="section-title">Constraints Are the Point</h2>
-          <p class="section-lead">There is no artificial ceiling here — <?= e($siteName) ?> stays intact through deliberate design. A community that knows its members, and lets them grow multiple accounts, moves with the kind of collective care that Filipinos call bayanihan.</p>
+          <p class="section-lead">There is no artificial ceiling here — <?= e($siteName) ?> stays intact through deliberate design. A community that knows its people moves with the kind of collective care that Filipinos call bayanihan.</p>
           <div class="why-items">
             <div class="why-item">
               <div class="why-icon">⚡</div>
@@ -961,28 +1013,12 @@ $streamOxford = count($streamWords) > 2
                 <div class="why-item-desc">Payouts settle via <?= $payoutMethodsText ?>. Whether you are in the Philippines or working abroad, your wallet receives the same way — no remittance cut, no delay.</div>
               </div>
             </div>
-            <div class="why-item">
-              <div class="why-icon">🔒</div>
-              <div>
-                <div class="why-item-title">Transparent &amp; Secure Platform</div>
-                <div class="why-item-desc">Every commission has a full audit trail. The platform includes CSRF protection, rate-limited login, and secure session management built in from the start.</div>
-              </div>
-            </div>
-            <?php if ($dfiEnabled && $featuredPkg): ?>
+            <?php if ($anyDfi): ?>
               <div class="why-item">
                 <div class="why-icon">📅</div>
                 <div>
                   <div class="why-item-title">Daily Fixed Income</div>
-                  <div class="why-item-desc">Earn a fixed daily amount for up to <?= $featuredPkg['daily_fixed_income_days'] ?> days after joining — a predictable baseline of <?= fmt_money($featuredPkg['daily_fixed_income']) ?>/day on top of your network earnings.</div>
-                </div>
-              </div>
-            <?php endif; ?>
-            <?php if ($featuredPkg): ?>
-              <div class="why-item">
-                <div class="why-icon">🛡️</div>
-                <div>
-                  <div class="why-item-title">Lifetime Cap Protection</div>
-                  <div class="why-item-desc">Your total lifetime earnings are capped at <?= $featuredPkg['lifetime_cap_multiplier'] ?>× your entry fee. This protects the network from overextension and guarantees sustainability for all members.</div>
+                  <div class="why-item-desc">Packages that carry it pay a fixed daily amount for a set number of days — from <?= fmt_money($minDfiAmt) ?>/day up to <?= fmt_money($maxDfiAmt) ?>/day — a predictable baseline on top of your network earnings.</div>
                 </div>
               </div>
             <?php endif; ?>
@@ -1004,10 +1040,10 @@ $streamOxford = count($streamWords) > 2
       <div class="testi-grid">
         <div class="testi-card fade-up">
           <div class="testi-stars">★★★★★</div>
-          <div class="testi-quote">"Pwede palang humawak ng higit sa isang account. Kapag malakas ang network mo, dagdag ka lang ng posisyon — hindi naman ito bawal, at bawat account may sariling kinikita."</div>
+          <div class="testi-quote">"Ang importante sa akin, may totoong farm sa likod nito. May manok, may produkto, may operasyon sa Isabela — hindi tulad ng ibang networking na wala kang mahahawakan."</div>
           <div class="testi-author">
             <div class="testi-avatar" style="background:#2d6a35;">R</div>
-            <div>
+            <div style="margin-top:auto;flex-shrink:0;">
               <div class="testi-name">Roger A.</div>
               <div class="testi-role">Member since Jan 2024 · Isabela</div>
             </div>
@@ -1015,10 +1051,10 @@ $streamOxford = count($streamWords) > 2
         </div>
         <div class="testi-card fade-up">
           <div class="testi-stars">★★★★★</div>
-          <div class="testi-quote">"Ang USDT payout ang dahilan kung bakit nag-join ako. OFW ang aking asawa — mas madali para sa amin na mag-transact ng hindi dumaan sa remittance. Direkta na."</div>
+          <div class="testi-quote">"Ang daily fixed income ang pinaka-gusto ko — alam kong may papasok araw-araw. Hindi malaki, pero sigurado. Yung tipong pampahinga ng isip."</div>
           <div class="testi-author">
             <div class="testi-avatar" style="background:#d4a017;color:#1a3a1e;">M</div>
-            <div>
+            <div style="margin-top:auto;flex-shrink:0;">
               <div class="testi-name">Maria Santos</div>
               <div class="testi-role">Member since Mar 2024 · Batangas</div>
             </div>
@@ -1026,10 +1062,10 @@ $streamOxford = count($streamWords) > 2
         </div>
         <div class="testi-card fade-up">
           <div class="testi-stars">★★★★★</div>
-          <div class="testi-quote">"Farmer ako at isang package lang ang nagpasimple ng lahat — hindi na ako nag-alinlangan kung kukuha ng mas mataas na tier. Pantay-pantay tayo dito. Bayanihan talaga."</div>
+          <div class="testi-quote">"Ang commission dito totoo ang real-time — pagka-register ng bagong member, andiyan na agad sa wallet ko. Hindi na ako naghihintay ng bahagi o linggo."</div>
           <div class="testi-author">
             <div class="testi-avatar" style="background:#6b4c2a;">J</div>
-            <div>
+            <div style="margin-top:auto;flex-shrink:0;">
               <div class="testi-name">Jose Dela Cruz</div>
               <div class="testi-role">Member since Feb 2024 · Nueva Ecija</div>
             </div>
@@ -1052,9 +1088,9 @@ $streamOxford = count($streamWords) > 2
           <a href="<?= $base ?>/?page=login" class="btn-gold" style="font-size:1rem;padding:1rem 2.5rem;">Sign In →</a>
         </div>
       <?php else: ?>
-        <div class="tag" style="background:rgba(212,160,23,.2);color:var(--gold-light);">Multiple Accounts Welcome</div>
-        <h2><?= e($siteName) ?> — One Community. Every Account Earns.</h2>
-        <p>The network keeps growing. Register one account or several — each position stands on its own, placed in the binary structure, and earns through the same streams from day one.</p>
+        <div class="tag" style="background:rgba(212,160,23,.2);color:var(--gold-light);">Open Community</div>
+        <h2><?= e($siteName) ?> — One Community. Many Packages.</h2>
+        <p>The network keeps growing. Register one account or several — each account carries the package you chose for it, and earns through that package's own streams from day one.</p>
         <div class="cta-buttons">
           <a href="<?= $base ?>/?page=register" class="btn-gold" style="font-size:1rem;padding:1rem 2.5rem;">🌱 Register Now</a>
         </div>
@@ -1073,7 +1109,7 @@ $streamOxford = count($streamWords) > 2
         <!-- Brand column -->
         <div>
           <div class="footer-brand-name" itemprop="name"><?= e($siteName) ?></div>
-          <div class="footer-brand-desc" itemprop="description">A Philippine poultry network where members can hold multiple accounts. <?= $pkgCount === 1 ? 'One package' : $pkgCount . ' packages' ?>, <?= count($payoutMethods) === 1 ? 'one payout currency' : count($payoutMethods) . ' payout methods' ?>, one community built on bayanihan.</div>
+          <div class="footer-brand-desc" itemprop="description">A Philippine poultry network. <?= $pkgCount ?> entry packages with package-based earning streams, <?= count($payoutMethods) === 1 ? 'one payout currency' : count($payoutMethods) . ' payout methods' ?>, one community built on bayanihan.</div>
 
           <!-- Address (machine-readable for ScamAdviser / Schema) -->
           <address itemprop="address" itemscope itemtype="https://schema.org/PostalAddress"
