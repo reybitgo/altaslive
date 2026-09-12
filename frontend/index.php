@@ -255,7 +255,7 @@ $streamOxford = count($streamWords) > 2
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="<?= $frontend ?>/style.css">
+  <link rel="stylesheet" href="<?= $frontend ?>/style.css?v=20260707">
 </head>
 
 <body>
