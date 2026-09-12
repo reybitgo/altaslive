@@ -118,6 +118,7 @@
               <?php foreach ($packages as $pkg):
                 $lifetimeCap = (float)$pkg['entry_fee'] * (float)$pkg['lifetime_cap_multiplier'];
                 $hasDfi = (float)$pkg['daily_fixed_income'] > 0;
+                $dfiOn = $hasDfi && (int)$pkg['dfi_enabled'] === 1;
               ?>
                 <tr>
                   <td style="padding-left:1.25rem;">
@@ -142,7 +143,7 @@
                     <div style="display:flex;gap:5px;flex-wrap:nowrap;justify-content:center;">
                       <span class="badge toggle-badge <?= (int)$pkg['pairing_enabled'] === 1 ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary toggle-off' ?>" title="Binary Network: <?= (int)$pkg['pairing_enabled'] === 1 ? 'ON' : 'OFF' ?>">🌳</span>
                       <span class="badge toggle-badge <?= (int)$pkg['indirect_referral_enabled'] === 1 ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary toggle-off' ?>" title="Indirect Referral: <?= (int)$pkg['indirect_referral_enabled'] === 1 ? 'ON' : 'OFF' ?>">🔗</span>
-                      <span class="badge toggle-badge <?= (int)$pkg['dfi_enabled'] === 1 ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary toggle-off' ?>" title="Daily Fixed Income: <?= (int)$pkg['dfi_enabled'] === 1 ? 'ON' : 'OFF' ?>">📅</span>
+                      <span class="badge toggle-badge <?= $dfiOn ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary toggle-off' ?>" title="Daily Fixed Income: <?= $dfiOn ? 'ON' : 'OFF' ?>">📅</span>
                     </div>
                   </td>
                   <td class="text-center">
@@ -365,7 +366,8 @@
             <div style="display:flex;gap:5px;flex-wrap:nowrap;justify-content:center;">
               <span class="badge toggle-badge <?= (int)$viewPkg['pairing_enabled'] === 1 ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary toggle-off' ?>" title="Binary Network: <?= (int)$viewPkg['pairing_enabled'] === 1 ? 'ON' : 'OFF' ?>">🌳</span>
               <span class="badge toggle-badge <?= (int)$viewPkg['indirect_referral_enabled'] === 1 ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary toggle-off' ?>" title="Indirect Referral: <?= (int)$viewPkg['indirect_referral_enabled'] === 1 ? 'ON' : 'OFF' ?>">🔗</span>
-              <span class="badge toggle-badge <?= (int)$viewPkg['dfi_enabled'] === 1 ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary toggle-off' ?>" title="Daily Fixed Income: <?= (int)$viewPkg['dfi_enabled'] === 1 ? 'ON' : 'OFF' ?>">📅</span>
+              <?php $viewDfiOn = (float)$viewPkg['daily_fixed_income'] > 0 && (int)$viewPkg['dfi_enabled'] === 1; ?>
+              <span class="badge toggle-badge <?= $viewDfiOn ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary toggle-off' ?>" title="Daily Fixed Income: <?= $viewDfiOn ? 'ON' : 'OFF' ?>">📅</span>
             </div>
           </div>
         </div>
