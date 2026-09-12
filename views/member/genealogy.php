@@ -1034,13 +1034,15 @@
     document.getElementById('rm_pos_label_right').classList.remove('opacity-50');
 
     const hasLeft=data.left!=null, hasRight=data.right!=null;
-    if(!hasLeft&&hasRight){
+    if(!hasLeft){
       document.getElementById('rm_binary_position').value='left';
       document.getElementById('rm_pos_left').checked=true;
-      document.getElementById('rm_pos_right').disabled=true;
       document.getElementById('rm_position_display').textContent='Left';
-      document.getElementById('rm_pos_label_right').classList.add('opacity-50');
-    }else if(hasLeft&&!hasRight){
+      if(hasRight){
+        document.getElementById('rm_pos_right').disabled=true;
+        document.getElementById('rm_pos_label_right').classList.add('opacity-50');
+      }
+    }else if(!hasRight){
       document.getElementById('rm_binary_position').value='right';
       document.getElementById('rm_pos_right').checked=true;
       document.getElementById('rm_pos_left').disabled=true;
