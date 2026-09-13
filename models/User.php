@@ -320,6 +320,9 @@ class User
         if ((float)$newPkg['entry_fee'] < (float)$curPkg['entry_fee']) {
             throw new RuntimeException('Downgrading is not allowed.');
         }
+        if (!Package::upgradeCompatible((int)$user['package_id'], $newPackageId)) {
+            throw new RuntimeException('Cannot upgrade to a package that disables a plan you already have.');
+        }
 
         $diff = (float)$newPkg['entry_fee'] - (float)$curPkg['entry_fee'];
 

@@ -629,7 +629,10 @@ class MemberController
 
         $targets = [];
         foreach (Package::all(true) as $pkg) {
-            if ((int)$pkg['id'] !== (int)$user['package_id'] && (float)$pkg['entry_fee'] > $curFee) {
+            if ((int)$pkg['id'] !== (int)$user['package_id']
+                && (float)$pkg['entry_fee'] > $curFee
+                && Package::upgradeCompatible((int)$user['package_id'], (int)$pkg['id'])
+            ) {
                 $pkg['diff'] = (float)$pkg['entry_fee'] - $curFee;
                 $targets[]   = $pkg;
             }
@@ -677,6 +680,11 @@ class MemberController
         $targetPkg = Package::find($newPackageId);
         if (!$curPkg || !$targetPkg) {
             flash('error', 'Invalid package selection.');
+            redirect('/?page=upgrade');
+        }
+
+        if (!Package::upgradeCompatible((int)$user['package_id'], $newPackageId)) {
+            flash('error', 'Cannot upgrade to a package that disables a plan you already have.');
             redirect('/?page=upgrade');
         }
 

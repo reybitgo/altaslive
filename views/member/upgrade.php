@@ -50,6 +50,7 @@ require 'views/partials/sidebar_member.php';
           <div class="card">
             <div class="card-header"><span class="card-title">🚀 Select Upgrade Package</span></div>
             <div class="card-body">
+              <div class="form-text mb-3" style="font-size:.75rem;">Only packages that keep the plans you already have (🌳 Binary, 🔗 Indirect, 📅 DFI) are shown.</div>
               <?php foreach ($targets as $pkg):
                 $targetPairing = Package::hasPairing((int)$pkg['id']);
               ?>

@@ -190,4 +190,38 @@ class Package
         $pkg = self::find($packageId);
         return $pkg ? (int)$pkg['pairing_enabled'] === 1 : false;
     }
+
+    /**
+     * Get the set of compensation plans enabled on a package, as a normalized
+     * mask combining the per-package toggles. DFI counts as active only when
+     * both the toggle is on and the daily amount is above zero.
+     */
+    public static function plans(int $packageId): array
+    {
+        $pkg = self::find($packageId);
+        if (!$pkg) {
+            return ['binary' => false, 'indirect' => false, 'dfi' => false];
+        }
+        return [
+            'binary'   => (int)$pkg['pairing_enabled'] === 1,
+            'indirect' => (int)$pkg['indirect_referral_enabled'] === 1,
+            'dfi'      => (int)$pkg['dfi_enabled'] === 1 && (float)$pkg['daily_fixed_income'] > 0,
+        ];
+    }
+
+    /**
+     * A target package is a valid upgrade only if it keeps every plan the
+     * current package already has enabled (source plans ⊆ target plans).
+     */
+    public static function upgradeCompatible(int $fromId, int $toId): bool
+    {
+        $fromPlans = self::plans($fromId);
+        $toPlans   = self::plans($toId);
+        foreach ($fromPlans as $plan => $on) {
+            if ($on && empty($toPlans[$plan])) {
+                return false;
+            }
+        }
+        return true;
+    }
 }
