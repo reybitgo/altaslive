@@ -93,13 +93,14 @@
         <form method="GET" action="<?= APP_URL ?>/" class="d-flex flex-wrap align-items-center justify-content-between gap-2">
           <input type="hidden" name="page" value="earnings">
           <input type="hidden" name="type" value="<?= e($type) ?>">
+          <?php if (is_imp_session()): ?><input type="hidden" name="imp" value="<?= e(session_id()) ?>"><?php endif; ?>
           <ul class="nav nav-pills card-header-pills gap-1">
             <?php
             $filterTabs = ['' => 'All', 'pairing' => '🤝 Pairing', 'direct_referral' => '👥 Direct', ...(Package::hasIndirectReferral((int)Auth::user()['package_id']) ? ['indirect_referral' => '🔗 Indirect'] : []), 'daily_fixed_income' => '📅 DFI'];
             foreach ($filterTabs as $val => $label):
             ?>
               <li class="nav-item">
-                <a class="nav-link <?= $type === $val ? 'active' : '' ?>" href="<?= APP_URL ?>/?page=earnings&type=<?= $val ?>"><?= $label ?></a>
+                <a class="nav-link <?= $type === $val ? 'active' : '' ?>" href="<?= link_to('earnings', ['type' => $val]) ?>"><?= $label ?></a>
               </li>
             <?php endforeach; ?>
           </ul>
@@ -163,7 +164,7 @@
         </table>
       </div>
       <?php if ($history['total_pages'] > 1): ?>
-        <div class="card-footer"><?= pagination_links($history, APP_URL . '/?page=earnings&type=' . urlencode($type) . '&per_page=' . $perPage) ?></div>
+        <div class="card-footer"><?= pagination_links($history, link_to('earnings', ['type' => $type, 'per_page' => $perPage])) ?></div>
       <?php endif; ?>
     </div>
   </div>

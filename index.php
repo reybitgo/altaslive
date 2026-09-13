@@ -13,8 +13,6 @@
  * All HTTP requests route through here.
  */
 
-session_start();
-
 require_once 'config/db.php';
 require_once 'core/helpers.php';
 require_once 'core/Auth.php';
@@ -35,6 +33,19 @@ spl_autoload_register(function (string $class): void {
         }
     }
 });
+
+// Super-Login: an impersonated member tab carries a URL-token (?imp=<nonce>)
+// that IS the PHP session id. No cookie session is used, so the superadmin's
+// own cookie session (mlm_sess) is never touched. Sessions must be configured
+// BEFORE session_start().
+$impNonce = preg_match('/^[a-f0-9]{64}$/', $_GET['imp'] ?? '') ? $_GET['imp'] : '';
+if ($impNonce !== '') {
+    Auth::startImpSession($impNonce);
+}
+session_start();
+if ($impNonce !== '') {
+    Auth::validateImpSession();
+}
 
 // Maintenance mode
 if (setting('maintenance_mode') === '1' && !Auth::isAdmin()) {
@@ -269,6 +280,10 @@ $routes = [
     'check_upline'       => ['AuthController',   'ajaxCheckUpline', 'any'],
     'logout'             => ['AuthController',   'logout',          'any'],
 
+    // ── Super-Login (superadmin → any member) ───────────────────
+    'slogin'             => ['AuthController',   'showSlogin',      'super'],
+    'do_slogin'          => ['AuthController',   'doSlogin',        'super'],
+
     // ── Member ────────────────────────────────────────
     'dashboard'          => ['MemberController', 'dashboard',       'member'],
     'profile'            => ['MemberController', 'profile',         'member'],
@@ -361,6 +376,10 @@ if ($role === 'member' && !Auth::check()) {
     redirect('/?page=login');
 }
 if ($role === 'admin' && !Auth::isAdmin()) {
+    flash('error', 'Access denied.');
+    redirect('/?page=login');
+}
+if ($role === 'super' && !Auth::isSuperadmin()) {
     flash('error', 'Access denied.');
     redirect('/?page=login');
 }

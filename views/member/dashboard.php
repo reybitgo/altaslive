@@ -36,7 +36,7 @@
                 </p>
               </div>
             </div>
-            <a href="<?= APP_URL ?>/?page=activate" class="btn btn-warning">
+            <a href="<?= link_to('activate') ?>" class="btn btn-warning">
               ⚡ Activate Now
             </a>
           </div>
@@ -73,7 +73,7 @@
                 </p>
               </div>
             </div>
-            <a href="<?= APP_URL ?>/?page=reactivate" class="btn btn-warning">
+            <a href="<?= link_to('reactivate') ?>" class="btn btn-warning">
               🔄 Reactivate Account
             </a>
           </div>
@@ -146,9 +146,9 @@
         <h4 class="fw-800 mb-1">Welcome back, <?= e($user['full_name'] ? explode(' ', $user['full_name'])[0] : '@' . $user['username']) ?>! 👋</h4>
         <p class="text-muted mb-0" style="font-size:.8rem;"><?= e($user['package_name'] ?? 'Member') ?> · Joined <?= fmt_date($user['joined_at']) ?></p>
       </div>
-      <a href="<?= APP_URL ?>/?page=payout" class="btn btn-primary btn-sm">💳 Request Payout</a>
+      <a href="<?= link_to('payout') ?>" class="btn btn-primary btn-sm">💳 Request Payout</a>
       <?php if (!isSeatLimitReached()): ?>
-        <a href="<?= APP_URL ?>/?page=register&sponsor=<?= urlencode($user['username']) ?>"
+        <a href="<?= link_to('register', ['sponsor' => $user['username']]) ?>"
           class="btn btn-success btn-sm">➕ Register Member</a>
       <?php else: ?>
         <span class="btn btn-secondary btn-sm" style="cursor:not-allowed;opacity:.6;"
@@ -166,9 +166,9 @@
           $balanceSub = fmt_money($withdrawable) . ' withdrawable · ' . fmt_money($nonWithdrawable) . ' locked';
       }
       $cards = [
-        [$user['ewallet_balance'], 'E-Wallet Balance',   '💰', 'primary', 'primary', $balanceSub, '/?page=payout'],
+        [$user['ewallet_balance'], 'E-Wallet Balance',   '💰', 'primary', 'primary', $balanceSub, 'payout'],
         [$summary['total_pairing'],  'Pairing Earnings', '🤝', 'success', 'success', fmt_money($status['matched_volume']) . ' matched lifetime', null],
-        [$summary['total_direct'],   'Direct Referral',  '👥', 'orange',  'warning', null, '/?page=genealogy&view=referral'],
+        [$summary['total_direct'],   'Direct Referral',  '👥', 'orange',  'warning', null, 'genealogy&view=referral'],
         ...(Package::hasIndirectReferral((int)$user['package_id']) ? [
           [$summary['total_indirect'], 'Indirect Referral', '🔗', 'purple',  'purple',  'Up to 10 levels', null],
         ] : []),
@@ -183,7 +183,7 @@
               <div class="stat-value text-<?= $color === 'orange' ? 'warning' : ($color === 'purple' ? 'primary' : $color) ?>"><?= fmt_money((float)$val) ?></div>
               <?php if ($sub): ?>
                 <div class="stat-sub">
-                  <?php if ($link): ?><a href="<?= APP_URL . $link ?>" class="text-decoration-none fw-semibold" style="font-size:.72rem;"><?= $sub ?></a>
+                  <?php if ($link): ?><a href="<?= link_to($link) ?>" class="text-decoration-none fw-semibold" style="font-size:.72rem;"><?= $sub ?></a>
                     <?php else: ?><?= $sub ?><?php endif; ?>
                 </div>
               <?php endif; ?>
@@ -200,7 +200,7 @@
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-3">
               <div class="card-title">🛡️ Lifetime Income Cap</div>
-              <a href="<?= APP_URL ?>/?page=cap_status" class="btn btn-outline-primary btn-sm" style="font-size:.65rem;">View Details →</a>
+              <a href="<?= link_to('cap_status') ?>" class="btn btn-outline-primary btn-sm" style="font-size:.65rem;">View Details →</a>
             </div>
             <?php if (!empty($user['capping_bypass'])): ?>
               <div class="text-center py-3">
@@ -239,7 +239,7 @@
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-3">
               <div class="card-title">📅 Daily Fixed Income</div>
-              <a href="<?= APP_URL ?>/?page=dfi_history" class="btn btn-outline-primary btn-sm" style="font-size:.65rem;">View History →</a>
+              <a href="<?= link_to('dfi_history') ?>" class="btn btn-outline-primary btn-sm" style="font-size:.65rem;">View History →</a>
             </div>
             <?php
             $dfiStatus = DailyFixedIncome::getMemberDFIStatus($user['id']);
@@ -296,7 +296,7 @@
             </div>
             <div class="mt-2 pt-2" style="border-top:1px solid var(--border-color);font-size:.72rem;color:var(--muted);">
               Lifetime cap: <strong><?= fmt_money($status['lifetime_earned'] ?? 0) ?></strong> / <?= fmt_money($status['lifetime_cap'] ?? 0) ?>
-              <a href="<?= APP_URL ?>/?page=cap_status" style="color:var(--primary);text-decoration:none;">View →</a>
+              <a href="<?= link_to('cap_status') ?>" style="color:var(--primary);text-decoration:none;">View →</a>
             </div>
             <?php if ($status['cap_remaining'] === 0): ?>
               <div class="alert alert-warning py-2 mb-0 mt-2" style="font-size:.78rem;">⚡ Daily cap reached — resets at midnight</div>
@@ -310,7 +310,7 @@
         <div class="card h-100">
           <div class="card-header d-flex justify-content-between align-items-center">
             <span class="card-title">🌳 Binary Legs</span>
-            <a href="<?= APP_URL ?>/?page=genealogy&view=binary" class="btn btn-outline-primary btn-sm" style="font-size:.72rem;">View Tree</a>
+            <a href="<?= link_to('genealogy&view=binary') ?>" class="btn btn-outline-primary btn-sm" style="font-size:.72rem;">View Tree</a>
           </div>
           <div class="card-body">
             <div class="row g-2 mb-3">
@@ -349,7 +349,7 @@
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <span class="card-title">📋 Recent Activity</span>
-        <a href="<?= APP_URL ?>/?page=earnings" class="btn btn-outline-primary btn-sm" style="font-size:.72rem;">View all</a>
+        <a href="<?= link_to('earnings') ?>" class="btn btn-outline-primary btn-sm" style="font-size:.72rem;">View all</a>
       </div>
       <div class="card-body py-0 px-3">
         <?php if (empty($recent)): ?>

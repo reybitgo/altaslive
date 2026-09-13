@@ -122,7 +122,7 @@ require 'views/partials/sidebar_member.php';
           <div class="card">
             <div class="card-header"><span class="card-title">💳 Payment</span></div>
             <div class="card-body">
-              <form method="POST" action="<?= APP_URL ?>/?page=do_upgrade" id="upgradeForm">
+              <form method="POST" action="<?= link_to('do_upgrade') ?>" id="upgradeForm">
                 <?= csrf_field() ?>
                 <input type="hidden" name="package_id" id="upgPackageId" value="">
                 <input type="hidden" name="binary_upline_id" id="upgUplineId" value="">
@@ -176,6 +176,7 @@ require 'views/partials/sidebar_member.php';
 <script>
   const PACKAGE_INFO = <?= json_encode(array_map(fn($p) => ['id' => (int)$p['id'], 'pairing_enabled' => Package::hasPairing((int)$p['id'])], $targets) ) ?>;
   const APP = '<?= APP_URL ?>';
+  const API_UPLINES = '<?= link_to('api_binary_uplines') ?>';
   const CSRF = '<?= csrf_token() ?>';
   let currentPairing = <?= $curPairing ? 'true' : 'false' ?>;
   let selectedUpline = null;
@@ -247,7 +248,7 @@ require 'views/partials/sidebar_member.php';
     const q = this.value.trim();
     if (q.length < 2) { resultsBox.style.display = 'none'; return; }
     upTimer = setTimeout(async () => {
-      const d = await (await fetch(APP + '/?page=api_binary_uplines&q=' + encodeURIComponent(q))).json();
+      const d = await (await fetch(API_UPLINES + '&q=' + encodeURIComponent(q))).json();
       resultsBox.innerHTML = '';
       const cands = d.candidates || [];
       if (!cands.length) {

@@ -65,7 +65,7 @@ $jsAdmin = [
         <div class="card h-100">
           <div class="card-header"><span class="card-title">🔄 Reactivate Your Account</span></div>
           <div class="card-body">
-            <form method="POST" action="<?= APP_URL ?>/?page=do_reactivate" id="reactivateForm" enctype="multipart/form-data">
+            <form method="POST" action="<?= link_to('do_reactivate') ?>" id="reactivateForm" enctype="multipart/form-data">
               <?= csrf_field() ?>
 
               <!-- Payment Method -->
@@ -186,7 +186,7 @@ $jsAdmin = [
               </button>
             </form>
 
-            <a href="<?= APP_URL ?>/?page=dashboard" class="btn btn-link btn-sm w-100 mt-2">← Back to Dashboard</a>
+            <a href="<?= link_to('dashboard') ?>" class="btn btn-link btn-sm w-100 mt-2">← Back to Dashboard</a>
           </div>
         </div>
       </div>

@@ -22,12 +22,17 @@ $nav = [
   ['page' => 'genealogy&view=binary',  'icon' => '🌳', 'label' => 'Binary Tree',      'pages' => ['genealogy'], 'view' => 'binary'],
   ['page' => 'genealogy&view=referral', 'icon' => '👥', 'label' => 'Referral Network', 'pages' => ['genealogy'], 'view' => 'referral'],
   'SEPARATOR:Account',
-  ['page' => 'upgrade', 'icon' => '⬆️', 'label' => 'Upgrade Package', 'pages' => ['upgrade']],
-  ['page' => 'register&sponsor=' . $user['username'], 'icon' => '➕', 'label' => 'Register Member', 'pages' => ['register']],
-  ['page' => 'ewallet_transfer', 'icon' => '💱', 'label' => 'Send Money', 'pages' => ['ewallet_transfer']],
-  ['page' => 'payout',  'icon' => '💳', 'label' => 'Payouts',   'pages' => ['payout']],
-  ['page' => 'profile', 'icon' => '⚙️', 'label' => 'Profile & Settings', 'pages' => ['profile']],
 ];
+
+// Staff accounts (admin/superadmin) are not themselves members — no upgrades.
+if (!Auth::isAdmin()) {
+  $nav[] = ['page' => 'upgrade', 'icon' => '⬆️', 'label' => 'Upgrade Package', 'pages' => ['upgrade']];
+}
+
+$nav[] = ['page' => 'register&sponsor=' . $user['username'], 'icon' => '➕', 'label' => 'Register Member', 'pages' => ['register']];
+$nav[] = ['page' => 'ewallet_transfer', 'icon' => '💱', 'label' => 'Send Money', 'pages' => ['ewallet_transfer']];
+$nav[] = ['page' => 'payout',  'icon' => '💳', 'label' => 'Payouts',   'pages' => ['payout']];
+$nav[] = ['page' => 'profile', 'icon' => '⚙️', 'label' => 'Profile & Settings', 'pages' => ['profile']];
 
 // Add Admin View link if the logged-in user is an admin browsing as member
 if (Auth::isAdmin()) {
@@ -67,7 +72,7 @@ function renderSidebarNav($nav, $cp, $user, $view, $initial, $name)
       $active = memberNavActive($item, $cp, $view);
       $href   = $item['page'] === '__frontend__'
         ? APP_URL . '/'
-        : APP_URL . '/?page=' . $item['page'];
+        : link_to($item['page']);
       $target = $item['page'] === '__frontend__' ? ' target="_blank" rel="noopener"' : '';
     ?>
       <a href="<?= $href ?>" <?= $target ?> class="nav-item-link <?= $active ? 'active' : '' ?>">
@@ -75,7 +80,12 @@ function renderSidebarNav($nav, $cp, $user, $view, $initial, $name)
         <?= e($item['label']) ?>
       </a>
     <?php endforeach; ?>
-    <a href="<?= APP_URL ?>/?page=logout" class="nav-item-link">
+    <?php if (Auth::isSuperadmin()): ?>
+    <a href="<?= link_to('slogin') ?>" target="_blank" rel="noopener" class="nav-item-link">
+      <span class="nav-icon">⭐</span> Super Login
+    </a>
+    <?php endif; ?>
+    <a href="<?= link_to('logout') ?>" class="nav-item-link">
       <span class="nav-icon">🚪</span> Logout
     </a>
   </nav>

@@ -58,16 +58,24 @@ $isMember      = ($user['role'] ?? '') === 'member';
             </button>
             <ul class="dropdown-menu dropdown-menu-end shadow-sm rounded-3 py-1 mt-1" style="min-width:160px;font-size:.82rem;">
                 <li>
-                    <a class="dropdown-item d-flex align-items-center gap-2 py-1.5" href="<?= APP_URL ?>/?page=<?= Auth::isAdmin() ? 'admin_settings' : 'profile' ?>">
+                    <a class="dropdown-item d-flex align-items-center gap-2 py-1.5" href="<?= link_to(Auth::isAdmin() ? 'admin_settings' : 'profile') ?>">
                         <span style="font-size:.95rem;"><?= Auth::isAdmin() ? '⚙️' : '👤' ?></span>
                         <span><?= Auth::isAdmin() ? 'Settings' : 'Profile' ?></span>
                     </a>
                 </li>
+                <?php if (Auth::isSuperadmin()): ?>
+                <li>
+                    <a class="dropdown-item d-flex align-items-center gap-2 py-1.5" href="<?= link_to('slogin') ?>" target="_blank" rel="noopener">
+                        <span style="font-size:.95rem;">⭐</span>
+                        <span>Super Login</span>
+                    </a>
+                </li>
+                <?php endif; ?>
                 <li>
                     <hr class="dropdown-divider my-1">
                 </li>
                 <li>
-                    <a class="dropdown-item d-flex align-items-center gap-2 py-1.5" href="<?= APP_URL ?>/?page=logout">
+                    <a class="dropdown-item d-flex align-items-center gap-2 py-1.5" href="<?= link_to('logout') ?>">
                         <span style="font-size:.95rem;">🚪</span>
                         <span>Logout</span>
                     </a>

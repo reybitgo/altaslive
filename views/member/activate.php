@@ -33,7 +33,7 @@
         <div class="card">
           <div class="card-header"><span class="card-title">⚡ Activate Account</span></div>
           <div class="card-body">
-            <form method="POST" action="<?= APP_URL ?>/?page=do_activate" id="activateForm">
+            <form method="POST" action="<?= link_to('do_activate') ?>" id="activateForm">
               <?= csrf_field() ?>
 
               <!-- Payment Method -->
@@ -238,7 +238,7 @@
               </button>
             </form>
 
-            <a href="<?= APP_URL ?>/?page=dashboard" class="btn btn-link btn-sm w-100 mt-2">← Back to Dashboard</a>
+            <a href="<?= link_to('dashboard') ?>" class="btn btn-link btn-sm w-100 mt-2">← Back to Dashboard</a>
           </div>
         </div>
       </div>
@@ -326,7 +326,7 @@
       const fd = new FormData();
       fd.append('code', code);
       fd.append('csrf_token', document.querySelector('[name=csrf_token]').value);
-      const data = await (await fetch('<?= APP_URL ?>/?page=validate_code', {
+      const data = await (await fetch('<?= link_to('validate_code') ?>', {
         method: 'POST',
         body: fd
       })).json();

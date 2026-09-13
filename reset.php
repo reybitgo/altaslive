@@ -139,12 +139,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'reset
             ewallet_sent_today      = 0.00,
             ewallet_sent_this_week  = 0.00,
             last_login            = NULL
-            WHERE role = 'admin'
+            WHERE role IN ('admin', 'superadmin')
         ");
-        $logs[] = ['ok', 'Reset admin to clean install state (counters, balances, tree placement, package all cleared)'];
+        $logs[] = ['ok', 'Reset admin accounts (admin + sadmin) to clean install state (counters, balances, tree placement, package all cleared)'];
 
         // 5. Reset auto-increment counters
-        foreach (['users', 'commissions', 'ewallet_ledger', 'payout_requests', 'reg_codes', 'reactivations', 'daily_fixed_income_log', 'ewallet_transfers', 'ewallet_admin_topups', 'cd_ledger', 'user_cd_status'] as $tbl) {
+        foreach (['users', 'commissions', 'ewallet_ledger', 'payout_requests', 'reg_codes', 'reactivations', 'daily_fixed_income_log', 'ewallet_transfers', 'ewallet_admin_topups', 'cd_ledger', 'user_cd_status', 'impersonation_log'] as $tbl) {
             $pdo->exec("ALTER TABLE {$tbl} AUTO_INCREMENT = 1");
         }
         $logs[] = ['ok', 'Reset auto-increment counters'];

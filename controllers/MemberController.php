@@ -130,6 +130,74 @@ class MemberController
         require 'views/member/earnings.php';
     }
 
+    /**
+     * Resolve the root member used to render the binary tree.
+     *
+     * Staff accounts (admin/superadmin) mirror each other: without an explicit
+     * root they see the top-most node of the binary placement tree (the whole
+     * network). That top node is a real user — normally a member, but it can
+     * be a staff account members were placed under — so it is found by walking
+     * the placement tree, not by role. All other users — including
+     * impersonated sessions — see their own subtree.
+     *
+     * @param int|null $requestedRoot  Explicit ?root= value, or null for default.
+     */
+    private static function resolveBinaryRoot(?int $requestedRoot = null): int
+    {
+        if ($requestedRoot !== null && $requestedRoot > 0) {
+            return $requestedRoot;
+        }
+
+        if (Auth::isAdmin()) {
+            $top = db()->query(
+                "SELECT u.id FROM users u
+                 WHERE u.binary_parent_id IS NULL
+                   AND EXISTS (
+                       SELECT 1 FROM users c WHERE c.binary_parent_id = u.id
+                   )
+                 ORDER BY u.id ASC LIMIT 1"
+            )->fetchColumn();
+            if ($top) {
+                return (int) $top;
+            }
+        }
+
+        return Auth::id();
+    }
+
+    /**
+     * Resolve the root user used to render the referral network.
+     *
+     * Mirrors resolveBinaryRoot(): staff accounts (admin/superadmin) see the
+     * same referral network as each other — the top-most sponsor (the user the
+     * whole sponsor tree hangs from, which may itself be a staff account).
+     * Other users — including impersonated sessions — see their own tree.
+     *
+     * @param int|null $requestedRoot  Explicit ?root= value, or null for default.
+     */
+    private static function resolveReferralRoot(?int $requestedRoot = null): int
+    {
+        if ($requestedRoot !== null && $requestedRoot > 0) {
+            return $requestedRoot;
+        }
+
+        if (Auth::isAdmin()) {
+            $top = db()->query(
+                "SELECT u.id FROM users u
+                 WHERE u.sponsor_id IS NULL
+                   AND EXISTS (
+                       SELECT 1 FROM users c WHERE c.sponsor_id = u.id
+                   )
+                 ORDER BY u.id ASC LIMIT 1"
+            )->fetchColumn();
+            if ($top) {
+                return (int) $top;
+            }
+        }
+
+        return Auth::id();
+    }
+
     public function genealogy(): void
     {
         Auth::guard('member');
@@ -138,6 +206,8 @@ class MemberController
         $packages = Package::all(true);
         $binaryPackages = array_values(array_filter($packages, fn($p) => (int)($p['pairing_enabled'] ?? 1) === 1));
         $pairingEnabled = Package::hasPairing((int)$user['package_id']);
+        $binaryRootId   = self::resolveBinaryRoot();
+        $referralRootId = self::resolveReferralRoot(isset($_GET['root']) ? (int)$_GET['root'] : null);
 
         // Admins may always view the binary tree; non-binary members never see it
         if ($view === 'binary' && !$pairingEnabled && !Auth::isAdmin()) {
@@ -148,11 +218,11 @@ class MemberController
         $direct   = [];
         if ($view === 'referral') {
             if (Package::hasIndirectReferral((int)$user['package_id'])) {
-                $indirect = User::indirectReferralTree($user['id']);
+                $indirect = User::indirectReferralTree($referralRootId);
             } else {
                 $page    = max(1, (int)($_GET['pg'] ?? 1));
                 $perPage = max(5, (int)($_GET['per_page'] ?? 10));
-                $direct  = User::directReferrals($user['id'], $page, $perPage);
+                $direct  = User::directReferrals($referralRootId, $page, $perPage);
             }
         }
         require 'views/member/genealogy.php';
@@ -161,7 +231,7 @@ class MemberController
     public function apiBinaryTree(): void
     {
         Auth::guard('member');
-        $rootId = isset($_GET['root']) ? (int)$_GET['root'] : Auth::id();
+        $rootId = self::resolveBinaryRoot(isset($_GET['root']) ? (int)$_GET['root'] : null);
         $depth  = min(4, max(1, (int)($_GET['depth'] ?? 3)));
         json_response(self::buildTreeNode($rootId, $depth));
     }

@@ -17,7 +17,7 @@
         <h4 class="fw-800 mb-1">🛡️ Lifetime Income Cap</h4>
         <p class="text-muted mb-0" style="font-size:.8rem;">Monitor your cap progress and earnings breakdown</p>
       </div>
-      <a href="<?= APP_URL ?>/?page=dashboard" class="btn btn-outline-primary btn-sm">← Dashboard</a>
+      <a href="<?= link_to('dashboard') ?>" class="btn btn-outline-primary btn-sm">← Dashboard</a>
     </div>
 
     <!-- Cap Progress Card -->
@@ -175,7 +175,7 @@
                 Window: <?= $capStatus['reactivation_window'] ?? 15 ?> days from <?= fmt_datetime($capStatus['capped_at']) ?>
               </p>
             </div>
-            <a href="<?= APP_URL ?>/?page=reactivate" class="btn btn-warning">
+            <a href="<?= link_to('reactivate') ?>" class="btn btn-warning">
               🔄 Reactivate — <?= fmt_money($capStatus['reactivation_fee'] ?? 0) ?>
             </a>
           </div>

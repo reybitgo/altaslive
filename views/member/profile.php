@@ -12,7 +12,7 @@
   <?php require 'views/partials/topbar.php'; ?>
   <div class="page-content">
     <?= render_flash() ?>
-    <form method="POST" action="<?= APP_URL ?>/?page=save_profile" enctype="multipart/form-data">
+    <form method="POST" action="<?= link_to('save_profile') ?>" enctype="multipart/form-data">
       <?= csrf_field() ?>
       <div class="row g-3">
         <!-- Left col -->

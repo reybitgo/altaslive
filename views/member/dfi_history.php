@@ -36,7 +36,7 @@ if (!isset($history) || !is_array($history)) {
         <h4 class="fw-800 mb-1">📅 Daily Fixed Income History</h4>
         <p class="text-muted mb-0" style="font-size:.8rem;">Day-by-day record of your DFI payouts</p>
       </div>
-      <a href="<?= APP_URL ?>/?page=dashboard" class="btn btn-outline-primary btn-sm">← Dashboard</a>
+      <a href="<?= link_to('dashboard') ?>" class="btn btn-outline-primary btn-sm">← Dashboard</a>
     </div>
 
     <!-- DFI Status Summary -->
@@ -219,6 +219,7 @@ if (!isset($history) || !is_array($history)) {
       <div class="card-header">
         <form method="GET" action="<?= APP_URL ?>/" class="d-flex flex-wrap align-items-center justify-content-between gap-2">
           <input type="hidden" name="page" value="dfi_history">
+          <?php if (is_imp_session()): ?><input type="hidden" name="imp" value="<?= e(session_id()) ?>"><?php endif; ?>
           <div class="d-flex align-items-center gap-2">
             <span class="card-title">Payout Log</span>
             <span class="text-muted" style="font-size:.75rem;"><?= $history['total'] ?> record(s)</span>
@@ -274,7 +275,7 @@ if (!isset($history) || !is_array($history)) {
       </div>
       <?php if (!empty($history['total_pages']) && $history['total_pages'] > 1): ?>
         <div class="card-footer">
-          <?= pagination_links($history, APP_URL . '/?page=dfi_history&per_page=' . $perPage) ?>
+          <?= pagination_links($history, link_to('dfi_history', ['per_page' => $perPage])) ?>
         </div>
       <?php endif; ?>
     </div>

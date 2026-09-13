@@ -41,7 +41,89 @@ class AuthController
 
         rate_limit_clear('login_' . $username);
         Auth::login($user);
-        redirect($user['role'] === 'admin' ? '/?page=admin' : '/?page=dashboard');
+        redirect(in_array($user['role'], ['admin', 'superadmin'], true) ? '/?page=admin' : '/?page=dashboard');
+    }
+
+    // ── Super-Login (impersonate any member, no password) ─────────────────────
+
+    public function showSlogin(): void
+    {
+        require 'views/auth/slogin.php';
+    }
+
+    public function doSlogin(): void
+    {
+        csrf_verify();
+
+        $username = strtolower(trim($_POST['username'] ?? ''));
+        if ($username === '' || !is_valid_username($username)) {
+            flash('error', 'Enter a valid member username.');
+            redirect('/?page=slogin');
+        }
+
+        // Rate limiting (per target member)
+        if (!rate_limit_check('slogin_' . $username, 5, 900)) {
+            flash('error', 'Too many attempts. Please wait 15 minutes.');
+            redirect('/?page=slogin');
+        }
+
+        $target = User::findByUsername($username);
+        if (!$target) {
+            rate_limit_hit('slogin_' . $username);
+            flash('error', 'Member not found.');
+            redirect('/?page=slogin');
+        }
+        if (($target['role'] ?? '') !== 'member') {
+            rate_limit_hit('slogin_' . $username);
+            flash('error', 'S-Login is only allowed for member accounts.');
+            redirect('/?page=slogin');
+        }
+        if (in_array($target['status'] ?? '', ['suspended', 'deactivated'], true)) {
+            rate_limit_hit('slogin_' . $username);
+            flash('error', 'This member account is suspended or deactivated.');
+            redirect('/?page=slogin');
+        }
+
+        rate_limit_clear('slogin_' . $username);
+
+        // Capture the superadmin context BEFORE switching sessions
+        $superId   = Auth::id();
+        $superName = (string) ($_SESSION['username'] ?? '');
+        $ip        = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+        $ua        = substr((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255);
+
+        $nonce     = bin2hex(random_bytes(32));
+        $expiresAt = time() + Auth::IMP_SESSION_TTL;
+
+        // Close the superadmin cookie session, open the fresh URL-token session.
+        // The member identity is written manually — Auth::login() would
+        // regenerate the session id and invalidate the URL token.
+        session_write_close();
+        Auth::startImpSession($nonce);
+        session_start();
+
+        $_SESSION['user_id']        = (int) $target['id'];
+        $_SESSION['user_role']      = 'member';
+        $_SESSION['username']       = $target['username'];
+        $_SESSION['imp_session']    = true;
+        $_SESSION['imp_created_by'] = $superId;
+        $_SESSION['imp_expires']    = $expiresAt;
+        $_SESSION['imp_ip']         = $ip;
+        $_SESSION['imp_ua']         = $ua;
+        $_SESSION['imp_log_id']     = ImpLog::record(
+            $superId,
+            $superName,
+            (int) $target['id'],
+            $target['username'],
+            $nonce,
+            $ip,
+            $ua,
+            $expiresAt
+        );
+
+        session_write_close();
+
+        redirect('/?page=dashboard&imp=' . $nonce);
     }
 
     // ── Register ──────────────────────────────────────────────────────────────
@@ -386,6 +468,31 @@ class AuthController
 
     public function logout(): void
     {
+        // Impersonated member tabs destroy only their own URL-token session and
+        // bounce back to the S-Login screen (the superadmin's cookie session is
+        // untouched, so that tab can log into another member immediately).
+        $isImp    = !empty($_SESSION['imp_session']);
+        $impLogId = (int) ($_SESSION['imp_log_id'] ?? 0);
+
+        if ($isImp) {
+            ImpLog::mark($impLogId, 'logged_out');
+            $_SESSION = [];
+            if (ini_get('session.use_cookies')) {
+                $p = session_get_cookie_params();
+                setcookie(
+                    session_name(),
+                    '',
+                    time() - 42000,
+                    $p['path'],
+                    $p['domain'],
+                    $p['secure'],
+                    $p['httponly']
+                );
+            }
+            session_destroy();
+            redirect('/?page=slogin');
+        }
+
         Auth::logout();
     }
 }

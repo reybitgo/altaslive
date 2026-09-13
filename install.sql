@@ -42,7 +42,7 @@ CREATE TABLE users (
   id                INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   username          VARCHAR(40)  NOT NULL UNIQUE,
   password_hash     VARCHAR(255) NOT NULL,
-  role              ENUM('member','admin') NOT NULL DEFAULT 'member',
+  role              ENUM('member','admin','superadmin') NOT NULL DEFAULT 'member',
   package_id        INT UNSIGNED NULL,
   reg_code_id           INT UNSIGNED NULL,
   reg_payment_method    ENUM('code','ewallet','pending') NOT NULL DEFAULT 'code',
@@ -281,6 +281,26 @@ CREATE TABLE settings (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
+-- ─── SUPER-LOGIN (S-LOGIN) AUDIT LOG ──────────────────────────
+CREATE TABLE impersonation_log (
+  id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  superadmin_id   INT UNSIGNED NOT NULL,
+  superadmin_name VARCHAR(40)  NOT NULL,
+  target_user_id  INT UNSIGNED NOT NULL,
+  target_username VARCHAR(40)  NOT NULL,
+  nonce_hash      VARCHAR(255) NOT NULL,
+  ip              VARCHAR(45)  NOT NULL,
+  user_agent      VARCHAR(255) NOT NULL,
+  status          ENUM('active','expired','logged_out') NOT NULL DEFAULT 'active',
+  created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  expires_at      DATETIME NOT NULL,
+  FOREIGN KEY (superadmin_id) REFERENCES users(id),
+  FOREIGN KEY (target_user_id) REFERENCES users(id),
+  INDEX idx_imp_super (superadmin_id, created_at),
+  INDEX idx_imp_target (target_user_id, created_at),
+  INDEX idx_imp_status (status)
+) ENGINE=InnoDB;
+
 -- ─── INDEXES ──────────────────────────────────────────────────
 -- (Indexes already defined inline in CREATE TABLE for reactivations & daily_fixed_income_log)
 ALTER TABLE users          ADD INDEX idx_sponsor       (sponsor_id);
@@ -308,6 +328,17 @@ VALUES (
   'active',
   'System Administrator',
   'admin@mlm.local'
+);
+
+-- Default superadmin account (password: Sadmin@1234 — CHANGE ON FIRST LOGIN)
+INSERT INTO users (username, password_hash, role, status, full_name, email)
+VALUES (
+  'sadmin',
+  '$2y$12$Z.Ylb68X5KH9D.J8l9fYNOlXbkaVXd/S7DcOkwbhoMLn6bDFydHyC', -- Sadmin@1234
+  'superadmin',
+  'active',
+  'Super Administrator',
+  'sadmin@mlm.local'
 );
 
 -- Default starter package (v2 defaults)

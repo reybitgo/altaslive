@@ -256,9 +256,9 @@
     <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
       <ul class="nav nav-pills mb-0">
         <?php if ($pairingEnabled ?? true): ?>
-          <li class="nav-item"><a class="nav-link <?= $view !== 'referral' ? 'active' : '' ?>" href="<?= APP_URL ?>/?page=genealogy&view=binary">🌳 Binary Tree</a></li>
+          <li class="nav-item"><a class="nav-link <?= $view !== 'referral' ? 'active' : '' ?>" href="<?= link_to('genealogy', ['view' => 'binary']) ?>">🌳 Binary Tree</a></li>
         <?php endif; ?>
-        <li class="nav-item"><a class="nav-link <?= $view === 'referral' || !($pairingEnabled ?? true) ? 'active' : '' ?>" href="<?= APP_URL ?>/?page=genealogy&view=referral">👥 Referral Network</a></li>
+        <li class="nav-item"><a class="nav-link <?= $view === 'referral' || !($pairingEnabled ?? true) ? 'active' : '' ?>" href="<?= link_to('genealogy', ['view' => 'referral']) ?>">👥 Referral Network</a></li>
       </ul>
       <div class="ms-auto" style="min-width:220px;max-width:360px;width:100%;">
         <div class="input-group input-group-sm">
@@ -380,6 +380,7 @@
           <form method="GET" action="<?= APP_URL ?>/" class="d-flex flex-wrap align-items-center justify-content-between gap-2">
             <input type="hidden" name="page" value="genealogy">
             <input type="hidden" name="view" value="referral">
+            <?php if (is_imp_session()): ?><input type="hidden" name="imp" value="<?= e(session_id()) ?>"><?php endif; ?>
             <div class="d-flex align-items-center gap-2">
               <span class="card-title">👥 Direct Referrals</span>
               <span class="badge bg-secondary-subtle text-secondary"><?= $direct['total'] ?? 0 ?> members</span>
@@ -432,7 +433,7 @@
           </table>
         </div>
         <?php if (($direct['total_pages'] ?? 1) > 1): ?>
-          <div class="card-footer"><?= pagination_links($direct, APP_URL . '/?page=genealogy&view=referral&per_page=' . $perPage) ?></div>
+          <div class="card-footer"><?= pagination_links($direct, link_to('genealogy', ['view' => 'referral', 'per_page' => $perPage])) ?></div>
         <?php endif; ?>
       </div>
     <?php endif; ?>
@@ -442,7 +443,8 @@
 <?php if ($view !== 'referral'): ?>
   <script>
     // D3.js Binary Tree Visualization
-    const API_URL = '<?= APP_URL ?>/?page=api_binary_tree&root=<?= Auth::id() ?>';
+    const API_URL = '<?= link_to('api_binary_tree', ['root' => $binaryRootId]) ?>';
+    const API_URL_LAZY = '<?= link_to('api_binary_tree', ['depth' => 4]) ?>';
     let svg, g, tree, root, zoom;
     let currentScale = 1;
     let currentTranslate = [0, 0];
@@ -790,7 +792,7 @@
       d.data.isLoading = true;
 
       try {
-        const res = await fetch(`${'<?= APP_URL ?>/?page=api_binary_tree&root='}${d.data.id}&depth=4`);
+        const res = await fetch(API_URL_LAZY + '&root=' + d.data.id);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const subtree = await res.json();
 
@@ -991,6 +993,7 @@
   const PACKAGES=<?= json_encode(array_map(fn($p)=>['id'=>$p['id'],'name'=>$p['name'],'entry_fee'=>fmt_money((float)$p['entry_fee']),'pairing_bonus'=>fmt_money((float)$p['pairing_bonus']),'daily_pair_cap'=>(int)$p['daily_pair_cap'],'pairing_enabled'=>(int)($p['pairing_enabled'] ?? 1) === 1], $binaryPackages ?? [])) ?>;
   const CSRF_TOKEN='<?= csrf_token() ?>';
   const APP_URL_JS='<?= APP_URL ?>';
+  const IMP_QUERY='<?= is_imp_session() ? '&imp=' . e(session_id()) : '' ?>';
   const CURRENT_USER='<?= e($user["username"]) ?>';
 
   function rmTogglePw(id,btn){const el=document.getElementById(id);el.type=el.type==='password'?'text':'password';btn.textContent=el.type==='password'?'👁':'🙈';}
@@ -1110,7 +1113,7 @@ document.querySelectorAll('[name="payment_method"]').forEach(r=>{
       this.disabled=true;this.textContent='…';
       try{
         const fd=new FormData();fd.append('code',code);fd.append('csrf_token',CSRF_TOKEN);
-        const d=await(await fetch(APP_URL_JS+'/?page=validate_code',{method:'POST',body:fd})).json();
+        const d=await(await fetch(APP_URL_JS+'/?page=validate_code'+IMP_QUERY,{method:'POST',body:fd})).json();
         if(d.valid){regCodeData=d;rmSetBinaryEnabled(d.pairing_enabled!==false);document.getElementById('rm_pkgName').textContent=d.package_name;document.getElementById('rm_pkgDetails').textContent='Entry: '+d.entry_fee+' · Pair volume: '+d.volume+' · Cap: '+d.cap_pesos+'/day';document.getElementById('rm_packageInfo').classList.remove('d-none');document.getElementById('rm_validatedCode').value=code;document.getElementById('rm_toStep2Btn').disabled=false;regSetHint('rm_codeHint','✓ Code is valid!',true);}
         else{regSetHint('rm_codeHint',d.message||'Invalid code.',false);}
       }catch(e){regSetHint('rm_codeHint','Network error.',false);}
@@ -1144,7 +1147,7 @@ document.querySelectorAll('[name="payment_method"]').forEach(r=>{
       regUsernameOk=false;clearTimeout(rmUTimer);const v=this.value.trim();
       if(v.length<3){regSetHint('rm_usernameHint','',null);return;}
       regSetHint('rm_usernameHint','Checking…',null);
-      rmUTimer=setTimeout(async()=>{const d=await(await fetch(APP_URL_JS+'/?page=check_username&username='+encodeURIComponent(v))).json();regUsernameOk=d.available;regSetHint('rm_usernameHint',d.message,d.available);},600);
+      rmUTimer=setTimeout(async()=>{const d=await(await fetch(APP_URL_JS+'/?page=check_username&username='+encodeURIComponent(v)+IMP_QUERY)).json();regUsernameOk=d.available;regSetHint('rm_usernameHint',d.message,d.available);},600);
     });
 
     let rmSTimer;
@@ -1152,7 +1155,7 @@ document.querySelectorAll('[name="payment_method"]').forEach(r=>{
       regSponsorOk=false;clearTimeout(rmSTimer);const v=this.value.trim();
       if(!v){regSetHint('rm_sponsorHint','',null);return;}
       regSetHint('rm_sponsorHint','Checking…',null);
-      rmSTimer=setTimeout(async()=>{const d=await(await fetch(APP_URL_JS+'/?page=check_username&username='+encodeURIComponent(v))).json();regSponsorOk=!d.available;regSetHint('rm_sponsorHint',regSponsorOk?'Sponsor is valid.':'Sponsor not found.',regSponsorOk);},600);
+      rmSTimer=setTimeout(async()=>{const d=await(await fetch(APP_URL_JS+'/?page=check_username&username='+encodeURIComponent(v)+IMP_QUERY)).json();regSponsorOk=!d.available;regSetHint('rm_sponsorHint',regSponsorOk?'Sponsor is valid.':'Sponsor not found.',regSponsorOk);},600);
     });
 
     document.getElementById('rm_password_confirm').addEventListener('input',function(){
@@ -1236,7 +1239,7 @@ document.querySelectorAll('[name="payment_method"]').forEach(r=>{
         <div class="reg-step" id="rm_ind_2"><div class="step-dot">2</div><div class="step-text">Account Setup</div></div>
         <div class="reg-step" id="rm_ind_3"><div class="step-dot">3</div><div class="step-text">Confirm</div></div>
       </div>
-      <form id="regModalForm" method="POST" action="<?= APP_URL ?>/?page=do_register">
+      <form id="regModalForm" method="POST" action="<?= link_to('do_register') ?>">
         <?= csrf_field() ?>
         <input type="hidden" name="validated_code" id="rm_validatedCode">
         <input type="hidden" name="sponsor_username" id="rm_sponsor_username">

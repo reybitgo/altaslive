@@ -21,6 +21,83 @@ class Auth
         }
     }
 
+    // ── Super-Login (Impersonation) Sessions ───────────────────────────────────
+    //
+    // S-Login sessions are separate from the normal cookie session (mlm_sess).
+    // Each impersonated member tab carries its own URL-token (`?imp=<nonce>`)
+    // which is used as the PHP session id directly. No session cookie is issued,
+    // so the superadmin's own cookie session is never disturbed.
+
+    public const IMP_SESSION_TTL = 28800; // 8 hours
+
+    /**
+     * Configure PHP to open the session identified by $nonce (URL token).
+     * Must be called BEFORE session_start().
+     */
+    public static function startImpSession(string $nonce): void
+    {
+        ini_set('session.use_cookies', '0');
+        ini_set('session.use_only_cookies', '0');
+        ini_set('session.use_strict_mode', '0');
+        ini_set('session.gc_maxlifetime', (string) self::IMP_SESSION_TTL);
+        session_name('mlm_imp');
+        session_id($nonce);
+    }
+
+    public static function isImpSession(): bool
+    {
+        return self::check() && !empty($_SESSION['imp_session']);
+    }
+
+    /**
+     * Validate every URL-token request. Invalid/impaired impersonation
+     * sessions are destroyed and the tab is bounced back to ?page=slogin.
+     * Called from index.php right after session_start().
+     */
+    public static function validateImpSession(): void
+    {
+        if (!self::isImpSession()) {
+            self::endImpSession('expired', null);
+        }
+
+        if (empty($_SESSION['imp_expires']) || (int) $_SESSION['imp_expires'] < time()) {
+            self::endImpSession('expired', null);
+        }
+
+        $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+        $ua = substr((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255);
+        if ((string) ($_SESSION['imp_ip'] ?? '') !== $ip || (string) ($_SESSION['imp_ua'] ?? '') !== $ua) {
+            self::endImpSession('expired', null);
+        }
+
+        $u = self::user();
+        if (!$u || ($u['role'] ?? '') !== 'member' || in_array($u['status'] ?? '', ['suspended', 'deactivated'], true)) {
+            self::endImpSession('expired', null);
+        }
+    }
+
+    private static function endImpSession(string $status, ?string $msg): void
+    {
+        if (!empty($_SESSION['imp_log_id'])) {
+            ImpLog::mark((int) $_SESSION['imp_log_id'], $status);
+        }
+        $_SESSION = [];
+        if (ini_get('session.use_cookies')) {
+            $p = session_get_cookie_params();
+            setcookie(
+                session_name(),
+                '',
+                time() - 42000,
+                $p['path'],
+                $p['domain'],
+                $p['secure'],
+                $p['httponly']
+            );
+        }
+        session_destroy();
+        redirect('/?page=slogin');
+    }
+
     // ── Login / Logout ────────────────────────────────────────────────────────
 
     public static function login(array $user): void
@@ -63,7 +140,12 @@ class Auth
 
     public static function isAdmin(): bool
     {
-        return self::check() && $_SESSION['user_role'] === 'admin';
+        return self::check() && in_array($_SESSION['user_role'], ['admin', 'superadmin'], true);
+    }
+
+    public static function isSuperadmin(): bool
+    {
+        return self::check() && $_SESSION['user_role'] === 'superadmin';
     }
 
     public static function isMember(): bool

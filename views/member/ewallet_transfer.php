@@ -48,7 +48,7 @@
         <div class="card h-100">
           <div class="card-header"><span class="card-title">📝 Transfer Details</span></div>
           <div class="card-body">
-            <form method="POST" action="<?= APP_URL ?>/?page=do_ewallet_transfer" id="transferForm">
+            <form method="POST" action="<?= link_to('do_ewallet_transfer') ?>" id="transferForm">
               <?= csrf_field() ?>
 
               <div class="mb-3">
@@ -112,7 +112,7 @@
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <span class="card-title">📋 Recent Transfers</span>
-        <a href="<?= APP_URL ?>/?page=earnings" class="btn btn-outline-primary btn-sm" style="font-size:.72rem;">View Ledger →</a>
+        <a href="<?= link_to('earnings') ?>" class="btn btn-outline-primary btn-sm" style="font-size:.72rem;">View Ledger →</a>
       </div>
       <div class="table-responsive">
         <table class="table table-hover mb-0" style="font-size:.85rem;">

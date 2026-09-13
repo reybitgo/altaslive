@@ -105,7 +105,7 @@ $jsHints['usdt_bep20'] = 'USDT will be sent to this BEP20 wallet address (Binanc
             <?php elseif ($withdrawableBalance < $minPayout): ?>
               <div class="alert alert-info mb-0">ℹ Minimum payout is <?= fmt_money($minPayout) ?>. Withdrawable balance: <?= fmt_money($withdrawableBalance) ?>.</div>
             <?php else: ?>
-              <form method="POST" action="<?= APP_URL ?>/?page=request_payout" id="payoutForm">
+              <form method="POST" action="<?= link_to('request_payout') ?>" id="payoutForm">
                 <?= csrf_field() ?>
                 <div class="mb-3">
                   <label class="form-label">Amount <span class="text-danger">*</span></label>
@@ -190,6 +190,7 @@ $jsHints['usdt_bep20'] = 'USDT will be sent to this BEP20 wallet address (Binanc
       <div class="card-header">
         <form method="GET" action="<?= APP_URL ?>/" class="d-flex flex-wrap align-items-center justify-content-between gap-2">
           <input type="hidden" name="page" value="payout">
+          <?php if (is_imp_session()): ?><input type="hidden" name="imp" value="<?= e(session_id()) ?>"><?php endif; ?>
           <span class="card-title">📋 Payout History</span>
 
           <!-- Rows per page -->
@@ -284,7 +285,7 @@ $jsHints['usdt_bep20'] = 'USDT will be sent to this BEP20 wallet address (Binanc
         </table>
       </div>
       <?php if ($history['total_pages'] > 1): ?>
-        <div class="card-footer"><?= pagination_links($history, APP_URL . '/?page=payout&per_page=' . $perPage) ?></div>
+        <div class="card-footer"><?= pagination_links($history, link_to('payout', ['per_page' => $perPage])) ?></div>
       <?php endif; ?>
     </div>
   </div>
@@ -358,6 +359,7 @@ $jsHints['usdt_bep20'] = 'USDT will be sent to this BEP20 wallet address (Binanc
     availableBalance: <?= $availableBalance ?>,
     minPayout: <?= $minPayout ?>,
     appUrl: '<?= APP_URL ?>',
+    impQuery: '<?= is_imp_session() ? '&imp=' . e(session_id()) : '' ?>',
     usdtTrc20GasFee: <?= (float)setting('usdt_trc20_gas_fee', '2.50') ?>,
     usdtBep20GasFee: <?= (float)setting('usdt_bep20_gas_fee', '0.05') ?>,
   };
@@ -474,7 +476,7 @@ $jsHints['usdt_bep20'] = 'USDT will be sent to this BEP20 wallet address (Binanc
 
     // Persist to DB in background — only if value changed
     try {
-      await fetch(window.PAYOUT_CONFIG.appUrl + '/?page=update_usdt_gas', {
+      await fetch(window.PAYOUT_CONFIG.appUrl + '/?page=update_usdt_gas' + window.PAYOUT_CONFIG.impQuery, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -553,7 +555,7 @@ $jsHints['usdt_bep20'] = 'USDT will be sent to this BEP20 wallet address (Binanc
 
     // Persist to DB in background — only if value changed
     try {
-      await fetch(window.PAYOUT_CONFIG.appUrl + '/?page=update_usdt_bep20_gas', {
+      await fetch(window.PAYOUT_CONFIG.appUrl + '/?page=update_usdt_bep20_gas' + window.PAYOUT_CONFIG.impQuery, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

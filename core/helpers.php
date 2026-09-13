@@ -106,6 +106,18 @@ function redirect(string $path): never
         session_write_close();
     }
 
+    // Impersonated sessions ride on a URL token — preserve it across
+    // POST-handler redirects so the member stays inside their session.
+    // (logon/slogout boundaries and logout keep the plain URL.)
+    if (
+        is_imp_session()
+        && str_starts_with($path, '/')
+        && !str_contains($path, 'imp=')
+        && !preg_match('#/?page=(slogin|logout)(&|$|#)#', $path)
+    ) {
+        $path .= (str_contains($path, '?') ? '&' : '?') . 'imp=' . session_id();
+    }
+
     // $path should start with / (relative to APP_URL) or be a full URL
     if (str_starts_with($path, 'http')) {
         header('Location: ' . $path);
@@ -123,6 +135,49 @@ function current_page(): string
 function is_page(string $page): bool
 {
     return current_page() === $page;
+}
+
+// ── Super-Login (Impersonation) URL Building ──────────────────────────────────
+
+/**
+ * True when the current request runs inside an impersonated member session
+ * (a superadmin S-Login tab). Normal members and superadmin's own tabs
+ * never match.
+ */
+function is_imp_session(): bool
+{
+    return !empty($_SESSION['imp_session']);
+}
+
+/**
+ * Build an app URL. $page may be a plain page token (e.g. 'dashboard') or a
+ * query-style string (e.g. 'genealogy&view=binary'); $params are additional
+ * overrides. When running impersonated, the URL token is appended so every
+ * navigation/AJAX call stays inside the member session.
+ */
+function link_to(string $page, array $params = []): string
+{
+    $query = [];
+
+    $segments = str_contains($page, '&') ? explode('&', $page) : [$page];
+    foreach ($segments as $i => $seg) {
+        if ($i === 0) {
+            $query['page'] = $seg;
+            continue;
+        }
+        $kv = explode('=', $seg, 2);
+        $query[$kv[0]] = $kv[1] ?? '';
+    }
+
+    foreach ($params as $k => $v) {
+        $query[$k] = $v;
+    }
+
+    if (is_imp_session()) {
+        $query['imp'] = session_id();
+    }
+
+    return APP_URL . '/?' . http_build_query($query);
 }
 
 // ── Flash Messages ────────────────────────────────────────────────────────────
