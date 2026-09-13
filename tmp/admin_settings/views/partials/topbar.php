@@ -47,6 +47,7 @@ $isMember      = ($user['role'] ?? '') === 'member';
                     <span class="bal-amount" style="color:#d97706;font-size:.8rem;">⏳ Active</span>
                 </div>
             <?php endif; ?>
+
         <?php endif; ?>
 
         <div class="dropdown">
@@ -74,6 +75,27 @@ $isMember      = ($user['role'] ?? '') === 'member';
                 </li>
             </ul>
         </div>
+
+        <?php
+        // Cart badge — shown for any logged-in user (member or admin), so admins
+        // can use the shopping cart too. Always reflects the LOGGED-IN user's cart
+        // (not the viewed member on admin_user_view). Drawer markup lives in
+        // cart_offcanvas.php, included globally via footer.php.
+        $cartCount = 0;
+        $activeCart = Cart::getActive((int)Auth::id());
+        if ($activeCart) {
+            $totals = Cart::getTotals((int)$activeCart['id']);
+            $cartCount = (int)$totals['total_items'];
+        }
+        ?>
+        <button class="btn btn-sm btn-outline-light position-relative" type="button" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas" title="View cart">
+            🛒
+            <?php if ($cartCount > 0): ?>
+                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:.65rem;">
+                    <?= $cartCount ?>
+                </span>
+            <?php endif; ?>
+        </button>
 
         <?php if (Auth::isAdmin() && ($_GET['page'] ?? '') === 'admin_settings'): ?>
             <button class="btn btn-sm btn-outline-light" type="button"

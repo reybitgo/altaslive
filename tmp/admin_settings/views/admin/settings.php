@@ -8,6 +8,7 @@
 <?php $pageTitle = 'System Settings'; ?>
 <?php require 'views/partials/head.php'; ?>
 <?php require 'views/partials/sidebar_admin.php'; ?>
+<?php $memberCount = (int)(User::counts()['total'] ?? 0); ?>
 <style>
     .tab-pane {
         display: none;
@@ -90,6 +91,20 @@
                                     <option value="1" <?= setting('maintenance_mode') === '1' ? 'selected' : '' ?>>🔴 On — Members see maintenance page</option>
                                 </select>
                             </div>
+                            <div class="mb-3">
+                                <label class="form-label">Maintenance Bypass Token</label>
+                                <input type="text" name="maintenance_bypass_token" class="form-control font-mono" value="<?= e(setting('maintenance_bypass_token', '')) ?>" placeholder="Leave empty to disable bypass">
+                                <div class="form-text">Append <code>?bypass=TOKEN</code> to the login URL when maintenance is on. Keep this token strong.</div>
+                            </div>
+                            <div class="rounded p-3 mb-3" style="background:#fef2f2;border:1px solid #fecaca;">
+                                <div class="d-flex align-items-start gap-2">
+                                    <span style="font-size:.9rem;flex-shrink:0;margin-top:1px;">🔒</span>
+                                    <div style="font-size:.78rem;color:#991b1b;line-height:1.6;">
+                                        <strong>Locked out?</strong> Access phpMyAdmin and run:
+                                        <code style="background:#fee2e2;padding:.1rem .35rem;border-radius:.25rem;">UPDATE settings SET value='0' WHERE key_name='maintenance_mode'</code>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="mb-0">
                                 <label class="form-label">🪑 Seat Limit</label>
                                 <input type="number" name="seat_limit" class="form-control" min="1" step="1" value="<?= e(setting('seat_limit', '1000')) ?>">
@@ -113,7 +128,280 @@
             </div>
 
             <!-- ════════════════════════════════════════════
-             TAB 3 — PAYMENTS
+             TAB 3 — COMPENSATION PLAN
+             ════════════════════════════════════════════ -->
+            <div class="tab-pane fade" id="tabPane-comp_plan" role="tabpanel">
+                <form method="POST" action="<?= APP_URL ?>/?page=admin_save_settings">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="group" value="comp_plan">
+                    <div class="card">
+                        <div class="card-header d-flex align-items-center gap-2">
+                            <span style="width:28px;height:28px;background:#f0fdf4;border-radius:.45rem;display:flex;align-items:center;justify-content:center;font-size:.85rem;">📋</span>
+                            <span class="card-title">Compensation Plan</span>
+                        </div>
+                        <div class="card-body">
+                            <!-- Binary -->
+                            <div class="rounded p-3 mb-3" style="background:#f8fafc;border:1px solid #e2e8f0;">
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" name="binary_enabled" id="binaryEnabled" value="1" <?= setting('binary_enabled', '1') === '1' ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="binaryEnabled" style="font-weight:700;font-size:.85rem;">Enable Binary Pairing Bonuses</label>
+                                </div>
+                                <div style="font-size:.78rem;color:var(--muted);line-height:1.6;padding-left:2.4rem;">
+                                    When disabled, no pairing bonuses are paid and binary placement is hidden during registration.
+                                    <?php if ($memberCount > 0): ?>
+                                        <br><span class="text-warning">⚠️ <?= $memberCount ?> member(s) exist — disable is blocked until <strong>reset.php</strong> is run.</span>
+                                    <?php else: ?>
+                                        <br><span class="text-success">✓ Clean system — binary can be disabled safely.</span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <!-- Binary Repeat Purchase -->
+                            <div class="rounded p-3 mb-3" style="background:#f8fafc;border:1px solid #e2e8f0;">
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" name="binary_repeat_enabled" id="binaryRepeatEnabled" value="1" <?= setting('binary_repeat_enabled', '1') === '1' ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="binaryRepeatEnabled" style="font-weight:700;font-size:.85rem;">Enable Binary Repeat Purchase</label>
+                                </div>
+                                <div style="font-size:.78rem;color:var(--muted);line-height:1.6;padding-left:2.4rem;">
+                                    When enabled, members can choose Left or Right leg during checkout and product PV earns binary pairing bonuses. When disabled, the Binary Position selector is hidden and product PV does not trigger binary pairing. Toggleable anytime.
+                                </div>
+                            </div>
+                            <!-- Indirect Referral -->
+                            <div class="rounded p-3 mb-3" style="background:#f8fafc;border:1px solid #e2e8f0;">
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" name="indirect_referral_enabled" id="indirectRefEnabled" value="1" <?= setting('indirect_referral_enabled', '1') === '1' ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="indirectRefEnabled" style="font-weight:700;font-size:.85rem;">Enable Indirect Referral (Unilevel) Bonuses</label>
+                                </div>
+                                <div style="font-size:.78rem;color:var(--muted);line-height:1.6;padding-left:2.4rem;">
+                                    When disabled, no unilevel bonuses are paid and all indirect referral UI is hidden.
+                                    <?php if ($memberCount > 0): ?>
+                                        <br><span class="text-warning">⚠️ <?= $memberCount ?> member(s) exist — disable is blocked until <strong>reset.php</strong> is run.</span>
+                                    <?php else: ?>
+                                        <br><span class="text-success">✓ Clean system — indirect referral can be disabled safely.</span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <!-- Unilevel Product Bonus -->
+                            <div class="rounded p-3 mb-3" style="background:#f8fafc;border:1px solid #e2e8f0;">
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" name="unilevel_product_enabled" id="unilevelProductEnabled" value="1" <?= setting('unilevel_product_enabled', '1') === '1' ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="unilevelProductEnabled" style="font-weight:700;font-size:.85rem;">Enable Unilevel Product Bonus</label>
+                                </div>
+                                <div style="font-size:.78rem;color:var(--muted);line-height:1.6;padding-left:2.4rem;">
+                                    When enabled, upline sponsors earn a 10-level unilevel cash bonus on each product purchase (gated by each upline's Personal PV Requirement). When disabled, the Unilevel Bonus section is hidden from the product edit form and no unilevel commissions are processed for product purchases.
+                                </div>
+                            </div>
+                            <!-- Daily Fixed Income -->
+                            <div class="rounded p-3 mb-3" style="background:#f8fafc;border:1px solid #e2e8f0;">
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" name="dfi_enabled" id="dfiEnabled" value="1" <?= setting('dfi_enabled', '1') === '1' ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="dfiEnabled" style="font-weight:700;font-size:.85rem;">Enable Daily Fixed Income</label>
+                                </div>
+                                <div style="font-size:.78rem;color:var(--muted);line-height:1.6;padding-left:2.4rem;margin-top:.25rem;">
+                                    When disabled, no daily fixed income payouts are processed for any member.
+                                </div>
+                            </div>
+                            <!-- Cap Multiplier -->
+                            <div class="mb-3">
+                                <label class="form-label">Default Lifetime Cap Multiplier</label>
+                                <input type="number" name="default_cap_multiplier" class="form-control" min="0" step="0.01" value="<?= e(setting('default_cap_multiplier', '3.00')) ?>">
+                                <div class="form-text">Lifetime cap = entry fee × multiplier</div>
+                            </div>
+                            <!-- PV per Peso Rate -->
+                            <div class="rounded p-3" style="background:linear-gradient(135deg,#eef2ff 0%,#e0e7ff 100%);border:1px solid #c7d2fe;">
+                                <div class="d-flex align-items-center gap-2 mb-2" style="color:#4f46e5;">
+                                    <span style="font-size:.9rem;">💎</span>
+                                    <span style="font-size:.82rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;">PV Conversion Rate</span>
+                                </div>
+                                <label class="form-label" style="color:#4f46e5;font-size:.8rem;font-weight:600;">PV per Peso Rate</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">₱</span>
+                                    <input type="number" name="pv_per_peso_rate" class="form-control font-mono" inputmode="decimal" min="0.0001" step="0.0001" value="<?= e(setting('pv_per_peso_rate', '1000.0000')) ?>">
+                                    <span class="input-group-text">per 1 PV</span>
+                                </div>
+                                <div class="form-text">Pesos paid per 1 PV when converting PV-based bonuses.</div>
+                            </div>
+                        </div>
+                        <div class="card-footer border-top-0 pt-0">
+                            <button type="submit" class="btn btn-primary w-100">💾 Save Settings</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- ════════════════════════════════════════════
+             TAB 4 — ROYALTY BONUS
+             ════════════════════════════════════════════ -->
+            <div class="tab-pane fade" id="tabPane-royalty" role="tabpanel">
+                <form method="POST" action="<?= APP_URL ?>/?page=admin_save_settings">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="group" value="royalty">
+                    <div class="card">
+                        <div class="card-header d-flex align-items-center gap-2">
+                            <span style="width:28px;height:28px;background:var(--royalty-dim,#fef3c7);border-radius:.45rem;display:flex;align-items:center;justify-content:center;font-size:.85rem;">⭐</span>
+                            <span class="card-title">Royalty Bonus — Pool/Share Model</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="rounded p-3 mb-3" style="background:#f8fafc;border:1px solid #e2e8f0;">
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" name="royalty_enabled" id="royaltyEnabled" value="1" <?= setting('royalty_enabled', '0') === '1' ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="royaltyEnabled" style="font-weight:700;font-size:.85rem;">Enable Royalty Bonus</label>
+                                </div>
+                                <div style="font-size:.78rem;color:var(--muted);line-height:1.6;padding-left:2.4rem;">
+                                    When enabled, a % of monthly repeat purchase sales funds the royalty pool, distributed monthly to qualifying ranks.
+                                </div>
+                            </div>
+
+                            <!-- Pool Configuration -->
+                            <div class="rounded p-3 mb-3" style="background:#eff6ff;border:1px solid #bfdbfe;">
+                                <h6 class="fw-700 mb-3" style="color:#1e40af;">🏦 Pool Configuration</h6>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label" style="font-size:.8rem;">Pool Rate (% of monthly repeat sales)</label>
+                                        <div class="input-group">
+                                            <input type="number" name="royalty_pool_rate" class="form-control" min="0" max="100" step="0.01" value="<?= e(setting('royalty_pool_rate', '10.00')) ?>">
+                                            <span class="input-group-text">%</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label" style="font-size:.8rem;">Minimum Pool Threshold (₱)</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">₱</span>
+                                            <input type="number" name="royalty_min_pool" class="form-control" min="0" step="0.01" value="<?= e(setting('royalty_min_pool', '500.00')) ?>">
+                                        </div>
+                                        <div class="form-text">Pool is forfeited if below this amount.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Rank Rate Allocation -->
+                            <div class="rounded p-3 mb-3" style="background:#f0fdf4;border:1px solid #bbf7d0;">
+                                <h6 class="fw-700 mb-3" style="color:#166534;">📊 Rank Rate Allocation (must sum to 100%)</h6>
+                                <div class="row g-3">
+                                    <?php $rr = [
+                                        'supervisor' => ['🥉 Supervisor', setting('royalty_supervisor_rate', '25')],
+                                        'manager'    => ['🥈 Manager',    setting('royalty_manager_rate', '25')],
+                                        'director'   => ['🥇 Director',   setting('royalty_director_rate', '25')],
+                                        'chairman'   => ['👑 Chairman',   setting('royalty_chairman_rate', '25')],
+                                    ]; ?>
+                                    <?php foreach ($rr as $rk => [$label, $val]): ?>
+                                        <div class="col-md-3">
+                                            <label class="form-label" style="font-size:.8rem;"><?= $label ?></label>
+                                            <div class="input-group">
+                                                <input type="number" name="royalty_<?= $rk ?>_rate" class="form-control royalty-rank-rate" min="0" max="100" step="0.01" value="<?= e($val) ?>" data-rank="<?= $rk ?>">
+                                                <span class="input-group-text">%</span>
+                                            </div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                                <div class="mt-2">
+                                    <span class="form-text">Sum: </span>
+                                    <span id="royaltyRateSum" style="font-weight:700;"></span>
+                                </div>
+                            </div>
+
+                            <!-- Qualification Gates -->
+                            <div class="rounded p-3 mb-3" style="background:#fffbeb;border:1px solid #fde68a;">
+                                <h6 class="fw-700 mb-3" style="color:#92400e;">🟡 Rank Qualification Gates</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered mb-0" style="font-size:.82rem;">
+                                        <thead>
+                                            <tr>
+                                                <th>Rank</th>
+                                                <th>Setting</th>
+                                                <th style="width:120px;">Value</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td>QA</td>
+                                                <td>Minimum Directs</td>
+                                                <td><input type="number" name="royalty_qa_directs" class="form-control form-control-sm" min="0" max="99" value="<?= e(setting('royalty_qa_directs', '3')) ?>"></td>
+                                            </tr>
+                                            <tr>
+                                                <td>QA</td>
+                                                <td>Personal PV Gate (OR)</td>
+                                                <td><input type="number" name="royalty_qa_personal_pv" class="form-control form-control-sm" min="0" step="10" value="<?= e(setting('royalty_qa_personal_pv', '200')) ?>"></td>
+                                            </tr>
+                                            <tr>
+                                                <td>QA</td>
+                                                <td>Group PV Gate (OR)</td>
+                                                <td><input type="number" name="royalty_qa_group_pv" class="form-control form-control-sm" min="0" step="100" value="<?= e(setting('royalty_qa_group_pv', '1000')) ?>"></td>
+                                            </tr>
+                                            <tr>
+                                                <td>Supervisor</td>
+                                                <td>Minimum Directs</td>
+                                                <td><input type="number" name="royalty_spv_directs" class="form-control form-control-sm" min="0" max="99" value="<?= e(setting('royalty_spv_directs', '10')) ?>"></td>
+                                            </tr>
+                                            <tr>
+                                                <td>Supervisor</td>
+                                                <td>Minimum QA Legs</td>
+                                                <td><input type="number" name="royalty_spv_qa_legs" class="form-control form-control-sm" min="0" max="99" value="<?= e(setting('royalty_spv_qa_legs', '5')) ?>"></td>
+                                            </tr>
+                                            <tr>
+                                                <td>Manager</td>
+                                                <td>Minimum Supervisor Legs</td>
+                                                <td><input type="number" name="royalty_mgr_sup_legs" class="form-control form-control-sm" min="0" max="99" value="<?= e(setting('royalty_mgr_sup_legs', '3')) ?>"></td>
+                                            </tr>
+                                            <tr>
+                                                <td>Director</td>
+                                                <td>Minimum Manager Legs</td>
+                                                <td><input type="number" name="royalty_dir_mgr_legs" class="form-control form-control-sm" min="0" max="99" value="<?= e(setting('royalty_dir_mgr_legs', '3')) ?>"></td>
+                                            </tr>
+                                            <tr>
+                                                <td>Chairman</td>
+                                                <td>Minimum Director Legs</td>
+                                                <td><input type="number" name="royalty_chm_dir_legs" class="form-control form-control-sm" min="0" max="99" value="<?= e(setting('royalty_chm_dir_legs', '3')) ?>"></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="form-text mt-2">OR gate for QA: member qualifies if they meet personal PV OR group PV threshold.</div>
+                            </div>
+                        </div>
+                        <div class="card-footer border-top-0 pt-0">
+                            <button type="submit" class="btn btn-primary w-100" id="royaltySaveBtn">💾 Save Settings</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <script>
+                // ── Rank rate sum validation ───────────────────────────────────────────
+                (function() {
+                    const inputs = document.querySelectorAll('.royalty-rank-rate');
+                    const sumEl = document.getElementById('royaltyRateSum');
+                    const saveBtn = document.getElementById('royaltySaveBtn');
+
+                    function updateSum() {
+                        let sum = 0;
+                        inputs.forEach(el => sum += parseFloat(el.value) || 0);
+                        sumEl.textContent = sum.toFixed(2) + '%';
+                        sumEl.style.color = Math.abs(sum - 100) <= 0.01 ? '#166534' : '#dc2626';
+                        if (saveBtn) {
+                            saveBtn.textContent = Math.abs(sum - 100) <= 0.01 ? '💾 Save Settings' : '⚠️ Rates must sum to 100%';
+                        }
+                    }
+
+                    inputs.forEach(el => el.addEventListener('input', updateSum));
+                    updateSum();
+
+                    // Block form submit if sum != 100
+                    const form = inputs[0]?.closest('form');
+                    if (form) {
+                        form.addEventListener('submit', function(e) {
+                            let sum = 0;
+                            inputs.forEach(el => sum += parseFloat(el.value) || 0);
+                            if (Math.abs(sum - 100) > 0.01) {
+                                e.preventDefault();
+                                alert('Rank rates must sum to 100%. Current sum: ' + sum.toFixed(2));
+                            }
+                        });
+                    }
+                })();
+            </script>
+
+            <!-- ════════════════════════════════════════════
+             TAB 5 — REACTIVATION
              ════════════════════════════════════════════ -->
             <div class="tab-pane fade" id="tabPane-payments" role="tabpanel">
                 <form method="POST" action="<?= APP_URL ?>/?page=admin_save_settings">
@@ -126,7 +414,7 @@
                         </div>
                         <div class="card-body">
                             <div class="mb-3">
-                                <label class="form-label" style="font-size:.8rem;font-weight:600;">Reactivation Payment Methods</label>
+                                <label class="form-label" style="font-size:.8rem;font-weight:600;">Payment Methods</label>
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" name="reactivation_ewallet_enabled" id="reEwEnabled" value="1" <?= setting('reactivation_ewallet_enabled', '1') === '1' ? 'checked' : '' ?>>
                                     <label class="form-check-label" for="reEwEnabled">E-Wallet (deduct balance immediately)</label>
@@ -170,7 +458,7 @@
             </div>
 
             <!-- ════════════════════════════════════════════
-             TAB 4 — E-WALLET TRANSFERS
+             TAB 5 — E-WALLET TRANSFERS
              ════════════════════════════════════════════ -->
             <div class="tab-pane fade" id="tabPane-ewallet" role="tabpanel">
                 <form method="POST" action="<?= APP_URL ?>/?page=admin_save_settings">
@@ -182,12 +470,10 @@
                             <span class="card-title">E-Wallet Transfers</span>
                         </div>
                         <div class="card-body">
-                            <div class="form-text mb-3" style="font-size:.75rem;">Configure member-to-member transfer rules and fees. Admin transfers are always free.</div>
                             <div class="row g-2 mb-3">
                                 <div class="col-6">
                                     <label class="form-label" style="font-weight:600;font-size:.78rem;">Transfer Fee (₱)</label>
                                     <input type="number" name="ewallet_transfer_fee" class="form-control" min="0" step="0.01" value="<?= e(setting('ewallet_transfer_fee', '0.00')) ?>">
-                                    <div class="form-text" style="font-size:.7rem;">Flat fee per member transfer</div>
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label" style="font-weight:600;font-size:.78rem;">Minimum Transfer (₱)</label>
@@ -213,7 +499,7 @@
             </div>
 
             <!-- ════════════════════════════════════════════
-             TAB 5 — PAYOUT METHODS
+             TAB 6 — PAYOUT METHODS
              ════════════════════════════════════════════ -->
             <div class="tab-pane fade" id="tabPane-payouts" role="tabpanel">
                 <form method="POST" action="<?= APP_URL ?>/?page=admin_save_settings">
@@ -228,7 +514,6 @@
                             <div class="form-text mb-3" style="font-size:.75rem;">Deducted from requested amount before sending. Set to 0 to disable.</div>
                             <div class="mb-3">
                                 <label class="form-label" style="font-size:.8rem;font-weight:600;">Available Methods</label>
-                                <div class="form-text mb-2" style="font-size:.75rem;">Disable methods to hide them from members. USDT is always enabled.</div>
                                 <div class="row g-2">
                                     <div class="col-6">
                                         <div class="form-check form-switch">
@@ -305,7 +590,7 @@
             </div>
 
             <!-- ════════════════════════════════════════════
-             TAB 6 — CHANGE PASSWORD (external form)
+             TAB 7 — CHANGE PASSWORD (external form)
              ════════════════════════════════════════════ -->
             <div class="tab-pane fade" id="tabPane-password" role="tabpanel">
                 <div class="card">
@@ -340,28 +625,9 @@
             </div>
 
             <!-- ════════════════════════════════════════════
-             TAB 7 — DAILY CAP RESET
+             TAB 9 — DAILY CAP RESET (external form)
              ════════════════════════════════════════════ -->
             <div class="tab-pane fade" id="tabPane-reset" role="tabpanel">
-                <form method="POST" action="<?= APP_URL ?>/?page=admin_save_settings">
-                    <?= csrf_field() ?>
-                    <input type="hidden" name="group" value="reset">
-                    <div class="card" style="margin-bottom:1rem;">
-                        <div class="card-header d-flex align-items-center gap-2">
-                            <span style="width:28px;height:28px;background:#eef2ff;border-radius:.45rem;display:flex;align-items:center;justify-content:center;font-size:.85rem;">🎯</span>
-                            <span class="card-title">Default Lifetime Cap Multiplier</span>
-                        </div>
-                        <div class="card-body">
-                            <label class="form-label">Default Lifetime Cap Multiplier</label>
-                            <input type="number" name="default_cap_multiplier" class="form-control" min="0" step="0.01" value="<?= e(setting('default_cap_multiplier', '3.00')) ?>">
-                            <div class="form-text">Lifetime cap = entry fee × multiplier. Default: 3.00</div>
-                        </div>
-                        <div class="card-footer border-top-0 pt-0">
-                            <button type="submit" class="btn btn-primary w-100">💾 Save Settings</button>
-                        </div>
-                    </div>
-                </form>
-
                 <div class="card">
                     <div class="card-header d-flex align-items-center gap-2">
                         <span style="width:28px;height:28px;background:#fef3c7;border-radius:.45rem;display:flex;align-items:center;justify-content:center;font-size:.85rem;">⏱️</span>
@@ -369,7 +635,7 @@
                     </div>
                     <div class="card-body">
                         <p class="text-muted mb-3" style="font-size:.85rem;line-height:1.7;">
-                            The midnight cron resets <code>pairs_paid_today = 0</code> and <code>pairs_volume_today = 0</code> for all members, clearing the daily pairing (matched volume) cap so they can earn again tomorrow.
+                            The midnight cron resets <code>paired_pv_today = 0</code> for all members, clearing the daily paired-PV cap.
                         </p>
                         <div class="rounded p-3 mb-3" style="background:#f4f6fb;">
                             <div class="text-muted mb-1" style="font-size:.68rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;">Last Reset</div>
@@ -385,7 +651,7 @@
                             </div>
                         <?php endif; ?>
                         <button type="button" class="btn btn-outline-warning w-100"
-                            onclick="showConfirm({title:'Run Daily Reset',message:'Reset pairs_paid_today = 0 and pairs_volume_today = 0 for ALL active members now? This simulates the midnight cron.',confirmText:'⟳ Run Reset',confirmClass:'btn-warning',formId:'manualResetForm'})">
+                            onclick="showConfirm({title:'Run Daily Reset',message:'Reset paired_pv_today = 0 for ALL active members now?',confirmText:'⟳ Run Reset',confirmClass:'btn-warning',formId:'manualResetForm'})">
                             ⟳ Run Daily Reset Now
                         </button>
                     </div>
@@ -393,7 +659,7 @@
             </div>
 
             <!-- ════════════════════════════════════════════
-             TAB 8 — SYSTEM OVERVIEW (read-only)
+             TAB 10 — SYSTEM OVERVIEW (read-only)
              ════════════════════════════════════════════ -->
             <div class="tab-pane fade" id="tabPane-overview" role="tabpanel">
                 <div class="card">
