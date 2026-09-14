@@ -875,7 +875,7 @@
       }
 
       .pkg-card {
-        width: 18rem;
+        flex: 1 1 18rem;
         max-width: 100%;
         background: var(--surface-2);
         border: 1px solid var(--border-col);
@@ -1158,6 +1158,10 @@
         .plv-grid {
           grid-template-columns: repeat(2, minmax(76px, 1fr));
           max-width: 100%;
+        }
+        .pkg-card {
+          flex: 1 0 100%;
+          max-width: none;
         }
       }
     </style>
@@ -3350,7 +3354,7 @@
                 ? `<div class="fc-row"><span>Pair volume</span><b>${fmtP(pl.pairBonus)}/join · ${pl.pairCap}/day</b></div>`
                 : `<div class="fc-row"><span>Pair volume</span><b>off</b></div>`;
               const dfiTxt = pl.dfiOn ? `${fmtP(pl.dfi)}/day` : "off";
-              return `<div class="fc-chip card m-2 pkg-card" style="width: 18rem">
+              return `<div class="fc-chip card m-2 pkg-card">
       <div class="fc-head">
         <span class="fc-name">${pl.name}</span>
         <span class="fc-mix">${Math.round(pl.mix)}% mix</span>
