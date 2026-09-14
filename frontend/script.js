@@ -67,14 +67,24 @@ backToTopBtn.addEventListener('click', () => {
 // ── PWA SERVICE WORKER REGISTRATION ────────────────────────
 if ('serviceWorker' in navigator) {
   const swCode = `
-    const CACHE_NAME = 'altas-farm-v2';
+    const CACHE_NAME = 'altas-farm-v3';
     const urlsToCache = ['.', 'index.html', 'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap'];
     self.addEventListener('install', event => {
       event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache)));
       self.skipWaiting();
     });
     self.addEventListener('fetch', event => {
-      event.respondWith(caches.match(event.request).then(response => response || fetch(event.request)));
+      if (event.request.mode === 'navigate') {
+        event.respondWith(
+          fetch(event.request).then(res => {
+            const copy = res.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+            return res;
+          }).catch(() => caches.match(event.request))
+        );
+      } else {
+        event.respondWith(caches.match(event.request).then(response => response || fetch(event.request)));
+      }
     });
     self.addEventListener('activate', event => {
       const cacheWhitelist = [CACHE_NAME];
@@ -118,6 +128,89 @@ if ('serviceWorker' in navigator) {
       document.body.style.overflow = '';
     }
   });
+
+  /* ── Package Details modal ─────────────────────────────── */
+  function fmtMoney(v) {
+    return '₱' + Number(v).toLocaleString('en-PH', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  }
+
+  // Build + open the package-details modal for a given package id.
+  function openPkgDetails(id) {
+    const pkg = (window.PKG_DETAILS || {})[id];
+    if (!pkg) return;
+    const G = window.PKG_GLOBALS || {};
+
+    // ── Unilevel referral breakdown (primary content) ──
+    let levelsHtml;
+    const levelRows = Object.entries(pkg.levels || {})
+      .filter(([, amt]) => Number(amt) > 0)
+      .sort((a, b) => Number(a[0]) - Number(b[0]));
+    if (pkg.indirect && levelRows.length) {
+      const rows = levelRows.map(([lv, amt]) =>
+        '<tr>' +
+          '<td><strong>Level ' + lv + '</strong></td>' +
+          '<td class="pkg-dl-amt">' + fmtMoney(amt) + '</td>' +
+        '</tr>'
+      ).join('');
+      levelsHtml =
+        '<h3>👥 Unilevel Referral Breakdown</h3>' +
+        '<p>Generational bonuses paid through your sponsor chain, on top of your direct referral bonus. Levels with a carry value are shown below.</p>' +
+        '<table class="pkg-details-table pkg-dl-breakdown"><thead>' +
+          '<tr><th>Level</th><th>Bonus / head</th></tr>' +
+        '</thead><tbody>' + rows + '</tbody></table>';
+    } else {
+      levelsHtml =
+        '<div class="pkg-dl-empty">This package does not include unilevel referral bonuses.</div>';
+    }
+
+    // ── Earning settings ──
+    const earn = [];
+    if (pkg.binary) {
+      earn.push(['⚖️ Binary Pairing Bonus',
+        fmtMoney(pkg.pair_amount) + ' per left-right pair &middot; capped at ' +
+        fmtMoney(pkg.pair_cap_amount) + '/day (' + Number(pkg.pair_cap) + ' pairs)']);
+    }
+    if (Number(pkg.direct_ref) > 0) {
+      earn.push(['🤝 Direct Referral Bonus', fmtMoney(pkg.direct_ref) + ' per recruit']);
+    }
+    if (pkg.dfi) {
+      earn.push(['📅 Daily Fixed Income', fmtMoney(pkg.dfi_amount) + '/day for ' + Number(pkg.dfi_days) + ' days']);
+    }
+    earn.push(['🔒 Lifetime Income Cap',
+      fmtMoney(pkg.cap_amount) + ' total &middot; ' + Number(pkg.cap_mult) + '&times; your entry fee']);
+    const earnHtml =
+      '<h3>Earning Settings</h3>' +
+      '<ul class="pkg-dl-list">' +
+      earn.map(function(r) {
+        return '<li><span class="pkg-dl-lbl">' + r[0] + '</span><span class="pkg-dl-val">' + r[1] + '</span></li>';
+      }).join('') +
+      '</ul>';
+
+    // ── Entry & payment settings ──
+    const entryRows = [
+['Entry fee', fmtMoney(pkg.entry) + ' <small>(one-time)</small>'],
+    ['Minimum payout', G.min_payout != null ? fmtMoney(G.min_payout) : '—'],
+      ['Reactivation fee', Number(pkg.react_fee) > 0 ? fmtMoney(pkg.react_fee) : '—'],
+      ['Reactivation window', Number(pkg.react_days) > 0 ? Number(pkg.react_days) + ' days after capping' : '—']
+    ];
+    const settleHtml =
+      '<h3>Entry &amp; Payment Settings</h3>' +
+      '<table class="pkg-details-table pkg-dl-settings"><tbody>' +
+      entryRows.map(function(r) {
+        return '<tr><td>' + r[0] + '</td><td class="pkg-dl-amt">' + r[1] + '</td></tr>';
+      }).join('') +
+      '</tbody></table>' +
+      '<p class="meta-line">' + (G.site_name || 'Our') + ' service fees and caps are reviewed periodically and may be updated by the platform.</p>';
+
+    const sub = document.getElementById('pkg-details-sub');
+    if (sub) sub.textContent = 'Full breakdown for the "' + pkg.name + '" package';
+    const body = document.getElementById('pkgDetailsBody');
+    if (body) body.innerHTML = levelsHtml + earnHtml + settleHtml;
+    openModal('modal-pkg-details');
+  }
 
   /* ── FAQ accordion ──────────────────────────────────────── */
   function toggleFaq(btn) {

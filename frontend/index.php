@@ -5,6 +5,9 @@ require_once __DIR__ . '/../models/Package.php';
 
 $base     = rtrim(APP_URL, '/');           // e.g. http://localhost/altas
 $frontend = $base . '/frontend';
+// Auto-cache-bust: version string = file modification time
+$styleV   = @filemtime(__DIR__ . '/style.css')  ?: 20260914;
+$scriptV  = @filemtime(__DIR__ . '/script.js')  ?: 20260914;
 
 // ── Load live settings ──
 $siteName        = setting('site_name', 'AltasFarm');
@@ -40,7 +43,20 @@ foreach ($packages as $p) {
         'dfi_amount'  => (float)$p['daily_fixed_income'],
         'dfi_days'    => (int)$p['daily_fixed_income_days'],
         'cap_mult'    => (float)$p['lifetime_cap_multiplier'],
+        'react_fee'   => (float)$p['reactivation_fee'],
+        'react_days'  => (int)$p['reactivation_window_days'],
+        'cap_amount'  => round($fee * (float)$p['lifetime_cap_multiplier'], 2),
+        'pair_cap_amount' => round((float)$p['pairing_bonus'] * (int)$p['daily_pair_cap'], 2),
+        'levels'      => [],
     ];
+    // Non-zero unilevel tiers for this package (primary detail-screen content)
+    if ((int)$p['indirect_referral_enabled'] === 1) {
+        $planFacts[$id]['levels'] = array_filter(
+            Package::getIndirectLevels($id),
+            fn($amt) => (float)$amt > 0
+        );
+        ksort($planFacts[$id]['levels']);
+    }
 }
 if ($minEntry === PHP_INT_MAX) $minEntry = 0;
 
@@ -255,7 +271,7 @@ $streamOxford = count($streamWords) > 2
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="<?= $frontend ?>/style.css?v=20260707">
+  <link rel="stylesheet" href="<?= $frontend ?>/style.css?v=<?= $styleV ?>">
 </head>
 
 <body>
@@ -558,8 +574,22 @@ $streamOxford = count($streamWords) > 2
         <div class="highlight-box">
           <p>For urgent account issues (locked account, incorrect withdrawal address), include your registered email and member ID in your message for faster resolution.</p>
         </div>
+</div>
 
+    </div>
+  </div>
+
+  <!-- ── Package Details Modal ─────────────────────────────────── -->
+  <div class="af-modal-backdrop" id="modal-pkg-details" role="dialog" aria-modal="true" aria-labelledby="pkg-details-title" onclick="closeModalOnBackdrop(event,'modal-pkg-details')">
+    <div class="af-modal">
+      <div class="af-modal-header">
+        <div>
+          <h2 id="pkg-details-title">Package Details</h2>
+          <p id="pkg-details-sub">Earning streams &amp; settings</p>
+        </div>
+        <button class="af-modal-close" onclick="closeModal('modal-pkg-details')" aria-label="Close">✕</button>
       </div>
+      <div class="af-modal-body" id="pkgDetailsBody"><!-- filled by openPkgDetails() --></div>
     </div>
   </div>
 
@@ -568,26 +598,6 @@ $streamOxford = count($streamWords) > 2
      SITE HEADER (fixed wrapper: contact strip + nav)
 ════════════════════════════════════════════════════════════ -->
   <header class="site-header">
-
-    <!-- CONTACT STRIP (gives crawlers a top-level address) -->
-    <div class="contact-strip" role="banner">
-      <div class="contact-strip-inner">
-        <a href="mailto:support@altasfarm.com" class="contact-item">
-          <span>✉</span> support@altasfarm.com
-        </a>
-        <?php if ($telegramUrl): ?>
-          <a href="<?= e($telegramUrl) ?>" target="_blank" rel="noopener" class="contact-item">
-            <span>✈</span> <?= e(preg_replace('#^https?://#', '', $telegramUrl)) ?>
-          </a>
-        <?php endif; ?>
-        <span class="contact-item">
-          <span>📍</span> Rang-ay, Cabatuan, Isabela, Philippines
-        </span>
-        <span class="contact-item">
-          <span>🕐</span> Mon–Sat · 8 AM–6 PM PST
-        </span>
-      </div>
-    </div>
 
     <!-- ════════════════════════════════════════════════════════
        NAV
@@ -944,13 +954,16 @@ $streamOxford = count($streamWords) > 2
       </div>
 
       <div class="pkg-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:2rem;margin-top:2rem;">
-        <?php foreach ($planFacts as $f): ?>
+        <?php foreach ($planFacts as $id => $f): ?>
           <div class="pkg-single fade-up" style="display:flex;flex-direction:column;border:2px solid var(--border-color);border-radius:var(--radius);overflow:hidden;">
             <div class="pkg-img">
               <img src="<?= $frontend ?>/pkg-starter.jpg" alt="<?= e($f['name']) ?>" loading="lazy">
             </div>
             <div class="pkg-body" style="display:flex;flex-direction:column;flex:1;padding:1.5rem;">
-              <div class="pkg-badge">🐣 <?= e($f['name']) ?></div>
+              <div class="pkg-title-row">
+                <div class="pkg-badge">🐣 <?= e($f['name']) ?></div>
+                <button type="button" class="pkg-details-btn" onclick="openPkgDetails(<?= $id ?>)">Details</button>
+              </div>
               <div class="pkg-price" style="font-size:1.75rem;margin:.5rem 0;"><?= fmt_money($f['entry']) ?> <small style="font-size:.5em;">one-time</small></div>
               <ul class="pkg-features" style="margin:1rem 0;padding-left:1.2rem;font-size:.85rem;">
                 <?php foreach (pkg_features($f) as [$lbl, $isOn, $detail]): ?>
@@ -1109,7 +1122,7 @@ $streamOxford = count($streamWords) > 2
         <!-- Brand column -->
         <div>
           <div class="footer-brand-name" itemprop="name"><?= e($siteName) ?></div>
-          <div class="footer-brand-desc" itemprop="description">A Philippine poultry network. <?= $pkgCount ?> entry packages with package-based earning streams, <?= count($payoutMethods) === 1 ? 'one payout currency' : count($payoutMethods) . ' payout methods' ?>, one community built on bayanihan.</div>
+          <div class="footer-brand-desc" itemprop="description"><a href="mailto:support@altasfarm.com" style="color:rgba(255,255,255,.75);">support@altasfarm.com</a><br>Mon–Sat, 8 AM–6 PM PST</div>
 
           <!-- Address (machine-readable for ScamAdviser / Schema) -->
           <address itemprop="address" itemscope itemtype="https://schema.org/PostalAddress"
@@ -1188,7 +1201,16 @@ $streamOxford = count($streamWords) > 2
   <!-- ════════════════════════════════════════════════════════════
      SCRIPTS
 ════════════════════════════════════════════════════════════ -->
-  <script src="<?= $frontend ?>/script.js"></script>
+  <script src="<?= $frontend ?>/script.js?v=<?= $scriptV ?>"></script>
+
+  <script>
+    /* ── Package-details modal data (built server-side) ── */
+    window.PKG_DETAILS = <?= json_encode($planFacts, JSON_PRESERVE_ZERO_FRACTION) ?>;
+    window.PKG_GLOBALS = <?= json_encode([
+        'site_name'    => $siteName,
+        'min_payout'   => $minPayout,
+    ]) ?>;
+  </script>
 
   <script>
     /* ── Sync fixed header height → CSS var so hero always clears it ── */
