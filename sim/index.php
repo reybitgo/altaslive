@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Binary MLM Simulator v5</title>
+    <title>Binary MLM Simulator v6</title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -338,8 +338,6 @@
         line-height: 1.5;
         margin-top: 2px;
       }
-
-      /* The combined slider + input row */
       .ctrl-row {
         display: flex;
         align-items: center;
@@ -376,18 +374,11 @@
         border-color: var(--accent-border);
         background: var(--surface-2);
       }
-      .num-input.purple:focus {
-        border-color: var(--purple-border);
+      .num-input.sm {
+        width: 68px;
       }
-      .num-input.pink:focus {
-        border-color: var(--pink-border);
-      }
-      .num-input.info-c:focus {
-        border-color: rgba(56, 189, 248, 0.4);
-      }
-      .num-input.err {
-        border-color: rgba(239, 68, 68, 0.6) !important;
-        background: var(--danger-dim) !important;
+      .num-input.mix-num {
+        width: 62px;
       }
 
       /* Range inputs */
@@ -422,26 +413,206 @@
         background: var(--accent);
         box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
       }
-      input[type="range"].purple-thumb::-webkit-slider-thumb {
-        background: var(--purple);
-        box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.2);
+
+      /* ─── PLAN EDITOR ─── */
+      .plan-card {
+        background: linear-gradient(135deg, var(--surface-1) 0%, #161d30 100%);
+        border: 1px solid var(--border-col);
+        border-radius: 14px;
+        padding: 1rem 1.125rem;
+        margin-bottom: 1rem;
+        position: relative;
       }
-      input[type="range"].purple-thumb::-moz-range-thumb {
-        background: var(--purple);
+      .plan-card.plan-a {
+        border-top: 3px solid var(--accent);
       }
-      input[type="range"].pink-thumb::-webkit-slider-thumb {
-        background: var(--pink);
-        box-shadow: 0 0 0 3px rgba(244, 114, 182, 0.2);
+      .plan-card.plan-b {
+        border-top: 3px solid var(--purple);
       }
-      input[type="range"].pink-thumb::-moz-range-thumb {
-        background: var(--pink);
+      .plan-card.plan-c {
+        border-top: 3px solid var(--pink);
       }
-      input[type="range"].info-thumb::-webkit-slider-thumb {
-        background: var(--info);
-        box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+      .plan-card-head {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem 1rem;
+        align-items: center;
+        margin-bottom: 0.875rem;
+        padding-right: 2.25rem;
       }
-      input[type="range"].info-thumb::-moz-range-thumb {
-        background: var(--info);
+      .plan-flags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.375rem 1rem;
+        align-items: center;
+        flex: 1 1 100%;
+        order: 30;
+      }
+      .plan-name {
+        flex: 1;
+        min-width: 130px;
+        background: var(--surface-3);
+        border: 1px solid var(--border-col);
+        border-radius: 7px;
+        color: #fff;
+        font-family: var(--font-display);
+        font-size: 13px;
+        font-weight: 600;
+        padding: 6px 10px;
+        outline: none;
+      }
+      .plan-name:focus {
+        border-color: var(--accent-border);
+      }
+      .plan-mix {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 170px;
+      }
+      .plan-switch {
+        margin-bottom: 0 !important;
+        font-size: 11.5px;
+        color: #94a3b8;
+        white-space: nowrap;
+        user-select: none;
+      }
+      .plan-switch .form-check-input {
+        width: 2.1em;
+        height: 1.05em;
+        margin-top: 0.05em;
+        cursor: pointer;
+        background-color: var(--surface-3);
+        border-color: var(--border-bright);
+      }
+      .plan-switch .form-check-input:checked {
+        background-color: var(--accent);
+        border-color: var(--accent);
+      }
+      .plan-switch.indirect .form-check-input:checked {
+        background-color: var(--purple);
+        border-color: var(--purple);
+      }
+      .plan-switch.dfi .form-check-input:checked {
+        background-color: var(--pink);
+        border-color: var(--pink);
+      }
+      .auto-rule {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 8px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .auto-rule-opt {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        cursor: pointer;
+        user-select: none;
+      }
+      .auto-rule-opt input {
+        accent-color: var(--accent);
+        cursor: pointer;
+        margin: 0;
+      }
+      .btn-rm {
+        position: absolute;
+        top: 0.7rem;
+        right: 0.7rem;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 1px solid var(--border-col);
+        background: var(--surface-3);
+        color: #94a3b8;
+        font-size: 12px;
+        line-height: 1;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.15s, color 0.15s, border-color 0.15s;
+        z-index: 2;
+      }
+      .btn-rm:hover {
+        background: var(--danger-dim);
+        color: var(--danger);
+        border-color: rgba(239, 68, 68, 0.4);
+      }
+      .plan-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 0.7rem 1rem;
+        align-items: end;
+      }
+      .plan-grid .si-label {
+        font-size: 10.5px;
+      }
+      .plan-grid .num-input {
+        width: 100%;
+      }
+      .hidden-field {
+        display: none !important;
+      }
+      .plv-row {
+        margin-top: 0.875rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--border-col);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .plv-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(76px, 1fr));
+        gap: 0.55rem;
+        max-width: 460px;
+      }
+      .plv-grid .plv {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        font-size: 10px;
+        color: var(--muted);
+        font-family: var(--font-mono);
+      }
+      .plv-grid .num-input {
+        width: 100%;
+      }
+      .plv-label {
+        font-size: 10.5px;
+        color: var(--muted);
+      }
+      .plan-mix-total {
+        font-size: 11px;
+        font-family: var(--font-mono);
+        color: var(--muted);
+      }
+      .plan-mix-total.ok {
+        color: var(--success);
+      }
+      .plan-mix-total.bad {
+        color: var(--danger);
+      }
+      .btn-plan-add {
+        width: 100%;
+        padding: 9px;
+        background: var(--surface-2);
+        border: 1px dashed var(--border-bright);
+        border-radius: 10px;
+        color: #94a3b8;
+        font-size: 12px;
+        font-weight: 600;
+        font-family: var(--font-display);
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .btn-plan-add:hover {
+        border-color: var(--accent-border);
+        color: var(--accent);
+        background: var(--accent-dim);
       }
 
       /* ─── RUN BUTTON ─── */
@@ -695,6 +866,147 @@
         font-weight: 700;
         font-family: var(--font-mono);
       }
+      .flow-caption {
+        font-size: 11.5px;
+        color: var(--muted);
+        font-family: var(--font-mono);
+        margin-top: 0.5rem;
+        line-height: 1.6;
+      }
+
+      .flow-caption-grid {
+        display: flex;
+        align-items: stretch;
+        gap: 10px;
+        overflow-x: auto;
+        margin-top: 0.5rem;
+        padding-bottom: 4px;
+        scrollbar-width: thin;
+        scrollbar-color: var(--surface-3) transparent;
+      }
+      .flow-caption-grid::-webkit-scrollbar {
+        height: 4px;
+      }
+      .flow-caption-grid::-webkit-scrollbar-thumb {
+        background: var(--surface-3);
+        border-radius: 2px;
+      }
+      .fc-chip {
+        flex: 0 0 240px;
+        background: var(--surface-2);
+        border: 1px solid var(--border-col);
+        border-radius: 10px;
+        padding: 0.7rem 0.8rem;
+      }
+      .fc-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+      .fc-name {
+        font-weight: 700;
+        font-size: 13px;
+        color: #fff;
+      }
+      .fc-mix {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--muted);
+        background: var(--surface-3);
+        border: 1px solid var(--border-col);
+        padding: 2px 7px;
+        border-radius: 999px;
+        white-space: nowrap;
+      }
+      .fc-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        font-size: 11.5px;
+        line-height: 2;
+      }
+      .fc-row span {
+        color: var(--muted);
+      }
+      .fc-row b {
+        font-family: var(--font-mono);
+        font-weight: 600;
+        color: #e2e8f0;
+        text-align: right;
+      }
+      .fc-flags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-top: 6px;
+        padding-top: 7px;
+        border-top: 1px dashed var(--border-col);
+      }
+      .fc-flag {
+        font-size: 10px;
+        font-weight: 600;
+        padding: 2px 7px;
+        border-radius: 999px;
+        white-space: nowrap;
+      }
+      .fc-flag.on {
+        background: rgba(16, 185, 129, 0.14);
+        color: var(--success);
+        border: 1px solid rgba(16, 185, 129, 0.35);
+      }
+      .fc-flag.off {
+        background: var(--surface-3);
+        color: var(--muted);
+        border: 1px solid var(--border-col);
+      }
+
+      .hero-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+      }
+      .hs-item {
+        background: var(--surface-1);
+        border: 1px solid var(--border-col);
+        border-radius: 12px;
+        padding: 0.95rem 1rem;
+        text-align: center;
+      }
+      .hs-lbl {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 7px;
+      }
+      .hs-val {
+        font-size: clamp(20px, 3vw, 28px);
+        font-weight: 700;
+        font-family: var(--font-mono);
+        line-height: 1;
+      }
+      .hs-val.white { color: #fff; }
+      .hs-val.green { color: var(--success); }
+      .hs-val.amber { color: var(--accent); }
+      .hs-val.info  { color: var(--info); }
+      .hs-val.slate { color: #94a3b8; }
+      .hs-sub {
+        font-size: 10.5px;
+        color: var(--muted);
+        margin-top: 6px;
+        line-height: 1.4;
+      }
+
+      .total-row td {
+        border-top: 2px solid var(--border-bright);
+        font-weight: 700;
+        color: #fff;
+        background: rgba(245, 158, 11, 0.07);
+      }
 
       .sim-divider {
         height: 1px;
@@ -719,6 +1031,9 @@
         font-size: 12px;
         min-width: 1050px;
         font-family: var(--font-mono);
+      }
+      table.compact {
+        min-width: 860px;
       }
       thead th {
         background: var(--surface-2);
@@ -748,6 +1063,9 @@
         text-align: center;
         color: var(--muted);
         font-size: 11px;
+      }
+      tbody td.left-td {
+        text-align: left;
       }
       tbody tr:last-child td {
         border-bottom: none;
@@ -847,9 +1165,9 @@
         .comp-plan-card {
           padding: 1rem;
         }
-        .num-input {
-          width: 72px;
-          font-size: 11px;
+        .plv-grid {
+          grid-template-columns: repeat(2, minmax(76px, 1fr));
+          max-width: 100%;
         }
       }
     </style>
@@ -859,11 +1177,13 @@
     <div class="app-header">
       <div class="container">
         <div class="app-badge">
-          <i class="bi bi-diagram-3-fill"></i> Binary MLM Simulator v5
+          <i class="bi bi-diagram-3-fill"></i> Binary MLM Simulator v6
         </div>
         <div class="app-title">Company Profit Calculator</div>
         <div class="app-subtitle">
-          <span class="tag">Binary pairing</span>
+          <span class="tag">Multi-plan join mix</span>
+          <span class="tag">Volume-based pairing</span>
+          <span class="tag">Per-plan toggles (binary · indirect · DFI)</span>
           <span class="tag">Income capping &amp; reactivation</span>
           <span class="tag">Daily fixed income</span>
           <span class="tag">Direct referral</span>
@@ -886,16 +1206,18 @@
             <i class="bi bi-person-plus-fill"></i>
           </div>
           <div class="comp-body">
-            <div class="comp-name">1 · Membership Entry</div>
+            <div class="comp-name">1 · Membership Entry + Plan Mix</div>
             <div class="comp-desc">
-              A new member pays the
-              <strong style="color: #e2e8f0">Entry Fee</strong> to join. A
-              portion covers the
-              <strong style="color: #e2e8f0">cost of goods</strong> (actual
-              product delivered). The remainder is the company's
-              <strong style="color: #e2e8f0">cash-in</strong> — working capital
-              from which all bonuses are paid. Every member is placed into the
-              binary tree using
+              Every new member buys one of the configured
+              <strong style="color: #e2e8f0">plans</strong>. Each day's new
+              members are split across plans by the
+              <strong style="color: #e2e8f0">join mix %</strong>. A portion of
+              the entry fee covers the
+              <strong style="color: #e2e8f0">cost of goods</strong> (global
+              product-cost %); the remainder is the company's
+              <strong style="color: #e2e8f0">cash-in</strong> — the working
+              capital from which all bonuses are paid. Every member is placed
+              into the binary tree using
               <strong style="color: #e2e8f0"
                 >Breadth-First (BFS) placement</strong
               >
@@ -911,21 +1233,50 @@
             <i class="bi bi-diagram-3-fill"></i>
           </div>
           <div class="comp-body">
-            <div class="comp-name">2 · Binary Pairing Bonus</div>
+            <div class="comp-name">2 · Binary Pairing (Volume-Based)</div>
             <div class="comp-desc">
               Each member has a
               <strong style="color: #e2e8f0">left leg</strong> and a
-              <strong style="color: #e2e8f0">right leg</strong>. Every time a
-              member gets one new recruit on each side, a
-              <strong style="color: #e2e8f0">pair</strong> is formed and earns
-              the <strong style="color: #e2e8f0">Pairing Bonus</strong>. A
+              <strong style="color: #e2e8f0">right leg</strong>. Every
+              <strong style="color: #c4b5fd">paid</strong> member contributes
+              their plan's <strong style="color: #e2e8f0">pair volume</strong>
+              (₱) into the matching leg of every upline ancestor. An ancestor
+              earns the
+              <strong style="color: #e2e8f0"
+                >minimum of its two legs' accumulated volume</strong
+              >, settled incrementally — so an unbalanced incoming volume
+              carries forward and matches in a later placement. A
               <strong style="color: #e2e8f0">daily pair cap</strong> limits
-              payable pairs per member per day — excess pairs are
+              payable volume per member per day
+              <em>(cap × own pair volume, in pesos)</em>; excess is
               <strong style="color: #fca5a5">flushed (permanently lost)</strong
-              >. Inactive members are skipped entirely.
+              >. Inactive and capped members are skipped and earn nothing (their
+              leg volume still accrues).
             </div>
             <span class="comp-badge amber"
-              >Pairs × Bonus (capped daily · active members only)</span
+              >Matched volume min(L,R) · Daily cap = cap × pair volume ₱</span
+            >
+          </div>
+        </div>
+        <div class="comp-row">
+          <div class="comp-icon purple">
+            <i class="bi bi-toggle-on"></i>
+          </div>
+          <div class="comp-body">
+            <div class="comp-name">3 · Per-Plan Compensation Toggles</div>
+            <div class="comp-desc">
+              Every plan carries the same switches as a production package:
+              <strong style="color: #e2e8f0">Binary</strong>
+              (<code>pairing_enabled</code>) ·
+              <strong style="color: #e2e8f0">Indirect</strong>
+              (<code>indirect_referral_enabled</code>) ·
+              <strong style="color: #e2e8f0">DFI</strong>
+              (<code>dfi_enabled</code>), plus a global Direct-referral switch.
+              Disabling a toggle turns that income stream off for the plan
+              exactly as it does in the live system.
+            </div>
+            <span class="comp-badge amber"
+              >Binary · Indirect · DFI — mirrored from packages</span
             >
           </div>
         </div>
@@ -934,34 +1285,28 @@
             <i class="bi bi-bar-chart-steps"></i>
           </div>
           <div class="comp-body">
-            <div class="comp-name">3 · Income Cap &amp; Reactivation</div>
+            <div class="comp-name">4 · Income Cap &amp; Reactivation</div>
             <div class="comp-desc">
-              Each member has a
+              Each member's
               <strong style="color: #e2e8f0">maximum total income cap</strong>
-              equal to the
-              <strong style="color: #c4b5fd">configured income cap</strong>
-              (₱50,000 by default). This cap applies to
+              is their plan's
+              <strong style="color: #c4b5fd"
+                >entry fee × lifetime cap multiplier</strong
+              >. The cap covers
               <strong style="color: #e2e8f0">all income types combined</strong>
-              — binary pairing bonuses, daily fixed income, direct referral,
-              and unilevel bonuses all count toward the cap. Once cumulative
-              earnings reach this limit, the account becomes
-              <strong style="color: #fca5a5">inactive</strong> — no pairing
-              bonuses, no daily fixed income, no direct referral, no unilevel:
-              the member earns nothing until reactivation. To resume, the
-              member pays the
-              <strong style="color: #e2e8f0">Reactivation Fee</strong>. Only
-              income earned <em>after</em> reactivation counts
-              toward the new cycle. If the member does not reactivate within the
-              <strong style="color: #e2e8f0">Reactivation Window</strong>, the
-              account becomes
+              — pairing, daily fixed income, direct referral and unilevel. Once
+              cumulative earnings reach this limit, the account becomes
+              <strong style="color: #fca5a5">inactive</strong> and earns nothing
+              until reactivation. To resume, the member pays the plan's
+              <strong style="color: #e2e8f0">Reactivation Fee</strong>; income
+              counters reset and only post-reactivation earnings count toward
+              the new cycle. Missing the
+              <strong style="color: #e2e8f0">Reactivation Window</strong> makes
+              the account
               <strong style="color: #fca5a5">permanently inactive</strong>.
-              Reactivation resets all earnings counters from zero.
             </div>
             <span class="comp-badge purple"
-              >Cap = Configurable Amount · Covers All Income Streams</span
-            >
-            <span class="comp-badge red" style="margin-left: 4px"
-              >Missed Window → Permanently Inactive</span
+              >Cap = Entry ₱ × Multiplier · Covers All Income Streams</span
             >
           </div>
         </div>
@@ -970,20 +1315,16 @@
             <i class="bi bi-calendar-check-fill"></i>
           </div>
           <div class="comp-body">
-            <div class="comp-name">4 · Daily Fixed Income</div>
+            <div class="comp-name">5 · Daily Fixed Income</div>
             <div class="comp-desc">
-              Every <strong style="color: #e2e8f0">active</strong> member earns
-              a <strong style="color: #e2e8f0">fixed daily amount</strong> for
-              up to a set number of days (the
-              <strong style="color: #e2e8f0">Daily Income Duration</strong>).
-              The daily fixed income is also subject to the
-              <strong style="color: #e2e8f0">total income cap</strong> — it
-              stops permanently if either the duration limit is exhausted
-              <em>or</em> the member's cumulative earnings hit the income cap,
-              whichever comes first. Days while inactive do <em>not</em> count —
-              the duration clock pauses and resumes on reactivation (but the cap
-              resets on reactivation, so fresh DFI can be earned in the new
-              cycle).
+              Every <strong style="color: #e2e8f0">active</strong> member on a
+              DFI-enabled plan earns a
+              <strong style="color: #e2e8f0">fixed daily amount</strong> for up
+              to the plan's set number of days. DFI also counts toward the
+              income cap — it stops at either the duration limit
+              <em>or</em> the cap, whichever comes first. Days while inactive do
+              <strong>not</strong> count; the clock pauses and resumes on
+              reactivation (with a fresh daily cycle).
             </div>
             <span
               class="comp-badge"
@@ -1001,14 +1342,15 @@
             <i class="bi bi-person-check-fill"></i>
           </div>
           <div class="comp-body">
-            <div class="comp-name">5 · Direct Referral Bonus</div>
+            <div class="comp-name">6 · Direct Referral Bonus</div>
             <div class="comp-desc">
               When a member directly recruits a new member, the sponsor
               immediately receives the
-              <strong style="color: #e2e8f0">Direct Referral Bonus</strong> — a
-              one-time cash payment per new recruit, paid at registration only
-              while the sponsor is active and under the income cap. Once the
-              sponsor's cap is reached, further referral bonuses are
+              <strong style="color: #e2e8f0">Direct Referral Bonus</strong> —
+              a one-time cash payment per recruit, the amount coming from the
+              <strong style="color: #e2e8f0">new member's plan</strong>. Paid at
+              registration only while the sponsor is active and under the income
+              cap; once capped, further referral bonuses are
               <strong style="color: #fca5a5">blocked</strong>.
             </div>
             <span class="comp-badge green"
@@ -1019,16 +1361,18 @@
         <div class="comp-row">
           <div class="comp-icon blue"><i class="bi bi-layers-fill"></i></div>
           <div class="comp-body">
-            <div class="comp-name">6 · Unilevel Bonus (Up to 10 Levels)</div>
+            <div class="comp-name">7 · Unilevel Bonus (Up to 10 Levels)</div>
             <div class="comp-desc">
-              When a new member joins, a
+              When a new member on an indirect-enabled plan joins, a
               <strong style="color: #e2e8f0">unilevel bonus</strong> flows up
               the <strong style="color: #e2e8f0">sponsor chain</strong>. L1
-              (direct sponsor) gets the most; higher levels get less. Configured
-              separately for L1, L2, L3, L4–5, L6–10. Limited by the
-              <strong style="color: #e2e8f0">Avg Sponsor Depth</strong> setting.
-              Each upline receives their share only while active and under the
-              income cap.
+              (direct sponsor) gets the most; higher levels get less. The
+              per-level amounts come from the
+              <strong style="color: #e2e8f0">new member's plan</strong> (L1–L10
+              config), and the
+              <strong style="color: #e2e8f0">Avg Sponsor Depth</strong> setting
+              stands in for the average real chain length. Each upline receives
+              their share only while active and under the income cap.
             </div>
             <span
               class="comp-badge"
@@ -1046,15 +1390,16 @@
             <i class="bi bi-shield-exclamation"></i>
           </div>
           <div class="comp-body">
-            <div class="comp-name">7 · Flush-Out Protection (Daily Cap)</div>
+            <div class="comp-name">8 · Flush-Out Protection (Daily Cap)</div>
             <div class="comp-desc">
-              If pairs on a given day exceed the daily cap, excess pairs are
+              If matched volume on a given day exceeds the daily pair cap, the
+              excess is
               <strong style="color: #fca5a5">flushed</strong> — not paid, not
               carried forward. This controls runaway payouts on high-growth days
               and protects company cash flow.
             </div>
             <span class="comp-badge red"
-              >Excess Pairs = Lost Permanently · No Carry-Forward</span
+              >Excess Volume = Lost Permanently · No Carry-Forward</span
             >
           </div>
         </div>
@@ -1064,24 +1409,34 @@
       <div class="note-box mb-4">
         <i class="bi bi-info-circle me-2" style="color: var(--accent)"></i>
         <strong style="color: #e2e8f0">Simulator mechanics:</strong>
-        Binary tree uses BFS placement. Inactive members are
-        <strong>skipped</strong> in pair counting — their sub-tree nodes exist
-        but contribute no bonuses to that member. The
-        <strong style="color: #c4b5fd">income cap is a configurable amount</strong
-        > (₱50,000 by default) and covers <strong>all earnings combined</strong>:
-        binary pairing bonuses + daily fixed income + direct referral + unilevel.
-        When the cap is reached, all income streams stop and the member earns
-        nothing. Reactivation is probabilistic: each
-        capped member reactivates (based on rate %) on the day after capping;
-        reactivation resets all earnings counters to zero for a fresh cycle.
-        Daily fixed income stops at either the duration limit OR when the
-        combined cap is reached — whichever comes first. Product cost is
-        subtracted from gross entry to derive actual company cash. Daily pair
-        cap: excess pairs are
-        <strong style="color: #fca5a5">lost permanently</strong>.
-        <strong style="color: #e2e8f0">Tip:</strong> Adjust via
-        <strong>slider</strong> or type directly into the number field — both
-        are fully synced.
+        Binary tree uses BFS placement; the sponsor chain uses a
+        <strong>linear, enrollment-order proxy</strong> (member i is sponsored
+        by member i−1) — an aggregate stand-in for a real branching sponsorship
+        graph, with <strong>Avg Sponsor Depth</strong> modeling the average
+        chain length. Pairing is
+        <strong style="color: #c4b5fd">volume-based</strong>: each paid member
+        injects their plan's pair volume into every ancestor's leg, and an
+        ancestor earns matched volume up to a daily cap of
+        <em>plan daily pair cap × plan pair volume</em> pesos; daily overflow is
+        <strong style="color: #fca5a5"
+          >flushed permanently (no carry-forward)</strong
+        >. The income cap is per-plan:
+        <code>entry fee × lifetime cap multiplier</code>, covering all income
+        types combined; on cap the member earns nothing until reactivation
+        (counters reset), and missing the window makes the account permanently
+        inactive. New members on a plan with the <em>Binary</em> toggle off
+        contribute no pair volume and trigger no pairing payouts; with
+        <em>Indirect</em> off no unilevel is paid for their join; with
+        <em>DFI</em> off they earn no daily fixed income. Leg counts always
+        increment. VIP bypass columns (<code>capping_bypass</code> /
+        <code>daily_cap_bypass</code>) are not modeled. The
+        <strong style="color: #e2e8f0">CD split</strong>
+        (<code>user_cd_status</code>) is intentionally not modeled.
+        <strong style="color: #e2e8f0">Tip:</strong> plan fields are number
+        inputs; join mix uses slider + number (auto-synced). Join mix is
+        auto-normalized if it does not total 100% — or turn on
+        <strong style="color: #e2e8f0">Auto join mix</strong> to compute it
+        from plan count / entry fees automatically.
       </div>
 
       <!-- ══════════ PRESETS ══════════ -->
@@ -1100,45 +1455,31 @@
           <i class="bi bi-trophy me-1"></i>High Cap
         </button>
         <button class="preset-btn" onclick="applyPreset('highref', this)">
-          <i class="bi bi-people me-1"></i>High Referral
+          <i class="bi bi-people me-1"></i>Referral-Only
         </button>
         <button class="preset-btn" onclick="applyPreset('fixedheavy', this)">
           <i class="bi bi-calendar-week me-1"></i>Fixed-Heavy
         </button>
       </div>
 
-      <!-- ══════════ CARD 1: Entry & Pairing ══════════ -->
+      <!-- ══════════ CARD 1: PLAN CONFIGURATION ══════════ -->
       <div class="sim-card mb-3">
         <div class="card-heading">
-          <i class="bi bi-currency-exchange"></i> Entry &amp; Pairing
+          <i class="bi bi-cpu"></i> Plan Configuration
+          <span class="plan-mix-total ms-auto" id="mix-total"></span>
+        </div>
+        <div id="plans"></div>
+        <button class="btn-plan-add" onclick="addPlan()" id="btn-add-plan">
+          <i class="bi bi-plus-lg me-1"></i>Add Plan
+        </button>
+      </div>
+
+      <!-- ══════════ CARD 2: GLOBAL SETTINGS ══════════ -->
+      <div class="sim-card mb-3">
+        <div class="card-heading">
+          <i class="bi bi-toggles"></i> Global Settings
         </div>
         <div class="row g-3">
-          <div class="col-12 col-sm-6 col-lg-3">
-            <div class="si">
-              <div class="si-label">Entry fee (₱)</div>
-              <div class="ctrl-row">
-                <input
-                  type="range"
-                  id="s-entry"
-                  min="500"
-                  max="100000"
-                  step="500"
-                  value="10000"
-                  oninput="syncFromSlider('entry')"
-                />
-                <input
-                  type="number"
-                  class="num-input"
-                  id="n-entry"
-                  value="10000"
-                  min="500"
-                  max="100000"
-                  step="500"
-                  oninput="syncFromNum('entry')"
-                />
-              </div>
-            </div>
-          </div>
           <div class="col-12 col-sm-6 col-lg-3">
             <div class="si">
               <div class="si-label">Product cost %</div>
@@ -1163,180 +1504,17 @@
                   oninput="syncFromNum('pcost')"
                 />
               </div>
-              <div class="si-hint">% of entry fee covering real goods cost</div>
-            </div>
-          </div>
-          <div class="col-12 col-sm-6 col-lg-3">
-            <div class="si">
-              <div class="si-label">Pairing bonus (₱)</div>
-              <div class="ctrl-row">
-                <input
-                  type="range"
-                  id="s-bonus"
-                  min="100"
-                  max="20000"
-                  step="100"
-                  value="1500"
-                  oninput="syncFromSlider('bonus')"
-                />
-                <input
-                  type="number"
-                  class="num-input"
-                  id="n-bonus"
-                  value="1500"
-                  min="100"
-                  max="20000"
-                  step="100"
-                  oninput="syncFromNum('bonus')"
-                />
-              </div>
-            </div>
-          </div>
-          <div class="col-12 col-sm-6 col-lg-3">
-            <div class="si">
-              <div class="si-label">Daily pair cap</div>
-              <div class="ctrl-row">
-                <input
-                  type="range"
-                  id="s-cap"
-                  min="1"
-                  max="30"
-                  step="1"
-                  value="3"
-                  oninput="syncFromSlider('cap')"
-                />
-                <input
-                  type="number"
-                  class="num-input"
-                  id="n-cap"
-                  value="3"
-                  min="1"
-                  max="30"
-                  step="1"
-                  oninput="syncFromNum('cap')"
-                />
-              </div>
-              <div class="si-hint">max pairs/member/day — excess flushed</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ══════════ CARD 2: Income Cap & Reactivation ══════════ -->
-      <div class="sim-card mb-3" style="border-color: var(--purple-border)">
-        <div class="card-heading">
-          <i class="bi bi-shield-lock-fill purple"></i> Income Capping &amp;
-          Reactivation
-        </div>
-        <div class="row g-3">
-          <!-- Adjustable income cap -->
-          <div class="col-12 col-sm-6 col-lg-3">
-            <div class="si">
-              <div class="si-label" style="color: var(--purple)">
-                Total income cap (₱)
-              </div>
-              <div class="ctrl-row">
-                <input
-                  type="range"
-                  class="purple-thumb"
-                  id="s-incap"
-                  min="1000"
-                  max="1000000"
-                  step="1000"
-                  value="50000"
-                  oninput="syncFromSlider('incap')"
-                />
-                <input
-                  type="number"
-                  class="num-input purple"
-                  id="n-incap"
-                  value="50000"
-                  min="1000"
-                  max="1000000"
-                  step="1000"
-                  oninput="syncFromNum('incap')"
-                />
-              </div>
               <div class="si-hint">
-                applies to
-                <strong style="color: #c4b5fd">all income types</strong>
-                combined: pairing + daily fixed + referral + unilevel
+                % of entry fee covering real goods cost (all plans)
               </div>
             </div>
           </div>
           <div class="col-12 col-sm-6 col-lg-3">
             <div class="si">
-              <div class="si-label" style="color: var(--purple)">
-                Reactivation fee (₱)
-              </div>
+              <div class="si-label">Reactivation rate %</div>
               <div class="ctrl-row">
                 <input
                   type="range"
-                  class="purple-thumb"
-                  id="s-reactfee"
-                  min="0"
-                  max="50000"
-                  step="500"
-                  value="10000"
-                  oninput="syncFromSlider('reactfee')"
-                />
-                <input
-                  type="number"
-                  class="num-input purple"
-                  id="n-reactfee"
-                  value="10000"
-                  min="0"
-                  max="50000"
-                  step="500"
-                  oninput="syncFromNum('reactfee')"
-                />
-              </div>
-              <div class="si-hint">
-                fee paid by member to reactivate their account
-              </div>
-            </div>
-          </div>
-          <div class="col-12 col-sm-6 col-lg-3">
-            <div class="si">
-              <div class="si-label" style="color: var(--purple)">
-                Reactivation window (days)
-              </div>
-              <div class="ctrl-row">
-                <input
-                  type="range"
-                  class="purple-thumb"
-                  id="s-reactwin"
-                  min="1"
-                  max="180"
-                  step="1"
-                  value="15"
-                  oninput="syncFromSlider('reactwin')"
-                />
-                <input
-                  type="number"
-                  class="num-input purple"
-                  id="n-reactwin"
-                  value="15"
-                  min="1"
-                  max="180"
-                  step="1"
-                  oninput="syncFromNum('reactwin')"
-                />
-              </div>
-              <div class="si-hint">
-                days to reactivate before permanent deactivation
-              </div>
-            </div>
-          </div>
-          <div class="col-12 col-sm-6 col-lg-3">
-            <div class="si">
-              <div class="si-label" style="color: var(--purple)">
-                Reactivation rate %
-              </div>
-              <div class="ctrl-row">
-                <input
-                  type="range"
-                  class="purple-thumb"
                   id="s-reactrate"
                   min="0"
                   max="100"
@@ -1346,7 +1524,7 @@
                 />
                 <input
                   type="number"
-                  class="num-input purple"
+                  class="num-input"
                   id="n-reactrate"
                   value="100"
                   min="0"
@@ -1360,401 +1538,62 @@
               </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      <!-- ══════════ CARD 3: Daily Fixed Income ══════════ -->
-      <div class="sim-card mb-3" style="border-color: var(--pink-border)">
-        <div class="card-heading">
-          <i class="bi bi-calendar-week-fill pink"></i> Daily Fixed Income
-        </div>
-        <div class="row g-3">
-          <div class="col-12 col-sm-6">
+          <div class="col-12 col-sm-6 col-lg-3">
             <div class="si">
-              <div class="si-label" style="color: var(--pink)">
-                Daily fixed income (₱/day)
+              <div class="si-label" style="margin-bottom: 8px">
+                Direct referral (global)
               </div>
-              <div class="ctrl-row">
+              <label class="form-check form-switch plan-switch" id="sw-direct-wrap">
                 <input
-                  type="range"
-                  class="pink-thumb"
-                  id="s-dfi"
-                  min="0"
-                  max="5000"
-                  step="1"
-                  value="33"
-                  oninput="syncFromSlider('dfi')"
+                  class="form-check-input"
+                  type="checkbox"
+                  id="sw-direct"
+                  checked
                 />
+                <span class="form-check-label"
+                  >Pay direct referral on joins</span
+                >
+              </label>
+              <div class="si-hint">
+                master switch — plan amounts still apply per join
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-sm-6 col-lg-3">
+            <div class="si">
+              <div class="si-label" style="margin-bottom: 8px">
+                Auto join mix
+              </div>
+              <label class="form-check form-switch plan-switch" id="sw-automix-wrap">
                 <input
-                  type="number"
-                  class="num-input pink"
-                  id="n-dfi"
-                  value="33"
-                  min="0"
-                  max="5000"
-                  step="1"
-                  oninput="syncFromNum('dfi')"
+                  class="form-check-input"
+                  type="checkbox"
+                  id="sw-automix"
+                  checked
                 />
+                <span class="form-check-label">Auto-compute</span>
+              </label>
+              <div class="auto-rule">
+                <label class="auto-rule-opt"
+                  ><input type="radio" name="automix-rule" value="equal" checked />
+                  Equal split</label
+                >
+                <label class="auto-rule-opt"
+                  ><input type="radio" name="automix-rule" value="entry" />
+                  Inverse entry</label
+                >
               </div>
               <div class="si-hint">
-                paid to each active member per day · set 0 to disable
-              </div>
-            </div>
-          </div>
-          <div class="col-12 col-sm-6">
-            <div class="si">
-              <div class="si-label" style="color: var(--pink)">
-                Max income days
-              </div>
-              <div class="ctrl-row">
-                <input
-                  type="range"
-                  class="pink-thumb"
-                  id="s-dfidays"
-                  min="7"
-                  max="3000"
-                  step="1"
-                  value="1515"
-                  oninput="syncFromSlider('dfidays')"
-                />
-                <input
-                  type="number"
-                  class="num-input pink"
-                  id="n-dfidays"
-                  value="1515"
-                  min="7"
-                  max="3000"
-                  step="1"
-                  oninput="syncFromNum('dfidays')"
-                />
-              </div>
-              <div class="si-hint">
-                max days of fixed income per member · clock pauses while
-                inactive
+                Computes each plan's join % automatically — equal split, or
+                weighted by inverse entry fee so cheaper plans take more joins.
+                Auto-normalized to 100%.
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- ══════════ CARD 4: Referral Commissions ══════════ -->
-      <div class="sim-card mb-3">
-        <div class="card-heading">
-          <i class="bi bi-person-plus"></i> Referral Commissions
-        </div>
-        <div class="row g-3">
-          <!-- Direct Referral -->
-          <div class="col-12 col-sm-6 col-lg-3">
-            <div class="si">
-              <div class="si-label">Direct referral (₱)</div>
-              <div class="ctrl-row">
-                <input
-                  type="range"
-                  id="s-direct"
-                  min="0"
-                  max="10000"
-                  step="50"
-                  value="1000"
-                  oninput="syncFromSlider('direct')"
-                />
-                <input
-                  type="number"
-                  class="num-input"
-                  id="n-direct"
-                  value="1000"
-                  min="0"
-                  max="10000"
-                  step="1"
-                  oninput="syncFromNum('direct')"
-                />
-              </div>
-              <div class="si-hint">paid to direct sponsor on each new join</div>
-            </div>
-          </div>
-
-          <!-- L1 -->
-          <div class="col-12 col-sm-6 col-lg-3">
-            <div class="si">
-              <div class="si-label">Unilevel L1 (₱)</div>
-              <div class="ctrl-row">
-                <input
-                  type="range"
-                  id="s-ul1"
-                  min="0"
-                  max="3000"
-                  step="10"
-                  value="0"
-                  oninput="syncFromSlider('ul1')"
-                />
-                <input
-                  type="number"
-                  class="num-input"
-                  id="n-ul1"
-                  value="0"
-                  min="0"
-                  max="3000"
-                  step="1"
-                  oninput="syncFromNum('ul1')"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- L2 -->
-          <div class="col-12 col-sm-6 col-lg-3">
-            <div class="si">
-              <div class="si-label">Unilevel L2 (₱)</div>
-              <div class="ctrl-row">
-                <input
-                  type="range"
-                  id="s-ul2"
-                  min="0"
-                  max="2000"
-                  step="10"
-                  value="0"
-                  oninput="syncFromSlider('ul2')"
-                />
-                <input
-                  type="number"
-                  class="num-input"
-                  id="n-ul2"
-                  value="0"
-                  min="0"
-                  max="2000"
-                  step="1"
-                  oninput="syncFromNum('ul2')"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- L3 -->
-          <div class="col-12 col-sm-6 col-lg-3">
-            <div class="si">
-              <div class="si-label">Unilevel L3 (₱)</div>
-              <div class="ctrl-row">
-                <input
-                  type="range"
-                  id="s-ul3"
-                  min="0"
-                  max="1000"
-                  step="10"
-                  value="0"
-                  oninput="syncFromSlider('ul3')"
-                />
-                <input
-                  type="number"
-                  class="num-input"
-                  id="n-ul3"
-                  value="0"
-                  min="0"
-                  max="1000"
-                  step="1"
-                  oninput="syncFromNum('ul3')"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- L4 -->
-          <div class="col-12 col-sm-6 col-lg-3">
-            <div class="si">
-              <div class="si-label">Unilevel L4 (₱)</div>
-              <div class="ctrl-row">
-                <input
-                  type="range"
-                  id="s-ul4"
-                  min="0"
-                  max="500"
-                  step="10"
-                  value="0"
-                  oninput="syncFromSlider('ul4')"
-                />
-                <input
-                  type="number"
-                  class="num-input"
-                  id="n-ul4"
-                  value="0"
-                  min="0"
-                  max="500"
-                  step="1"
-                  oninput="syncFromNum('ul4')"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- L5 -->
-          <div class="col-12 col-sm-6 col-lg-3">
-            <div class="si">
-              <div class="si-label">Unilevel L5 (₱)</div>
-              <div class="ctrl-row">
-                <input
-                  type="range"
-                  id="s-ul5"
-                  min="0"
-                  max="500"
-                  step="10"
-                  value="0"
-                  oninput="syncFromSlider('ul5')"
-                />
-                <input
-                  type="number"
-                  class="num-input"
-                  id="n-ul5"
-                  value="0"
-                  min="0"
-                  max="500"
-                  step="1"
-                  oninput="syncFromNum('ul5')"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- L6 -->
-          <div class="col-12 col-sm-6 col-lg-3">
-            <div class="si">
-              <div class="si-label">Unilevel L6 (₱)</div>
-              <div class="ctrl-row">
-                <input
-                  type="range"
-                  id="s-ul6"
-                  min="0"
-                  max="300"
-                  step="10"
-                  value="0"
-                  oninput="syncFromSlider('ul6')"
-                />
-                <input
-                  type="number"
-                  class="num-input"
-                  id="n-ul6"
-                  value="0"
-                  min="0"
-                  max="300"
-                  step="1"
-                  oninput="syncFromNum('ul6')"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- L7 -->
-          <div class="col-12 col-sm-6 col-lg-3">
-            <div class="si">
-              <div class="si-label">Unilevel L7 (₱)</div>
-              <div class="ctrl-row">
-                <input
-                  type="range"
-                  id="s-ul7"
-                  min="0"
-                  max="300"
-                  step="10"
-                  value="0"
-                  oninput="syncFromSlider('ul7')"
-                />
-                <input
-                  type="number"
-                  class="num-input"
-                  id="n-ul7"
-                  value="0"
-                  min="0"
-                  max="300"
-                  step="1"
-                  oninput="syncFromNum('ul7')"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- L8 -->
-          <div class="col-12 col-sm-6 col-lg-3">
-            <div class="si">
-              <div class="si-label">Unilevel L8 (₱)</div>
-              <div class="ctrl-row">
-                <input
-                  type="range"
-                  id="s-ul8"
-                  min="0"
-                  max="300"
-                  step="10"
-                  value="0"
-                  oninput="syncFromSlider('ul8')"
-                />
-                <input
-                  type="number"
-                  class="num-input"
-                  id="n-ul8"
-                  value="0"
-                  min="0"
-                  max="300"
-                  step="1"
-                  oninput="syncFromNum('ul8')"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- L9 -->
-          <div class="col-12 col-sm-6 col-lg-3">
-            <div class="si">
-              <div class="si-label">Unilevel L9 (₱)</div>
-              <div class="ctrl-row">
-                <input
-                  type="range"
-                  id="s-ul9"
-                  min="0"
-                  max="300"
-                  step="10"
-                  value="0"
-                  oninput="syncFromSlider('ul9')"
-                />
-                <input
-                  type="number"
-                  class="num-input"
-                  id="n-ul9"
-                  value="0"
-                  min="0"
-                  max="300"
-                  step="1"
-                  oninput="syncFromNum('ul9')"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- L10 -->
-          <div class="col-12 col-sm-6 col-lg-3">
-            <div class="si">
-              <div class="si-label">Unilevel L10 (₱)</div>
-              <div class="ctrl-row">
-                <input
-                  type="range"
-                  id="s-ul10"
-                  min="0"
-                  max="300"
-                  step="10"
-                  value="0"
-                  oninput="syncFromSlider('ul10')"
-                />
-                <input
-                  type="number"
-                  class="num-input"
-                  id="n-ul10"
-                  value="0"
-                  min="0"
-                  max="300"
-                  step="1"
-                  oninput="syncFromNum('ul10')"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ══════════ CARD 5: Growth Parameters ══════════ -->
+      <!-- ══════════ CARD 3: GROWTH PARAMETERS ══════════ -->
       <div class="sim-card mb-4">
         <div class="card-heading">
           <i class="bi bi-graph-up-arrow info"></i> Growth Parameters
@@ -1766,7 +1605,6 @@
               <div class="ctrl-row">
                 <input
                   type="range"
-                  class="info-thumb"
                   id="s-maxm"
                   min="100"
                   max="50000"
@@ -1776,7 +1614,7 @@
                 />
                 <input
                   type="number"
-                  class="num-input info-c"
+                  class="num-input"
                   id="n-maxm"
                   value="1000"
                   min="100"
@@ -1793,7 +1631,6 @@
               <div class="ctrl-row">
                 <input
                   type="range"
-                  class="info-thumb"
                   id="s-npd"
                   min="1"
                   max="2000"
@@ -1803,7 +1640,7 @@
                 />
                 <input
                   type="number"
-                  class="num-input info-c"
+                  class="num-input"
                   id="n-npd"
                   value="50"
                   min="1"
@@ -1820,7 +1657,6 @@
               <div class="ctrl-row">
                 <input
                   type="range"
-                  class="info-thumb"
                   id="s-depth"
                   min="1"
                   max="10"
@@ -1830,7 +1666,7 @@
                 />
                 <input
                   type="number"
-                  class="num-input info-c"
+                  class="num-input"
                   id="n-depth"
                   value="4"
                   min="1"
@@ -1881,8 +1717,39 @@
           <div class="hero-sub" id="r-margin">—</div>
         </div>
 
-        <div class="sec-label mb-2">Money Flow Per Member Registration</div>
-        <div class="flow-strip mb-4" id="flow-cards"></div>
+        <div class="hero-stats mb-4">
+          <div class="hs-item">
+            <div class="hs-lbl"><i class="bi bi-people me-1"></i>Accounts encoded</div>
+            <div class="hs-val white" id="r-members">0</div>
+            <div class="hs-sub">total members, all plans</div>
+          </div>
+          <div class="hs-item">
+            <div class="hs-lbl"><i class="bi bi-person-check me-1"></i>Active now</div>
+            <div class="hs-val green" id="r-active">0</div>
+            <div class="hs-sub">currently earning</div>
+          </div>
+          <div class="hs-item">
+            <div class="hs-lbl"><i class="bi bi-pause-circle me-1"></i>Capped now</div>
+            <div class="hs-val amber" id="r-capped-now">0</div>
+            <div class="hs-sub" id="r-capped-now-s">in reactivation window</div>
+          </div>
+          <div class="hs-item">
+            <div class="hs-lbl"><i class="bi bi-person-x me-1"></i>Permanently inactive</div>
+            <div class="hs-val slate" id="r-perm-now">0</div>
+            <div class="hs-sub">missed reactivation window</div>
+          </div>
+          <div class="hs-item">
+            <div class="hs-lbl"><i class="bi bi-calendar3 me-1"></i>Days</div>
+            <div class="hs-val info" id="r-days-hero">0</div>
+            <div class="hs-sub">simulation duration</div>
+          </div>
+        </div>
+
+        <div class="sec-label mb-2">
+          Money Flow Per Member Registration (mix-weighted avg)
+        </div>
+        <div class="flow-strip mb-1" id="flow-cards"></div>
+        <div class="flow-caption-grid mb-4" id="flow-caption"></div>
 
         <div class="section-divider">
           <div class="sd-line"></div>
@@ -2034,19 +1901,19 @@
           <div class="col-6 col-lg-3">
             <div class="mc c">
               <div class="ml">
-                <i class="bi bi-check2-circle me-1"></i>Pairs paid out
+                <i class="bi bi-check2-circle me-1"></i>Pair settlements
               </div>
               <div class="mv" id="r-pairs-n">0</div>
-              <div class="ms">bonus-earning pairs</div>
+              <div class="ms">ancestor matched-volume payments</div>
             </div>
           </div>
           <div class="col-6 col-lg-3">
             <div class="mc d">
               <div class="ml">
-                <i class="bi bi-x-circle me-1"></i>Pairs flushed
+                <i class="bi bi-x-circle me-1"></i>Flush events
               </div>
               <div class="mv" id="r-flushed">0</div>
-              <div class="ms">lost to daily cap</div>
+              <div class="ms" id="r-flushed-s"></div>
             </div>
           </div>
           <div class="col-6 col-lg-3">
@@ -2055,7 +1922,7 @@
                 <i class="bi bi-shield-check me-1"></i>Flush saved company
               </div>
               <div class="mv" id="r-saved">₱0</div>
-              <div class="ms">flush-out protection value</div>
+              <div class="ms">daily-cap flush value in pesos</div>
             </div>
           </div>
           <div class="col-6 col-lg-3">
@@ -2102,6 +1969,33 @@
               <div class="mv" id="r-comratio">0%</div>
               <div class="ms">of gross entry revenue</div>
             </div>
+          </div>
+        </div>
+
+        <div class="sim-divider"></div>
+        <div class="sec-label mb-2">
+          <i class="bi bi-table me-2"></i>Plan Breakdown
+        </div>
+        <div class="sim-card p-0 mb-4" style="overflow: hidden">
+          <div class="tbl-wrap">
+            <table class="compact">
+              <thead>
+                <tr>
+                  <th>Plan</th>
+                  <th>Mix %</th>
+                  <th>Members</th>
+                  <th>% pop</th>
+                  <th>Entry (₱)</th>
+                  <th>Goods (₱)</th>
+                  <th>Direct (₱)</th>
+                  <th>Unilevel (₱)</th>
+                  <th>Pairing (₱)</th>
+                  <th>DFI (₱)</th>
+                  <th>Total out (₱)</th>
+                </tr>
+              </thead>
+              <tbody id="plan-tbl-body"></tbody>
+            </table>
           </div>
         </div>
 
@@ -2155,204 +2049,329 @@
     <script>
       // ══════════════════════════════════════════
       //  PRESETS
-      //  Default rationale:
-      //    Entry ₱10,000 · 30% goods → cash-in ₱7,000/member
-      //    Pairing ₱1,500 · cap 3/day → max ₱4,500 payout risk
-      //    Income cap ₱50,000 = all income types combined (fair ceiling)
-      //    Reactivation fee ₱10,000 (100% of entry, high barrier)
-      //    Window 15 days (reasonable deadline)
-      //    Reactrate 100% (all capped members choose to re-up)
-      //    DFI ₱33/day × 1,515 days = ₱50,000 max fixed income per member
-      //    Direct ₱1,000 · Unilevel ₱0 across all levels (L1–L10 off)
-      //    Max 1,000 members · 50 new/day · avg depth 4
+      //  Each preset is a set of plans (with join mix) + global controls.
+      //  Default mirrors tmp/pckgs/pckgs.json — the seeded live package
+      //  lineup (Basic → Platinum, entry ₱5k–₱1M, per-plan binary/indirect/
+      //  DFI toggles, unilevel L1–L4, lifetime cap 3×–5× entry).
       // ══════════════════════════════════════════
       const PRESETS = {
         default: {
-          entry: 10000,
           pcost: 30,
-          bonus: 1500,
-          cap: 3,
-          incap: 50000,
-          reactfee: 10000,
-          reactwin: 15,
-          reactrate: 100,
-          dfi: 33,
-          dfidays: 1515,
-          direct: 1000,
-          ul1: 0,
-          ul2: 0,
-          ul3: 0,
-          ul4: 0,
-          ul5: 0,
-          ul6: 0,
-          ul7: 0,
-          ul8: 0,
-          ul9: 0,
-          ul10: 0,
-          maxm: 1000,
+          maxm: 2000,
           npd: 50,
           depth: 4,
+          reactrate: 100,
+          directOn: true,
+          plans: [
+            {
+              name: "Basic",
+              mix: 100,
+              entry: 5000,
+              pairBonus: 0,
+              pairCap: 0,
+              directRef: 500,
+              capMult: 5,
+              reactFee: 5000,
+              reactWin: 15,
+              dfi: 20,
+              dfiDays: 1250,
+              binary: false,
+              indirect: true,
+              dfiOn: true,
+              levels: [0, 200, 100, 50, 10, 0, 0, 0, 0, 0, 0],
+            },
+            {
+              name: "Starter",
+              mix: 100,
+              entry: 10000,
+              pairBonus: 1500,
+              pairCap: 5,
+              directRef: 1000,
+              capMult: 3,
+              reactFee: 10000,
+              reactWin: 15,
+              dfi: 33,
+              dfiDays: 909,
+              binary: true,
+              indirect: false,
+              dfiOn: true,
+              levels: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            },
+            {
+              name: "Pro",
+              mix: 100,
+              entry: 10000,
+              pairBonus: 0,
+              pairCap: 0,
+              directRef: 1500,
+              capMult: 5,
+              reactFee: 10000,
+              reactWin: 15,
+              dfi: 50,
+              dfiDays: 1000,
+              binary: false,
+              indirect: true,
+              dfiOn: true,
+              levels: [0, 500, 300, 200, 100, 0, 0, 0, 0, 0, 0],
+            },
+            {
+              name: "Elite",
+              mix: 100,
+              entry: 20000,
+              pairBonus: 0,
+              pairCap: 0,
+              directRef: 2500,
+              capMult: 5,
+              reactFee: 20000,
+              reactWin: 15,
+              dfi: 100,
+              dfiDays: 1000,
+              binary: false,
+              indirect: true,
+              dfiOn: true,
+              levels: [0, 1000, 500, 300, 100, 0, 0, 0, 0, 0, 0],
+            },
+            {
+              name: "Silver",
+              mix: 100,
+              entry: 50000,
+              pairBonus: 0,
+              pairCap: 0,
+              directRef: 6500,
+              capMult: 5,
+              reactFee: 50000,
+              reactWin: 15,
+              dfi: 250,
+              dfiDays: 1000,
+              binary: false,
+              indirect: true,
+              dfiOn: true,
+              levels: [0, 2500, 1000, 500, 200, 0, 0, 0, 0, 0, 0],
+            },
+            {
+              name: "Gold",
+              mix: 100,
+              entry: 100000,
+              pairBonus: 0,
+              pairCap: 0,
+              directRef: 12000,
+              capMult: 5,
+              reactFee: 100000,
+              reactWin: 15,
+              dfi: 500,
+              dfiDays: 1000,
+              binary: false,
+              indirect: true,
+              dfiOn: true,
+              levels: [0, 5000, 2000, 1000, 500, 0, 0, 0, 0, 0, 0],
+            },
+            {
+              name: "Diamond",
+              mix: 100,
+              entry: 500000,
+              pairBonus: 0,
+              pairCap: 0,
+              directRef: 60000,
+              capMult: 5,
+              reactFee: 500000,
+              reactWin: 15,
+              dfi: 2500,
+              dfiDays: 1000,
+              binary: false,
+              indirect: true,
+              dfiOn: true,
+              levels: [0, 20000, 10000, 5000, 2000, 0, 0, 0, 0, 0, 0],
+            },
+            {
+              name: "Platinum",
+              mix: 100,
+              entry: 1000000,
+              pairBonus: 0,
+              pairCap: 0,
+              directRef: 120000,
+              capMult: 5,
+              reactFee: 1000000,
+              reactWin: 15,
+              dfi: 5000,
+              dfiDays: 1000,
+              binary: false,
+              indirect: true,
+              dfiOn: true,
+              levels: [0, 40000, 20000, 10000, 5000, 0, 0, 0, 0, 0, 0],
+            },
+          ],
         },
         aggressive: {
-          entry: 10000,
-          pcost: 70,
-          bonus: 3000,
-          cap: 5,
-          incap: 50000,
-          reactfee: 4000,
-          reactwin: 45,
+          pcost: 40,
+          maxm: 3000,
+          npd: 150,
+          depth: 6,
           reactrate: 70,
-          dfi: 300,
-          dfidays: 120,
-          direct: 800,
-          ul1: 400,
-          ul2: 250,
-          ul3: 200,
-          ul4: 150,
-          ul5: 150,
-          ul6: 100,
-          ul7: 100,
-          ul8: 100,
-          ul9: 100,
-          ul10: 100,
-          maxm: 5000,
-          npd: 200,
-          depth: 5,
+          directOn: true,
+          plans: [
+            {
+              name: "Starter",
+              mix: 70,
+              entry: 10000,
+              pairBonus: 2000,
+              pairCap: 3,
+              directRef: 500,
+              capMult: 3.0,
+              reactFee: 10000,
+              reactWin: 15,
+              dfi: 100,
+              dfiDays: 90,
+              binary: true,
+              indirect: true,
+              dfiOn: true,
+              levels: [0, 300, 200, 150, 100, 100, 50, 50, 50, 50, 50],
+            },
+            {
+              name: "Power",
+              mix: 30,
+              entry: 50000,
+              pairBonus: 8000,
+              pairCap: 8,
+              directRef: 4000,
+              capMult: 4.0,
+              reactFee: 15000,
+              reactWin: 30,
+              dfi: 500,
+              dfiDays: 120,
+              binary: true,
+              indirect: true,
+              dfiOn: true,
+              levels: [0, 800, 600, 450, 300, 300, 150, 150, 150, 150, 150],
+            },
+          ],
         },
         lean: {
-          entry: 10000,
-          pcost: 35,
-          bonus: 2000,
-          cap: 3,
-          incap: 20000,
-          reactfee: 2000,
-          reactwin: 30,
-          reactrate: 60,
-          dfi: 100,
-          dfidays: 60,
-          direct: 500,
-          ul1: 300,
-          ul2: 200,
-          ul3: 150,
-          ul4: 100,
-          ul5: 100,
-          ul6: 50,
-          ul7: 50,
-          ul8: 50,
-          ul9: 50,
-          ul10: 50,
+          pcost: 30,
           maxm: 1000,
           npd: 50,
           depth: 4,
+          reactrate: 60,
+          directOn: true,
+          plans: [
+            {
+              name: "Lite",
+              mix: 100,
+              entry: 5000,
+              pairBonus: 800,
+              pairCap: 2,
+              directRef: 400,
+              capMult: 2.0,
+              reactFee: 1000,
+              reactWin: 20,
+              dfi: 25,
+              dfiDays: 60,
+              binary: true,
+              indirect: true,
+              dfiOn: true,
+              levels: [0, 150, 100, 75, 50, 50, 25, 25, 25, 25, 25],
+            },
+          ],
         },
         highcap: {
-          entry: 20000,
-          pcost: 60,
-          bonus: 2000,
-          cap: 3,
-          incap: 100000,
-          reactfee: 5000,
-          reactwin: 60,
-          reactrate: 50,
-          dfi: 200,
-          dfidays: 90,
-          direct: 500,
-          ul1: 300,
-          ul2: 200,
-          ul3: 150,
-          ul4: 100,
-          ul5: 100,
-          ul6: 50,
-          ul7: 50,
-          ul8: 50,
-          ul9: 50,
-          ul10: 50,
+          pcost: 50,
           maxm: 2000,
           npd: 80,
-          depth: 4,
+          depth: 5,
+          reactrate: 50,
+          directOn: true,
+          plans: [
+            {
+              name: "Elite",
+              mix: 100,
+              entry: 20000,
+              pairBonus: 2500,
+              pairCap: 3,
+              directRef: 1500,
+              capMult: 10.0,
+              reactFee: 8000,
+              reactWin: 60,
+              dfi: 200,
+              dfiDays: 180,
+              binary: true,
+              indirect: true,
+              dfiOn: true,
+              levels: [0, 400, 300, 200, 150, 150, 100, 100, 100, 100, 100],
+            },
+          ],
         },
         highref: {
-          entry: 10000,
-          pcost: 60,
-          bonus: 1000,
-          cap: 3,
-          incap: 30000,
-          reactfee: 2000,
-          reactwin: 20,
-          reactrate: 55,
-          dfi: 150,
-          dfidays: 60,
-          direct: 1000,
-          ul1: 600,
-          ul2: 400,
-          ul3: 300,
-          ul4: 200,
-          ul5: 200,
-          ul6: 100,
-          ul7: 100,
-          ul8: 100,
-          ul9: 100,
-          ul10: 100,
+          pcost: 30,
           maxm: 1000,
           npd: 50,
           depth: 6,
+          reactrate: 55,
+          directOn: true,
+          plans: [
+            {
+              name: "Referral",
+              mix: 100,
+              entry: 10000,
+              pairBonus: 0,
+              pairCap: 1,
+              directRef: 3000,
+              capMult: 5.0,
+              reactFee: 5000,
+              reactWin: 20,
+              dfi: 150,
+              dfiDays: 90,
+              binary: false,
+              indirect: true,
+              dfiOn: true,
+              levels: [0, 800, 600, 450, 300, 300, 150, 150, 150, 150, 150],
+            },
+          ],
         },
         fixedheavy: {
-          entry: 10000,
           pcost: 55,
-          bonus: 1000,
-          cap: 2,
-          incap: 40000,
-          reactfee: 3000,
-          reactwin: 30,
-          reactrate: 65,
-          dfi: 500,
-          dfidays: 180,
-          direct: 400,
-          ul1: 200,
-          ul2: 150,
-          ul3: 100,
-          ul4: 75,
-          ul5: 75,
-          ul6: 25,
-          ul7: 25,
-          ul8: 25,
-          ul9: 25,
-          ul10: 25,
           maxm: 1000,
           npd: 50,
           depth: 4,
+          reactrate: 65,
+          directOn: false,
+          plans: [
+            {
+              name: "Fixed",
+              mix: 100,
+              entry: 10000,
+              pairBonus: 1000,
+              pairCap: 2,
+              directRef: 0,
+              capMult: 2.0,
+              reactFee: 2000,
+              reactWin: 30,
+              dfi: 500,
+              dfiDays: 180,
+              binary: true,
+              indirect: true,
+              dfiOn: true,
+              levels: [0, 100, 75, 50, 25, 25, 0, 0, 0, 0, 0],
+            },
+          ],
         },
       };
 
-      // ══════════════════════════════════════════
-      //  FIELD CONFIGS — min/max/step for clamping
-      // ══════════════════════════════════════════
-      const FIELD_CFG = {
-        entry: { min: 500, max: 100000, step: 500 },
-        pcost: { min: 0, max: 95, step: 1 },
-        bonus: { min: 100, max: 20000, step: 100 },
-        cap: { min: 1, max: 30, step: 1 },
-        incap: { min: 1000, max: 1000000, step: 1000 },
-        reactfee: { min: 0, max: 50000, step: 500 },
-        reactwin: { min: 1, max: 180, step: 1 },
-        reactrate: { min: 0, max: 100, step: 1 },
-        dfi: { min: 0, max: 5000, step: 1 },
-        dfidays: { min: 7, max: 3000, step: 1 },
-        direct: { min: 0, max: 10000, step: 1 },
-        ul1: { min: 0, max: 3000, step: 1 },
-        ul2: { min: 0, max: 2000, step: 1 },
-        ul3: { min: 0, max: 1000, step: 1 },
-        ul4: { min: 0, max: 500, step: 1 },
-        ul5: { min: 0, max: 500, step: 1 },
-        ul6: { min: 0, max: 300, step: 1 },
-        ul7: { min: 0, max: 300, step: 1 },
-        ul8: { min: 0, max: 300, step: 1 },
-        ul9: { min: 0, max: 300, step: 1 },
-        ul10: { min: 0, max: 300, step: 1 },
-        maxm: { min: 100, max: 50000, step: 1 },
-        npd: { min: 1, max: 2000, step: 1 },
-        depth: { min: 1, max: 10, step: 1 },
+      const MAX_PLANS = 8;
+      const DEFAULT_PLAN = {
+        name: "Basic",
+        mix: 100,
+        entry: 5000,
+        pairBonus: 0,
+        pairCap: 0,
+        directRef: 500,
+        capMult: 5,
+        reactFee: 5000,
+        reactWin: 15,
+        dfi: 20,
+        dfiDays: 1250,
+        binary: false,
+        indirect: true,
+        dfiOn: true,
+        levels: [0, 200, 100, 50, 10, 0, 0, 0, 0, 0, 0],
       };
 
       const fmtN = (n) => Math.round(n).toLocaleString();
@@ -2375,16 +2394,12 @@
         const ni = document.getElementById("n-" + k);
         if (!sl || !ni) return;
         let v = parseFloat(ni.value);
-        const cfg = FIELD_CFG[k] || {};
-        if (isNaN(v)) {
-          ni.classList.add("err");
-          return;
-        }
-        ni.classList.remove("err");
-        v = clamp(v, cfg.min ?? -Infinity, cfg.max ?? Infinity);
-        const slMin = parseFloat(sl.min),
-          slMax = parseFloat(sl.max);
-        sl.value = clamp(v, slMin, slMax);
+        const min = parseFloat(sl.min),
+          max = parseFloat(sl.max);
+        if (isNaN(v)) return;
+        v = clamp(v, min, max);
+        ni.value = v;
+        sl.value = v;
       }
 
       function getVal(k) {
@@ -2397,204 +2412,471 @@
         return sl ? parseFloat(sl.value) : 0;
       }
 
+      // ══════════ PLAN ROW RENDERING ══════════
+      function planRowHTML(i) {
+        const tone = i % 3 === 0 ? "plan-a" : i % 3 === 1 ? "plan-b" : "plan-c";
+        let levelsHtml = "";
+        for (let l = 1; l <= 10; l++) {
+          levelsHtml += `
+        <label class="plv"><span>L${l}</span>
+          <input type="number" class="num-input" data-lv="${l}" value="0" min="0" step="1" />
+        </label>`;
+        }
+        return `
+      <div class="plan-card ${tone}" data-pi="${i}">
+        <div class="plan-card-head">
+          <input type="text" class="plan-name" placeholder="Plan name" value="Plan ${i + 1}" />
+          <div class="plan-flags">
+          <label class="form-check form-switch plan-switch" title="Binary pairing enabled (pairing_enabled)">
+            <input class="form-check-input" type="checkbox" data-flag="binary" checked />
+            <span class="form-check-label">Binary</span>
+          </label>
+          <label class="form-check form-switch plan-switch indirect" title="Indirect (unilevel) enabled (indirect_referral_enabled)">
+            <input class="form-check-input" type="checkbox" data-flag="indirect" checked />
+            <span class="form-check-label">Indirect</span>
+          </label>
+          <label class="form-check form-switch plan-switch dfi" title="Daily fixed income enabled (dfi_enabled)">
+            <input class="form-check-input" type="checkbox" data-flag="dfi" checked />
+            <span class="form-check-label">DFI</span>
+          </label>
+          </div>
+          <div class="plan-mix">
+            <div class="si-label">Join mix %</div>
+            <div class="ctrl-row">
+              <input type="range" class="mix-slider" min="0" max="100" step="1" value="100" />
+              <input type="number" class="num-input mix-num" value="100" min="0" max="100" step="1" />
+            </div>
+          </div>
+          <button class="btn-rm" title="Remove plan">✕</button>
+        </div>
+        <div class="plan-grid">
+          <div class="si"><div class="si-label">Entry fee (₱)</div><input type="number" class="num-input" data-f="entry" value="10000" min="1" step="500" /></div>
+          <div class="si" data-stream="pair"><div class="si-label">Pair volume (₱)</div><input type="number" class="num-input" data-f="pair" value="2000" min="0" step="100" /></div>
+          <div class="si" data-stream="pair"><div class="si-label">Daily pair cap</div><input type="number" class="num-input" data-f="cap" value="3" min="0" step="1" /></div>
+          <div class="si"><div class="si-label">Direct ref (₱)</div><input type="number" class="num-input" data-f="direct" value="500" min="0" step="50" /></div>
+          <div class="si"><div class="si-label">Cap mult ×</div><input type="number" class="num-input" data-f="mult" value="3" min="1" step="0.25" /></div>
+          <div class="si"><div class="si-label">React. fee (₱)</div><input type="number" class="num-input" data-f="reactfee" value="10000" min="0" step="500" /></div>
+          <div class="si"><div class="si-label">React. window (d)</div><input type="number" class="num-input" data-f="reactwin" value="15" min="1" step="1" /></div>
+          <div class="si" data-stream="dfi"><div class="si-label">Daily fixed (₱/day)</div><input type="number" class="num-input" data-f="dfi" value="100" min="0" step="1" /></div>
+          <div class="si" data-stream="dfi"><div class="si-label">Max income days</div><input type="number" class="num-input" data-f="dfidays" value="90" min="1" step="1" /></div>
+        </div>
+        <div class="plv-row">
+          <div class="plv-label">Unilevel L1–L10 (₱) — from this plan, paid on its joins</div>
+          <div class="plv-grid">${levelsHtml}</div>
+        </div>
+      </div>`;
+      }
+
+      function rowOf(el) {
+        return el.closest(".plan-card");
+      }
+
+      function fieldValues(row, keys) {
+        return keys.map((k) => {
+          const i = row.querySelector(`input[data-f="${k}"]`);
+          if (!i) return 0;
+          const v = parseFloat(i.value);
+          return isFinite(v) ? v : 0;
+        });
+      }
+      function setFieldValues(row, keys, vals) {
+        keys.forEach((k, idx) => {
+          const i = row.querySelector(`input[data-f="${k}"]`);
+          if (i && vals[idx] !== undefined) i.value = vals[idx];
+        });
+      }
+      function levelValues(row) {
+        const arr = [];
+        for (let l = 1; l <= 10; l++) {
+          const i = row.querySelector(`input[data-lv="${l}"]`);
+          const v = i ? parseFloat(i.value) : NaN;
+          arr.push(isFinite(v) ? v : 0);
+        }
+        return arr;
+      }
+      function setLevelValues(row, vals) {
+        for (let l = 1; l <= 10; l++) {
+          const i = row.querySelector(`input[data-lv="${l}"]`);
+          if (i && vals[l - 1] !== undefined) i.value = vals[l - 1];
+        }
+      }
+      function toggleStreamFields(row, stream, on) {
+        const grid = row.querySelector(".plan-grid");
+        grid.querySelectorAll(`.si[data-stream="${stream}"]`).forEach((el) => {
+          el.classList.toggle("hidden-field", !on);
+        });
+      }
+      function setFlagClass(row) {
+        row._prev = row._prev || {};
+        const checked = (f) => row.querySelector(`[data-flag="${f}"]`).checked;
+        const streams = {
+          pair: { on: checked("binary"), f: ["pair", "cap"] },
+          dfi: { on: checked("dfi"), f: ["dfi", "dfidays"] },
+        };
+        for (const [key, st] of Object.entries(streams)) {
+          if (!st.on) {
+            if (row._prev[key] === undefined)
+              row._prev[key] = fieldValues(row, st.f);
+            setFieldValues(row, st.f, st.f.map(() => 0));
+          } else if (row._prev[key] !== undefined) {
+            setFieldValues(row, st.f, row._prev[key]);
+            delete row._prev[key];
+          }
+          toggleStreamFields(row, key, st.on);
+        }
+        const indirect = checked("indirect");
+        if (!indirect) {
+          if (row._prev.indirect === undefined)
+            row._prev.indirect = levelValues(row);
+          setLevelValues(row, new Array(10).fill(0));
+        } else if (row._prev.indirect !== undefined) {
+          setLevelValues(row, row._prev.indirect);
+          delete row._prev.indirect;
+        }
+        row.querySelector(".plv-row").classList.toggle("hidden-field", !indirect);
+      }
+
+      function syncMixSlider(row) {
+        const sl = row.querySelector(".mix-slider");
+        const ni = row.querySelector(".mix-num");
+        if (!sl || !ni) return;
+        ni.value = sl.value;
+      }
+      function syncMixNum(row) {
+        const sl = row.querySelector(".mix-slider");
+        const ni = row.querySelector(".mix-num");
+        if (!sl || !ni) return;
+        let v = parseFloat(ni.value);
+        if (isNaN(v)) return;
+        v = clamp(v, 0, 100);
+        ni.value = v;
+        sl.value = v;
+      }
+
+      const plansWrap = document.getElementById("plans");
+      plansWrap.addEventListener("change", (e) => {
+        const t = e.target;
+        const row = t.closest(".plan-card");
+        if (!row) return;
+        if (t.matches(".mix-slider")) syncMixSlider(row);
+        if (t.matches('[data-flag]')) setFlagClass(row);
+        if (autoMixEnabled() && t.matches('[data-f="entry"]'))
+          applyAutoMixToDom();
+        updateMixTotal();
+      });
+      plansWrap.addEventListener("input", (e) => {
+        const t = e.target;
+        const row = t.closest(".plan-card");
+        if (!row) return;
+        if (t.matches(".mix-num")) syncMixNum(row);
+        if (t.matches(".mix-slider")) syncMixSlider(row);
+        if (autoMixEnabled() && t.matches('[data-f="entry"]'))
+          applyAutoMixToDom();
+        updateMixTotal();
+      });
+      plansWrap.addEventListener("click", (e) => {
+        const t = e.target;
+        if (t.matches(".btn-rm")) removePlan(t.closest(".plan-card"));
+      });
+
+      const swAuto = document.getElementById("sw-automix");
+      if (swAuto) swAuto.addEventListener("change", applyAutoMixToDom);
+      document
+        .querySelectorAll('input[name="automix-rule"]')
+        .forEach((el) => el.addEventListener("change", applyAutoMixToDom));
+
+      function autoMixEnabled() {
+        const sw = document.getElementById("sw-automix");
+        return !!(sw && sw.checked);
+      }
+      function autoMixRule() {
+        const sel = document.querySelector(
+          'input[name="automix-rule"]:checked'
+        );
+        return sel && sel.value === "entry" ? "entry" : "equal";
+      }
+      function autoMixPlans(plans) {
+        if (autoMixRule() === "entry") {
+          const inv = plans.map((p) => 1 / Math.max(1, p.entry));
+          const sum = inv.reduce((a, b) => a + b, 0);
+          return plans.map((p, i) => (inv[i] / sum) * 100);
+        }
+        return plans.map(() => 100 / plans.length);
+      }
+      function niceMixes(mixes) {
+        const r = mixes.map((m) => Math.floor(m * 10) / 10);
+        const tenths = Math.round((100 - r.reduce((a, b) => a + b, 0)) * 10);
+        const idx = mixes
+          .map((m, i) => [i, m * 10 - Math.floor(m * 10)])
+          .sort((a, b) => b[1] - a[1]);
+        for (let k = 0; k < tenths; k++) r[idx[k % idx.length][0]] += 0.1;
+        return r;
+      }
+      function applyAutoMixToDom() {
+        const rows = plansWrap.querySelectorAll(".plan-card");
+        const on = autoMixEnabled();
+        document
+          .querySelectorAll('input[name="automix-rule"]')
+          .forEach((r) => (r.disabled = !on));
+        rows.forEach((r) => {
+          r.querySelector(".mix-slider").disabled = on;
+          r.querySelector(".mix-num").disabled = on;
+        });
+        if (on && rows.length) {
+          const plans = Array.from(rows).map(planFromRow);
+          const mixes = niceMixes(autoMixPlans(plans));
+          rows.forEach((r, i) => {
+            r.querySelector(".mix-slider").value = mixes[i];
+            r.querySelector(".mix-num").value = mixes[i];
+          });
+        }
+        updateMixTotal();
+      }
+
+      function updateMixTotal() {
+        const el = document.getElementById("mix-total");
+        if (!el) return;
+        if (autoMixEnabled()) {
+          el.textContent = "Mix: auto (100%)";
+          el.classList.add("ok");
+          el.classList.remove("bad");
+          return;
+        }
+        const rows = plansWrap.querySelectorAll(".plan-card");
+        let sum = 0;
+        rows.forEach((r) => {
+          sum += parseFloat(r.querySelector(".mix-num").value) || 0;
+        });
+        el.textContent = "Mix total: " + Math.round(sum) + "%";
+        el.classList.toggle("ok", Math.abs(sum - 100) < 0.5);
+        el.classList.toggle("bad", Math.abs(sum - 100) >= 0.5);
+      }
+
+      function planFromRow(row) {
+        const numV = (sel) => {
+          const v = parseFloat(row.querySelector(sel)?.value);
+          return isFinite(v) ? v : 0;
+        };
+        const name = (row.querySelector(".plan-name").value || "").trim();
+        const levels = [0];
+        for (let l = 1; l <= 10; l++)
+          levels.push(numV(`input[data-lv="${l}"]`));
+        return {
+          name: name || "Plan",
+          mix: clamp(Math.round(numV(".mix-num")), 0, 100),
+          entry: Math.max(1, numV('input[data-f="entry"]')),
+          pairBonus: Math.max(0, numV('input[data-f="pair"]')),
+          pairCap: Math.max(0, Math.round(numV('input[data-f="cap"]'))),
+          directRef: Math.max(0, numV('input[data-f="direct"]')),
+          capMult: Math.max(1, numV('input[data-f="mult"]')),
+          reactFee: Math.max(0, numV('input[data-f="reactfee"]')),
+          reactWin: Math.max(1, Math.round(numV('input[data-f="reactwin"]'))),
+          dfi: Math.max(0, numV('input[data-f="dfi"]')),
+          dfiDays: Math.max(1, Math.round(numV('input[data-f="dfidays"]'))),
+          binary: row.querySelector('[data-flag="binary"]').checked,
+          indirect: row.querySelector('[data-flag="indirect"]').checked,
+          dfiOn: row.querySelector('[data-flag="dfi"]').checked,
+          levels,
+        };
+      }
+
+      function readPlans() {
+        const rows = plansWrap.querySelectorAll(".plan-card");
+        const plans = Array.from(rows).map(planFromRow);
+        if (autoMixEnabled()) {
+          const mixes = autoMixPlans(plans);
+          plans.forEach((p, i) => (p.mix = mixes[i]));
+          return plans;
+        }
+        const totalMix = plans.reduce((s, p) => s + p.mix, 0);
+        if (totalMix <= 0) {
+          plans.forEach((p) => (p.mix = 100 / plans.length));
+        } else if (Math.abs(totalMix - 100) >= 0.5) {
+          plans.forEach((p) => (p.mix = (p.mix / totalMix) * 100));
+        }
+        return plans;
+      }
+
+      function setPlanValues(cfg, row) {
+        row.querySelector(".plan-name").value = cfg.name || "";
+        row.querySelector('[data-flag="binary"]').checked = !!cfg.binary;
+        row.querySelector('[data-flag="indirect"]').checked = !!cfg.indirect;
+        row.querySelector('[data-flag="dfi"]').checked = !!cfg.dfiOn;
+        const sl = row.querySelector(".mix-slider");
+        const ni = row.querySelector(".mix-num");
+        sl.value = cfg.mix;
+        ni.value = cfg.mix;
+        const fMap = {
+          entry: cfg.entry,
+          pair: cfg.pairBonus,
+          cap: cfg.pairCap,
+          direct: cfg.directRef,
+          mult: cfg.capMult,
+          reactfee: cfg.reactFee,
+          reactwin: cfg.reactWin,
+          dfi: cfg.dfi,
+          dfidays: cfg.dfiDays,
+        };
+        Object.entries(fMap).forEach(([k, v]) => {
+          const input = row.querySelector(`input[data-f="${k}"]`);
+          if (input) input.value = v;
+        });
+        for (let l = 1; l <= 10; l++) {
+          const input = row.querySelector(`input[data-lv="${l}"]`);
+          if (input) input.value = cfg.levels[l] || 0;
+        }
+        setFlagClass(row);
+      }
+
+      function renderPlans(configs) {
+        plansWrap.innerHTML = configs.map((_, i) => planRowHTML(i)).join("");
+        configs.forEach((cfg, i) => {
+          setPlanValues(cfg, plansWrap.querySelectorAll(".plan-card")[i]);
+        });
+        applyAutoMixToDom();
+        updateAddBtn();
+      }
+
+      function addPlan() {
+        const count = plansWrap.querySelectorAll(".plan-card").length;
+        if (count >= MAX_PLANS) return;
+        const row = document.createElement("div");
+        row.innerHTML = planRowHTML(count).trim();
+        plansWrap.appendChild(row.firstChild);
+        setPlanValues({ ...DEFAULT_PLAN, name: "Plan " + (count + 1) }, plansWrap.querySelectorAll(".plan-card")[count]);
+        applyAutoMixToDom();
+        updateAddBtn();
+      }
+
+      function removePlan(row) {
+        if (!row) return;
+        if (plansWrap.querySelectorAll(".plan-card").length <= 1) return;
+        row.remove();
+        applyAutoMixToDom();
+        updateAddBtn();
+      }
+
+      function updateAddBtn() {
+        const btn = document.getElementById("btn-add-plan");
+        if (btn) btn.style.display =
+          plansWrap.querySelectorAll(".plan-card").length >= MAX_PLANS
+            ? "none"
+            : "block";
+      }
+
       function applyPreset(key, btn) {
         document
           .querySelectorAll(".preset-btn")
           .forEach((b) => b.classList.remove("on"));
-        btn.classList.add("on");
+        if (btn) btn.classList.add("on");
         const p = PRESETS[key] || PRESETS.default;
-        Object.entries(p).forEach(([k, v]) => {
+        const setField = (k, v) => {
           const sl = document.getElementById("s-" + k);
           const ni = document.getElementById("n-" + k);
           if (sl) sl.value = v;
-          if (ni) {
-            ni.value = v;
-            ni.classList.remove("err");
-          }
-        });
+          if (ni) ni.value = v;
+        };
+        setField("pcost", p.pcost);
+        setField("maxm", p.maxm);
+        setField("npd", p.npd);
+        setField("depth", p.depth);
+        setField("reactrate", p.reactrate);
+        document.getElementById("sw-direct").checked = !!p.directOn;
+        renderPlans(p.plans);
       }
 
-      function getUniLevels() {
-        return [
-          0,
-          getVal("ul1"),
-          getVal("ul2"),
-          getVal("ul3"),
-          getVal("ul4"),
-          getVal("ul5"),
-          getVal("ul6"),
-          getVal("ul7"),
-          getVal("ul8"),
-          getVal("ul9"),
-          getVal("ul10"),
-        ];
-      }
-      function uniPerJoin(levels, depth) {
-        let t = 0;
-        for (let i = 1; i <= Math.min(depth, 10); i++) t += levels[i];
-        return t;
-      }
-
-      let simLog = [],
-        curPage = 1;
-      const PER_PAGE = 25;
-
-      function runSim() {
-        const progWrap = document.getElementById("prog");
-        const progBar = document.getElementById("prog-bar");
-        progWrap.style.display = "block";
-        progBar.style.width = "10%";
-        setTimeout(() => {
-          const entryVal = getVal("entry");
-          const params = {
-            entry: entryVal,
-            pcostPct: getVal("pcost") / 100,
-            bonus: getVal("bonus"),
-            cap: getVal("cap"),
-            incap: getVal("incap"), // configurable total income cap — all income types combined
-            reactfee: getVal("reactfee"),
-            reactwin: getVal("reactwin"),
-            reactrate: getVal("reactrate") / 100,
-            dfi: getVal("dfi"),
-            dfidays: getVal("dfidays"),
-            direct: getVal("direct"),
-            maxM: getVal("maxm"),
-            npd: getVal("npd"),
-            depth: getVal("depth"),
-            levels: getUniLevels(),
-          };
-          const r = simulate(params);
-          progBar.style.width = "100%";
-          setTimeout(() => {
-            progWrap.style.display = "none";
-            progBar.style.width = "0%";
-            displayResults(r, params);
-          }, 300);
-        }, 40);
+      // ══════════════════════════════════════════
+      //  GET PARAMS
+      // ══════════════════════════════════════════
+      function getParams() {
+        return {
+          plans: readPlans(),
+          pcostPct: clamp(getVal("pcost"), 0, 95) / 100,
+          maxm: Math.round(clamp(getVal("maxm"), 1, 50000)),
+          npd: Math.round(clamp(getVal("npd"), 1, 2000)),
+          depth: Math.round(clamp(getVal("depth"), 1, 10)),
+          reactrate: clamp(getVal("reactrate"), 0, 100) / 100,
+          directOn: document.getElementById("sw-direct").checked,
+        };
       }
 
       // ══════════════════════════════════════════
       //  CORE SIMULATION
-      //  incap = configurable total income cap · covers ALL income types combined
+      //  Mirrors core/Commission.php, core/DailyFixedIncome.php and
+      //  core/CapEngine.php:
+      //   · binary = volume-based incremental matching (min(L,R), daily cap
+      //     in pesos = daily_pair_cap × own pair volume, overflow flushed)
+      //   · cap per member = own plan entry_fee × lifetime_cap_multiplier,
+      //     all income streams combined
+      //   · direct + unilevel amounts from the NEW member's plan; unilevel
+      //     walks the linear sponsor chain (enrollment-order proxy)
+      //   · plan toggles gate binary/indirect participation and DFI
       // ══════════════════════════════════════════
       function simulate(p) {
         const {
-          entry,
+          plans,
           pcostPct,
-          bonus,
-          cap,
-          incap,
-          reactfee,
-          reactwin,
-          reactrate,
-          dfi,
-          dfidays,
-          direct,
-          maxM,
+          maxm,
           npd,
           depth,
-          levels,
+          reactrate,
+          directOn,
+          resetDfiOnReact = false,
         } = p;
 
-        const leftCount = []; // left-leg recruit count
-        const rightCount = []; // right-leg recruit count
-        const paidPairs = []; // cumulative pairs whose pointer has been advanced
-        const memberEarned = []; // total earned this cycle (pairing + DFI combined)
-        const memberStatus = []; // 'active' | 'capped' | 'perminact'
-        const inactDay = []; // day account became capped
-        const memberDfiDays = []; // active days of fixed income used this cycle
-        const memberDfiDone = []; // DFI duration limit reached (permanent per cycle, resets on reactivation)
+        if (!plans.length) return null;
+
+        // Per-member state
+        const planOf = []; // plan index per member
+        const leftCount = [],
+          rightCount = [];
+        const leftVol = [],
+          rightVol = []; // accumulated leg volume (pesos)
+        const volMatched = []; // volume already settled (paid + flushed)
+        const volToday = []; // volume settled today (for daily cap)
+        const memberEarned = []; // lifetime earned this cycle
+        const memberStatus = []; // active | capped | perminact
+        const inactDay = [];
+        const memberDfiDays = [];
+        const memberDfiDone = [];
+
+        const planStats = plans.map(() => ({
+          members: 0,
+          gross: 0,
+          goods: 0,
+          direct: 0,
+          uni: 0,
+          pair: 0,
+          dfi: 0,
+        }));
 
         let totalMembers = 0,
           totalGross = 0,
           totalGoods = 0,
-          totalBonusPair = 0,
-          totalBonusDirect = 0,
-          totalBonusUni = 0;
-        let totalBonusDfi = 0,
           totalReactRev = 0;
-        let totalPairsPaid = 0,
-          totalFlushed = 0,
-          totalCapSaved = 0,
-          totalDfiCapSaved = 0,
-          totalPairSaved = 0,
-          totalDirectSaved = 0,
-          totalUniSaved = 0;
+        let totalPair = 0,
+          totalDirect = 0,
+          totalUni = 0,
+          totalDfi = 0;
+        let pairEvents = 0,
+          flushEvents = 0,
+          flushPesos = 0;
+        let capSaved = 0,
+          pairCapSaved = 0,
+          directSaved = 0,
+          uniSaved = 0,
+          dfiCapSaved = 0;
         let totalCappedEver = 0,
           totalReacts = 0,
           totalPermInact = 0;
         const log = [];
         let day = 0;
 
-        const uniPerMember = uniPerJoin(levels, depth);
+        const capOf = (i) =>
+          plans[planOf[i]].entry * plans[planOf[i]].capMult;
 
-        function addMember(acc) {
-          const idx = totalMembers;
-          leftCount.push(0);
-          rightCount.push(0);
-          paidPairs.push(0);
-          memberEarned.push(0);
-          memberStatus.push("active");
-          inactDay.push(-1);
-          memberDfiDays.push(0);
-          memberDfiDone.push(false);
-          totalMembers++;
-          totalGross += entry;
-          totalGoods += entry * pcostPct;
-          if (idx > 0) creditReferralChain(idx, acc);
-          let cur = idx;
-          while (cur > 0) {
-            const parent = (cur - 1) >> 1;
-            if (cur === 2 * parent + 1) leftCount[parent]++;
-            else rightCount[parent]++;
-            cur = parent;
-          }
-        }
-
-        // Cap-aware credit of one payment to a recipient. Only active members
-        // with remaining cap room receive anything; blocked amounts are saved.
-        function creditRecipient(rec, amount, isDirect, acc) {
-          const block = (amt) => {
-            if (isDirect) {
-              totalDirectSaved += amt;
-              acc.directSaved += amt;
-            } else {
-              totalUniSaved += amt;
-              acc.uniSaved += amt;
-            }
-            totalCapSaved += amt;
-          };
-          if (rec < 0) return;
-          if (memberStatus[rec] !== "active") {
-            block(amount);
-            return;
-          }
-          const capRoom = Math.max(0, incap - memberEarned[rec]);
-          const pay = Math.min(amount, capRoom);
-          memberEarned[rec] += pay;
-          if (isDirect) {
-            totalBonusDirect += pay;
-            acc.direct += pay;
-          } else {
-            totalBonusUni += pay;
-            acc.uni += pay;
-          }
-          if (amount - pay > 0) block(amount - pay);
-          checkCap(rec);
-        }
-
-        // Direct + unilevel flow up the single sponsor chain (idx-1, idx-2, …).
-        function creditReferralChain(idx, acc) {
-          const sponsor = idx - 1;
-          creditRecipient(sponsor, direct, true, acc);
-          const myDepth = Math.min(idx, depth);
-          for (let lv = 1; lv <= myDepth && lv <= 10; lv++)
-            creditRecipient(idx - lv, levels[lv], false, acc);
-        }
-
-        // Helper: check and apply cap — returns true if member just became capped
         function checkCap(i) {
-          if (memberEarned[i] >= incap && memberStatus[i] === "active") {
+          if (memberStatus[i] === "active" && memberEarned[i] >= capOf(i)) {
             memberStatus[i] = "capped";
             inactDay[i] = day;
             totalCappedEver++;
@@ -2603,18 +2885,184 @@
           return false;
         }
 
-        while (totalMembers < maxM) {
+        // Credit one payment to an earner, aware of the lifetime cap.
+        // kind: 'pair' | 'direct' | 'uni'; acc is the day accumulator.
+        function creditEarner(i, amount, kind, acc) {
+          if (amount <= 0) return;
+          if (memberStatus[i] !== "active") {
+            const b = amount;
+            if (kind === "pair") pairCapSaved += b;
+            else if (kind === "direct") directSaved += b;
+            else uniSaved += b;
+            capSaved += b;
+            return;
+          }
+          const room = Math.max(0, capOf(i) - memberEarned[i]);
+          const pay = Math.min(amount, room);
+          memberEarned[i] += pay;
+          if (kind === "pair") {
+            totalPair += pay;
+            acc.pair += pay;
+            planStats[planOf[i]].pair += pay;
+          } else if (kind === "direct") {
+            totalDirect += pay;
+            acc.direct += pay;
+            planStats[planOf[i]].direct += pay;
+          } else {
+            totalUni += pay;
+            acc.uni += pay;
+            planStats[planOf[i]].uni += pay;
+          }
+          const blocked = amount - pay;
+          if (blocked > 0) {
+            if (kind === "pair") pairCapSaved += blocked;
+            else if (kind === "direct") directSaved += blocked;
+            else uniSaved += blocked;
+            capSaved += blocked;
+          }
+          checkCap(i);
+        }
+
+        // Settle newly matched volume for ancestor a (mirrors the incremental
+        // available − processed matching in Commission::processBinaryPlacement).
+        function settlePairs(a, acc) {
+          if (memberStatus[a] !== "active") return;
+          const ap = plans[planOf[a]];
+          if (!ap.binary || ap.pairBonus <= 0) return;
+          const available = Math.min(leftVol[a], rightVol[a]);
+          const newSettle = available - volMatched[a];
+          if (newSettle <= 0) return;
+          const capPesos = ap.pairCap * ap.pairBonus;
+          const capRemaining = Math.max(0, capPesos - volToday[a]);
+          const payNow = Math.min(newSettle, capRemaining);
+          const flushNow = newSettle - payNow;
+          volMatched[a] += newSettle;
+          volToday[a] += payNow;
+          if (flushNow > 0) {
+            flushEvents++;
+            flushPesos += flushNow;
+          }
+          if (payNow > 0) {
+            pairEvents++;
+            creditEarner(a, payNow, "pair", acc);
+          }
+        }
+
+        // Direct + unilevel flow up the linear sponsor chain (idx-1, idx-2…).
+        function creditRefChain(idx, acc) {
+          const pl = plans[planOf[idx]]; // NEW member's plan drives amounts
+          if (directOn && pl.directRef > 0) {
+            creditEarner(idx - 1, pl.directRef, "direct", acc);
+          }
+          if (pl.indirect) {
+            const levels = Math.min(idx, depth, 10);
+            for (let lv = 1; lv <= levels; lv++) {
+              const b = pl.levels[lv];
+              if (b > 0) creditEarner(idx - lv, b, "uni", acc);
+            }
+          }
+        }
+
+        // Add one member. planIdx = which plan the join bought.
+        function addMember(planIdx, acc) {
+          const idx = totalMembers;
+          const pl = plans[planIdx];
+          planOf.push(planIdx);
+          leftCount.push(0);
+          rightCount.push(0);
+          leftVol.push(0);
+          rightVol.push(0);
+          volMatched.push(0);
+          volToday.push(0);
+          memberEarned.push(0);
+          memberStatus.push("active");
+          inactDay.push(-1);
+          memberDfiDays.push(0);
+          memberDfiDone.push(false);
+          totalMembers++;
+          totalGross += pl.entry;
+          totalGoods += pl.entry * pcostPct;
+          planStats[planIdx].members++;
+          planStats[planIdx].gross += pl.entry;
+          planStats[planIdx].goods += pl.entry * pcostPct;
+
+          // Binary: propagate volume up BFS parents + settle incrementally.
+          // Leg counts always increment; volume only for binary-enabled paid
+          // members. Disabled plans contribute no volume and no payouts.
+          const newVol = pl.binary && pl.pairBonus > 0 ? pl.pairBonus : 0;
+          let cur = idx;
+          while (cur > 0) {
+            const parent = (cur - 1) >> 1;
+            const isLeft = cur === 2 * parent + 1;
+            if (isLeft) leftCount[parent]++;
+            else rightCount[parent]++;
+            if (newVol > 0) {
+              if (isLeft) leftVol[parent] += newVol;
+              else rightVol[parent] += newVol;
+              settlePairs(parent, acc);
+            }
+            cur = parent;
+          }
+
+          if (idx > 0) creditRefChain(idx, acc);
+        }
+
+        // Spread N joins across plans proportionally to join mix.
+        function buildDaySeq(plansArr, n) {
+          const totalW = plansArr.reduce((s, x) => s + x.mix, 0) || 1;
+          const exact = plansArr.map((x) => (x.mix / totalW) * n);
+          const counts = exact.map(Math.floor);
+          let rem = n - counts.reduce((a, b) => a + b, 0);
+          while (rem > 0) {
+            let best = -1,
+              bestFrac = -1;
+            for (let k = 0; k < plansArr.length; k++) {
+              const frac = exact[k] - counts[k];
+              if (frac > bestFrac + 1e-9) {
+                best = k;
+                bestFrac = frac;
+              }
+            }
+            counts[best]++;
+            rem--;
+          }
+          const seq = [];
+          const idxPos = counts.map(() => 0);
+          const nextScore = plansArr.map((_, k) =>
+            counts[k] > 0 ? 0 : Infinity
+          );
+          for (let j = 0; j < n; j++) {
+            let best = -1,
+              bestScore = Infinity;
+            for (let k = 0; k < plansArr.length; k++) {
+              if (nextScore[k] < bestScore) {
+                bestScore = nextScore[k];
+                best = k;
+              }
+            }
+            seq.push(best);
+            idxPos[best]++;
+            nextScore[best] =
+              idxPos[best] >= counts[best] ? Infinity : idxPos[best] / counts[best];
+          }
+          return seq;
+        }
+
+        while (totalMembers < maxm) {
           day++;
 
-          // ── 1. Expire reactivation windows ──
+          // 1. Expire reactivation windows
           for (let i = 0; i < totalMembers; i++) {
-            if (memberStatus[i] === "capped" && day - inactDay[i] > reactwin) {
+            if (
+              memberStatus[i] === "capped" &&
+              day - inactDay[i] > plans[planOf[i]].reactWin
+            ) {
               memberStatus[i] = "perminact";
               totalPermInact++;
             }
           }
 
-          // ── 2. Process reactivations (day after capping) ──
+          // 2. Process reactivations (day after capping)
           let dayReactRev = 0,
             dayReacts = 0;
           for (let i = 0; i < totalMembers; i++) {
@@ -2622,98 +3070,79 @@
               if (Math.random() < reactrate) {
                 memberStatus[i] = "active";
                 memberEarned[i] = 0; // full reset — new earning cycle
-                memberDfiDays[i] = 0; // DFI duration resets too
-                memberDfiDone[i] = false; // can earn DFI again in new cycle
-                paidPairs[i] = Math.min(leftCount[i], rightCount[i]); // skip accumulated pairs
-                totalReactRev += reactfee;
-                dayReactRev += reactfee;
+                // DFI entitlement is NOT restarted by default: a member can
+                // never re-earn their full fixed-income allocation a second
+                // time, so repeated reactivation cannot compound DFI.
+                if (resetDfiOnReact) {
+                  memberDfiDays[i] = 0;
+                  memberDfiDone[i] = false;
+                }
+                // pair volume counters are NOT reset — the member resumes
+                // matching the volume that accrued while capped
+                totalReactRev += plans[planOf[i]].reactFee;
+                dayReactRev += plans[planOf[i]].reactFee;
                 dayReacts++;
                 totalReacts++;
               }
             }
           }
 
-          // ── 3. New members ──
-          const toAdd = Math.min(npd, maxM - totalMembers);
-          const prevTotal = totalMembers;
-          const refAcc = { direct: 0, uni: 0, directSaved: 0, uniSaved: 0 };
-          for (let i = 0; i < toAdd; i++) addMember(refAcc);
-          const newMembers = totalMembers - prevTotal;
-          const entryToday = newMembers * entry;
-          const goodsToday = newMembers * entry * pcostPct;
+          // 3. Reset daily pair-volume counters
+          for (let i = 0; i < totalMembers; i++) volToday[i] = 0;
+
+          // 4. New members
+          const toAdd = Math.min(npd, maxm - totalMembers);
+          const prevGross = totalGross;
+          const prevGoods = totalGoods;
+          const acc = {
+            direct: 0,
+            uni: 0,
+            pair: 0,
+            dfi: 0,
+            directSaved: 0,
+            uniSaved: 0,
+          };
+          const seq = buildDaySeq(plans, toAdd);
+          for (let j = 0; j < toAdd; j++) addMember(seq[j], acc);
+          const newMembers = toAdd;
+          const entryToday = totalGross - prevGross;
+          const goodsToday = totalGoods - prevGoods;
           const cashInToday = entryToday - goodsToday + dayReactRev;
-          const directPaidToday = refAcc.direct;
-          const uniToday = refAcc.uni;
+          const directPaidToday = acc.direct;
+          const uniToday = acc.uni;
+          const pairToday = acc.pair;
 
-          // ── 4. Pairing bonuses (cap-aware, covers combined earnings) ──
-          let pairToday = 0,
-            paidToday = 0,
-            flushedToday = 0,
-            pairSavedToday = 0;
+          // 5. Daily fixed income (also subject to combined cap)
+          let dfiToday = 0;
           for (let i = 0; i < totalMembers; i++) {
+            const pln = plans[planOf[i]];
+            if (!pln.dfiOn || pln.dfi <= 0) continue;
             if (memberStatus[i] !== "active") continue;
-            const maxPairs = Math.min(leftCount[i], rightCount[i]);
-            const newPairs = maxPairs - paidPairs[i];
-            if (newPairs <= 0) continue;
-
-            // How much room is left under the combined cap?
-            const capRoom = Math.max(0, incap - memberEarned[i]);
-            const maxPayableByBonus =
-              bonus > 0 ? Math.floor(capRoom / bonus) : 0;
-            const pairsEligible = Math.min(newPairs, maxPayableByBonus);
-            const capsaved = newPairs - pairsEligible; // blocked by cap
-            const payNow = Math.min(pairsEligible, cap); // further limited by daily pair cap
-            const flushed = pairsEligible - payNow; // excess over daily cap
-
-            paidPairs[i] += newPairs;
-            const earned = payNow * bonus;
-            memberEarned[i] += earned;
-            pairToday += earned;
-            paidToday += payNow;
-            flushedToday += flushed;
-            pairSavedToday += capsaved * bonus;
-            checkCap(i);
-          }
-          totalBonusPair += pairToday;
-          totalPairsPaid += paidToday;
-          totalFlushed += flushedToday;
-          totalCapSaved += pairSavedToday;
-          totalPairSaved += pairSavedToday;
-
-          // ── 5. Daily fixed income (also subject to combined cap) ──
-          let dfiToday = 0,
-            dfiCapSavedToday = 0;
-          if (dfi > 0) {
-            for (let i = 0; i < totalMembers; i++) {
-              if (memberStatus[i] !== "active") continue; // paused while inactive
-              if (memberDfiDone[i]) continue; // duration exhausted this cycle
-
-              // Check cap room
-              const capRoom = Math.max(0, incap - memberEarned[i]);
-              if (capRoom <= 0) {
-                // cap already hit — DFI blocked
-                dfiCapSavedToday += dfi;
-                checkCap(i);
-                continue;
-              }
-              const actualDfi = Math.min(dfi, capRoom); // partial if near cap
-              memberDfiDays[i]++;
-              memberEarned[i] += actualDfi;
-              dfiToday += actualDfi;
-              if (actualDfi < dfi) dfiCapSavedToday += dfi - actualDfi;
-
-              // Stop DFI permanently for this cycle if cap now reached or duration maxed
-              if (memberEarned[i] >= incap) {
-                memberDfiDone[i] = true;
-                checkCap(i);
-              } else if (memberDfiDays[i] >= dfidays) {
-                memberDfiDone[i] = true;
-              }
+            if (memberDfiDone[i]) continue;
+            const room = Math.max(0, capOf(i) - memberEarned[i]);
+            if (room <= 0) {
+              dfiCapSaved += pln.dfi;
+              capSaved += pln.dfi;
+              checkCap(i);
+              continue;
+            }
+            const amt = Math.min(pln.dfi, room);
+            memberDfiDays[i]++;
+            memberEarned[i] += amt;
+            totalDfi += amt;
+            dfiToday += amt;
+            planStats[planOf[i]].dfi += amt;
+            if (amt < pln.dfi) {
+              dfiCapSaved += pln.dfi - amt;
+              capSaved += pln.dfi - amt;
+            }
+            if (memberEarned[i] >= capOf(i)) {
+              memberDfiDone[i] = true;
+              checkCap(i);
+            } else if (memberDfiDays[i] >= pln.dfiDays) {
+              memberDfiDone[i] = true;
             }
           }
-          totalBonusDfi += dfiToday;
-          totalDfiCapSaved += dfiCapSavedToday;
-          totalCapSaved += dfiCapSavedToday;
 
           const totalOutToday =
             pairToday + dfiToday + directPaidToday + uniToday;
@@ -2722,10 +3151,10 @@
             totalGross -
             totalGoods +
             totalReactRev -
-            totalBonusPair -
-            totalBonusDirect -
-            totalBonusUni -
-            totalBonusDfi;
+            totalPair -
+            totalDirect -
+            totalUni -
+            totalDfi;
           const activeCount = memberStatus.filter((s) => s === "active").length;
           const cappedCount = memberStatus.filter((s) => s === "capped").length;
           const permCount = memberStatus.filter(
@@ -2749,44 +3178,54 @@
             uniToday,
             netToday,
             cumulProfit,
-            paidToday,
-            flushedToday,
-            pairSavedToday,
           });
         }
 
-        const totalAllBonuses =
-          totalBonusPair + totalBonusDirect + totalBonusUni + totalBonusDfi;
+        const totalAllBonuses = totalPair + totalDirect + totalUni + totalDfi;
         const netProfit =
           totalGross - totalGoods + totalReactRev - totalAllBonuses;
         const cashRevenue = totalGross - totalGoods + totalReactRev;
+        const weighted = { entry: 0, direct: 0, uni: 0, dfi: 0 };
+        const tw = plans.reduce((s, x) => s + x.mix, 0) || 1;
+        plans.forEach((pl) => {
+          const f = (pl.mix || 0) / tw;
+          weighted.entry += f * pl.entry;
+          weighted.direct += f * (directOn ? pl.directRef : 0);
+          let u = 0;
+          for (let lv = 1; lv <= Math.min(depth, 10); lv++) u += pl.levels[lv];
+          weighted.uni += f * u;
+          weighted.dfi += f * (pl.dfiOn ? pl.dfi : 0);
+        });
+
         return {
           log,
           totalGross,
           totalGoods,
           totalReactRev,
-          totalBonusPair,
-          totalBonusDirect,
-          totalBonusUni,
-          totalBonusDfi,
-          totalPairsPaid,
-          totalFlushed,
-          totalCapSaved,
-          totalDfiCapSaved,
-          totalPairSaved,
-          totalDirectSaved,
-          totalUniSaved,
+          totalPair,
+          totalDirect,
+          totalUni,
+          totalDfi,
+          pairEvents,
+          flushEvents,
+          flushPesos,
+          capSaved,
+          pairCapSaved,
+          directSaved,
+          uniSaved,
+          dfiCapSaved,
           totalCappedEver,
           totalReacts,
           totalPermInact,
           totalMembers,
+          activeNow: memberStatus.filter((s) => s === "active").length,
+          cappedNow: memberStatus.filter((s) => s === "capped").length,
+          permNow: memberStatus.filter((s) => s === "perminact").length,
           days: day,
           netProfit,
           cashRevenue,
-          incap, // pass through for display
           margin: cashRevenue > 0 ? (netProfit / cashRevenue) * 100 : 0,
           grossMargin: totalGross > 0 ? (netProfit / totalGross) * 100 : 0,
-          flushSaved: totalFlushed * bonus,
           maxDayPayout: log.length
             ? Math.max(
                 ...log.map(
@@ -2797,29 +3236,41 @@
             : 0,
           avgEarn: totalMembers > 0 ? totalAllBonuses / totalMembers : 0,
           comRatio: totalGross > 0 ? (totalAllBonuses / totalGross) * 100 : 0,
-          uniPerMember,
+          weighted,
+          plans,
+          planStats,
+          depth,
+          directOn,
+          pcostPct,
         };
+      }
+
+      // ══════════════════════════════════════════
+      //  RUN
+      // ══════════════════════════════════════════
+      function runSim() {
+        const progWrap = document.getElementById("prog");
+        const progBar = document.getElementById("prog-bar");
+        progWrap.style.display = "block";
+        progBar.style.width = "10%";
+        setTimeout(() => {
+          const params = getParams();
+          const r = simulate(params);
+          progBar.style.width = "100%";
+          setTimeout(() => {
+            progWrap.style.display = "none";
+            progBar.style.width = "0%";
+            if (r) displayResults(r, params);
+          }, 300);
+        }, 40);
       }
 
       // ══════════════════════════════════════════
       //  DISPLAY RESULTS
       // ══════════════════════════════════════════
       function displayResults(r, p) {
-        const {
-          entry,
-          pcostPct,
-          bonus,
-          cap,
-          direct,
-          depth,
-          dfi,
-          dfidays,
-          incap,
-          reactfee,
-          reactwin,
-          reactrate,
-          levels,
-        } = p;
+        const { pcostPct } = p;
+        const w = r.weighted;
 
         const lossEl = document.getElementById("alert-loss");
         const warnEl = document.getElementById("alert-warn");
@@ -2850,18 +3301,19 @@
           r.comRatio.toFixed(1) +
           "% paid as commissions";
 
-        const cashIn = Math.round(entry * (1 - pcostPct));
-        const uniTotal = Math.round(r.uniPerMember);
-        const leftover = cashIn - direct - uniTotal - (dfi > 0 ? dfi : 0);
+        // ── flow strip (mix-weighted avg per join) ──
+        const cashIn = w.entry - w.entry * pcostPct;
+        const leftover =
+          cashIn - w.direct - w.uni - (w.dfi > 0 ? w.dfi : 0);
         const flowData = [
           {
-            label: "Entry fee",
-            val: fmtP(entry),
+            label: "Entry fee (avg)",
+            val: fmtP(w.entry),
             color: "var(--bs-body-color)",
           },
           {
             label: `− Goods cost (${Math.round(pcostPct * 100)}%)`,
-            val: fmtP(Math.round(entry * pcostPct)),
+            val: fmtP(w.entry * pcostPct),
             color: "var(--danger)",
           },
           {
@@ -2870,19 +3322,19 @@
             color: "var(--info)",
           },
           {
-            label: "− Direct referral",
-            val: fmtP(direct),
+            label: `− Direct referral`,
+            val: fmtP(w.direct),
+            color: r.directOn ? "var(--danger)" : "var(--muted)",
+          },
+          {
+            label: `− Unilevel (${p.depth}L avg)`,
+            val: fmtP(w.uni),
             color: "var(--danger)",
           },
           {
-            label: `− Unilevel (${depth}L)`,
-            val: fmtP(uniTotal),
-            color: "var(--danger)",
-          },
-          {
-            label: `− Daily fixed (${dfi > 0 ? fmtP(dfi) + "/d" : "off"})`,
-            val: dfi > 0 ? fmtP(dfi) : "₱0",
-            color: dfi > 0 ? "var(--pink)" : "var(--muted)",
+            label: `− Daily fixed (${w.dfi > 0 ? fmtP(w.dfi) + "/d" : "off"})`,
+            val: w.dfi > 0 ? fmtP(w.dfi) : "₱0",
+            color: w.dfi > 0 ? "var(--pink)" : "var(--muted)",
           },
           {
             label: "= Pre-pairing margin",
@@ -2899,10 +3351,50 @@
     </div>`,
           )
           .join("");
+        const flagCls = (on) => (on ? "on" : "off");
+        const flagTxt = (on) => (on ? "on" : "off");
+        document.getElementById("flow-caption").innerHTML =
+          '<div class="flow-caption-grid">' +
+          r.plans
+            .map((pl) => {
+              const pairRow = pl.binary
+                ? `<div class="fc-row"><span>Pair volume</span><b>${fmtP(pl.pairBonus)}/join · ${pl.pairCap}/day</b></div>`
+                : `<div class="fc-row"><span>Pair volume</span><b>off</b></div>`;
+              const dfiTxt = pl.dfiOn ? `${fmtP(pl.dfi)}/day` : "off";
+              return `<div class="fc-chip">
+      <div class="fc-head">
+        <span class="fc-name">${pl.name}</span>
+        <span class="fc-mix">${Math.round(pl.mix)}% mix</span>
+      </div>
+      <div class="fc-row"><span>Entry fee</span><b>${fmtP(pl.entry)}</b></div>
+      ${pairRow}
+      <div class="fc-flags">
+        <span class="fc-flag ${flagCls(pl.binary)}">Binary ${flagTxt(pl.binary)}</span>
+        <span class="fc-flag ${flagCls(pl.indirect)}">Indirect ${flagTxt(pl.indirect)}</span>
+        <span class="fc-flag ${flagCls(pl.dfiOn)}">DFI ${dfiTxt}</span>
+      </div>
+    </div>`;
+            })
+            .join("") +
+          "</div>";
+
+        document.getElementById("r-members").textContent = fmtN(r.totalMembers);
+        document.getElementById("r-active").textContent = fmtN(r.activeNow);
+        document.getElementById("r-capped-now").textContent = fmtN(r.cappedNow);
+        document.getElementById("r-capped-now-s").textContent =
+          "reactivated " +
+          fmtN(r.totalReacts) +
+          " · ever capped " +
+          fmtN(r.totalCappedEver);
+        document.getElementById("r-perm-now").textContent = fmtN(r.permNow);
+        document.getElementById("r-days-hero").textContent = fmtN(r.days);
 
         document.getElementById("r-gross").textContent = fmtP(r.totalGross);
         document.getElementById("r-gross-s").textContent =
-          fmtN(r.totalMembers) + " members × " + fmtP(entry);
+          fmtN(r.totalMembers) +
+          " members · avg " +
+          fmtP(r.totalMembers ? r.totalGross / r.totalMembers : 0) +
+          "/join";
         document.getElementById("r-pcost").textContent = fmtP(r.totalGoods);
         document.getElementById("r-pcost-s").textContent =
           Math.round(pcostPct * 100) +
@@ -2912,47 +3404,40 @@
           r.totalReactRev,
         );
         document.getElementById("r-reactrev-s").textContent =
-          fmtN(r.totalReacts) + " reactivations × " + fmtP(reactfee);
+          fmtN(r.totalReacts) + " reactivations"; // fees vary per plan
         document.getElementById("r-cashin").textContent = fmtP(r.cashRevenue);
-        document.getElementById("r-pair-paid").textContent = fmtP(
-          r.totalBonusPair,
-        );
+        document.getElementById("r-pair-paid").textContent = fmtP(r.totalPair);
         document.getElementById("r-pair-s").textContent =
-          fmtN(r.totalPairsPaid) + " pairs × " + fmtP(bonus);
+          fmtN(r.pairEvents) +
+          " settlements · " +
+          fmtN(r.flushEvents) +
+          " flush events · " +
+          fmtP(r.pairCapSaved) +
+          " cap-blocked";
         document.getElementById("r-direct-paid").textContent = fmtP(
-          r.totalBonusDirect,
+          r.totalDirect,
         );
         document.getElementById("r-direct-s").textContent =
-          fmtP(r.totalBonusDirect) +
+          fmtP(r.totalDirect) +
           " paid · " +
-          fmtP(r.totalDirectSaved) +
-          " cap-blocked · ~" +
-          fmtN(r.totalMembers) +
-          " × " +
-          fmtP(direct);
-        document.getElementById("r-uni-paid").textContent = fmtP(
-          r.totalBonusUni,
-        );
-        const uniBreakdown = p.levels
-          .slice(1, depth + 1)
-          .map((v, i) => `L${i + 1}:${fmtP(v)}`)
-          .join(" · ");
+          fmtP(r.directSaved) +
+          " cap-blocked";
+        document.getElementById("r-uni-paid").textContent = fmtP(r.totalUni);
         const uniPaidAvg = r.totalMembers
-          ? Math.round(r.totalBonusUni / r.totalMembers)
+          ? Math.round(r.totalUni / r.totalMembers)
           : 0;
         document.getElementById("r-uni-s").textContent =
           "avg " +
           fmtP(uniPaidAvg) +
           "/join paid · " +
-          fmtP(r.totalUniSaved) +
-          " cap-blocked · " +
-          uniBreakdown;
-        document.getElementById("r-dfi-paid").textContent = fmtP(
-          r.totalBonusDfi,
-        );
+          fmtP(r.uniSaved) +
+          " cap-blocked · weighted " +
+          fmtP(w.uni) +
+          "/join";
+        document.getElementById("r-dfi-paid").textContent = fmtP(r.totalDfi);
         document.getElementById("r-dfi-s").textContent =
-          dfi > 0
-            ? fmtP(dfi) + "/day · max " + dfidays + " days/member"
+          w.dfi > 0
+            ? fmtP(w.dfi) + "/day weighted avg"
             : "Disabled (₱0/day)";
         document.getElementById("r-capped").textContent = fmtN(
           r.totalCappedEver,
@@ -2963,23 +3448,19 @@
         document.getElementById("r-perminact").textContent = fmtN(
           r.totalPermInact,
         );
-        document.getElementById("r-capsaved").textContent = fmtP(
-          r.totalCapSaved,
-        );
+        document.getElementById("r-capsaved").textContent = fmtP(r.capSaved);
         document.getElementById("r-capsaved-s").textContent =
-          "cap = " +
-          fmtP(r.incap) +
-          " · blocked: pair " +
-          fmtP(r.totalPairSaved) +
+          "blocked: pair " +
+          fmtP(r.pairCapSaved) +
           " + dfi " +
-          fmtP(r.totalDfiCapSaved) +
+          fmtP(r.dfiCapSaved) +
           " + ref " +
-          fmtP(r.totalDirectSaved + r.totalUniSaved);
-        document.getElementById("r-pairs-n").textContent = fmtN(
-          r.totalPairsPaid,
-        );
-        document.getElementById("r-flushed").textContent = fmtN(r.totalFlushed);
-        document.getElementById("r-saved").textContent = fmtP(r.flushSaved);
+          fmtP(r.directSaved + r.uniSaved);
+        document.getElementById("r-pairs-n").textContent = fmtN(r.pairEvents);
+        document.getElementById("r-flushed").textContent = fmtN(r.flushEvents);
+        document.getElementById("r-flushed-s").textContent =
+          fmtP(r.flushPesos) + " flushed volume";
+        document.getElementById("r-saved").textContent = fmtP(r.flushPesos);
         document.getElementById("r-days").textContent = fmtN(r.days);
         document.getElementById("r-avg").textContent = fmtP(r.avgEarn);
         document.getElementById("r-peak").textContent = fmtP(r.maxDayPayout);
@@ -2988,6 +3469,7 @@
         document.getElementById("r-comratio").textContent =
           r.comRatio.toFixed(1) + "%";
 
+        renderPlanBreakdown(r);
         simLog = r.log;
         curPage = 1;
         renderTable();
@@ -3000,6 +3482,72 @@
           120,
         );
       }
+
+      function renderPlanBreakdown(r) {
+        const tbody = document.getElementById("plan-tbl-body");
+        const planColors = ["var(--accent)", "var(--purple)", "var(--pink)"];
+        const total = {
+          members: 0,
+          gross: 0,
+          goods: 0,
+          direct: 0,
+          uni: 0,
+          pair: 0,
+          dfi: 0,
+        };
+        const rows = r.plans
+          .map((pl, i) => {
+            const s = r.planStats[i];
+            total.members += s.members;
+            total.gross += s.gross;
+            total.goods += s.goods;
+            total.direct += s.direct;
+            total.uni += s.uni;
+            total.pair += s.pair;
+            total.dfi += s.dfi;
+            const totalOut = s.direct + s.uni + s.pair + s.dfi;
+            const pop =
+              r.totalMembers > 0 ? ((s.members / r.totalMembers) * 100).toFixed(1) : "0.0";
+            const flags = `${pl.binary ? "B" : "b"}·${pl.indirect ? "I" : "i"}·${pl.dfiOn ? "D" : "d"}`;
+            return `
+    <tr>
+      <td style="color:${planColors[i % 3]}">${pl.name} <span class="ms" style="font-size:10px;color:var(--muted)">${flags}</span></td>
+      <td>${Math.round(pl.mix)}%</td>
+      <td>${fmtN(s.members)}</td>
+      <td>${pop}%</td>
+      <td class="ti">${fmtP(s.gross)}</td>
+      <td class="tr">${fmtP(s.goods)}</td>
+      <td>${fmtP(s.direct)}</td>
+      <td>${fmtP(s.uni)}</td>
+      <td class="tw">${fmtP(s.pair)}</td>
+      <td class="tpk">${fmtP(s.dfi)}</td>
+      <td class="${totalOut >= 0 ? "tg" : "tr"}">${fmtP(totalOut)}</td>
+    </tr>`;
+          })
+          .join("");
+        const tOut = total.direct + total.uni + total.pair + total.dfi;
+        const mixSum = r.plans.reduce((s, pl) => s + (pl.mix || 0), 0);
+        tbody.innerHTML =
+          rows +
+          `
+    <tr class="total-row">
+      <td>All plans</td>
+      <td>${Math.round(mixSum)}%</td>
+      <td>${fmtN(total.members)}</td>
+      <td>100%</td>
+      <td class="ti">${fmtP(total.gross)}</td>
+      <td class="tr">${fmtP(total.goods)}</td>
+      <td>${fmtP(total.direct)}</td>
+      <td>${fmtP(total.uni)}</td>
+      <td class="tw">${fmtP(total.pair)}</td>
+      <td class="tpk">${fmtP(total.dfi)}</td>
+      <td class="tg">${fmtP(tOut)}</td>
+    </tr>`;
+      }
+
+      let simLog = [],
+        curPage = 1;
+      const PER_PAGE = 25;
 
       function renderTable() {
         const total = Math.ceil(simLog.length / PER_PAGE);
@@ -3042,7 +3590,7 @@
           .scrollIntoView({ behavior: "smooth", block: "start" });
       }
 
-      // Income cap is set directly via the Total income cap field
+      applyPreset("default", document.querySelector(".preset-btn"));
     </script>
   </body>
 </html>
