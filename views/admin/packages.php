@@ -294,7 +294,7 @@
               </div>
               <div class="col-md-6">
                 <label class="form-label" style="color:var(--pink);">Max DFI Days</label>
-                <input type="number" name="daily_fixed_income_days" id="pkgDfiDays" class="form-control" inputmode="numeric" min="1" max="1000" value="<?= e($editPkg['daily_fixed_income_days'] ?? 90) ?>">
+                <input type="number" name="daily_fixed_income_days" id="pkgDfiDays" class="form-control" inputmode="numeric" min="1" value="<?= e($editPkg['daily_fixed_income_days'] ?? 90) ?>">
                 <div class="form-text">Maximum days of fixed income per member</div>
               </div>
             </div>
