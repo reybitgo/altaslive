@@ -565,10 +565,9 @@
         gap: 8px;
       }
       .plv-grid {
-        display: grid;
-        grid-template-columns: repeat(5, minmax(76px, 1fr));
-        gap: 0.55rem;
-        max-width: 460px;
+        display: flex;
+        flex-wrap: wrap;
+        max-width: none;
       }
       .plv-grid .plv {
         display: flex;
@@ -577,6 +576,13 @@
         font-size: 10px;
         color: var(--muted);
         font-family: var(--font-mono);
+        flex: 1 1 6rem;
+        max-width: calc(100% - 1rem);
+        margin: 0.5rem;
+        background: var(--surface-2);
+        border: 1px solid var(--border-col);
+        border-radius: 10px;
+        padding: 0.45rem 0.6rem;
       }
       .plv-grid .num-input {
         width: 100%;
@@ -1155,9 +1161,8 @@
         .comp-plan-card {
           padding: 1rem;
         }
-        .plv-grid {
-          grid-template-columns: repeat(2, minmax(76px, 1fr));
-          max-width: 100%;
+        .plv-grid .plv {
+          flex: 1 0 100%;
         }
         .pkg-card {
           flex: 1 0 100%;
@@ -2412,7 +2417,7 @@
         let levelsHtml = "";
         for (let l = 1; l <= 10; l++) {
           levelsHtml += `
-        <label class="plv"><span>L${l}</span>
+        <label class="plv card m-2 plv-card"><span>L${l}</span>
           <input type="number" class="num-input" data-lv="${l}" value="0" min="0" step="1" />
         </label>`;
         }
@@ -2456,7 +2461,7 @@
         </div>
         <div class="plv-row">
           <div class="plv-label">Unilevel L1–L10 (₱) — from this plan, paid on its joins</div>
-          <div class="plv-grid">${levelsHtml}</div>
+          <div class="plv-grid d-flex flex-wrap">${levelsHtml}</div>
         </div>
       </div>`;
       }
