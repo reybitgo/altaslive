@@ -874,25 +874,15 @@
         line-height: 1.6;
       }
 
-      .flow-caption-grid {
-        display: flex;
-        align-items: stretch;
-        gap: 10px;
-        overflow-x: auto;
-        margin-top: 0.5rem;
-        padding-bottom: 4px;
-        scrollbar-width: thin;
-        scrollbar-color: var(--surface-3) transparent;
-      }
-      .flow-caption-grid::-webkit-scrollbar {
-        height: 4px;
-      }
-      .flow-caption-grid::-webkit-scrollbar-thumb {
-        background: var(--surface-3);
-        border-radius: 2px;
+      .pkg-card {
+        width: 18rem;
+        max-width: 100%;
+        background: var(--surface-2);
+        border: 1px solid var(--border-col);
+        color: inherit;
+        font-family: inherit;
       }
       .fc-chip {
-        flex: 0 0 240px;
         background: var(--surface-2);
         border: 1px solid var(--border-col);
         border-radius: 10px;
@@ -1749,7 +1739,7 @@
           Money Flow Per Member Registration (mix-weighted avg)
         </div>
         <div class="flow-strip mb-1" id="flow-cards"></div>
-        <div class="flow-caption-grid mb-4" id="flow-caption"></div>
+        <div class="d-flex flex-wrap mb-4" id="flow-caption"></div>
 
         <div class="section-divider">
           <div class="sd-line"></div>
@@ -3354,14 +3344,13 @@
         const flagCls = (on) => (on ? "on" : "off");
         const flagTxt = (on) => (on ? "on" : "off");
         document.getElementById("flow-caption").innerHTML =
-          '<div class="flow-caption-grid">' +
           r.plans
             .map((pl) => {
               const pairRow = pl.binary
                 ? `<div class="fc-row"><span>Pair volume</span><b>${fmtP(pl.pairBonus)}/join · ${pl.pairCap}/day</b></div>`
                 : `<div class="fc-row"><span>Pair volume</span><b>off</b></div>`;
               const dfiTxt = pl.dfiOn ? `${fmtP(pl.dfi)}/day` : "off";
-              return `<div class="fc-chip">
+              return `<div class="fc-chip card m-2 pkg-card" style="width: 18rem">
       <div class="fc-head">
         <span class="fc-name">${pl.name}</span>
         <span class="fc-mix">${Math.round(pl.mix)}% mix</span>
@@ -3375,8 +3364,7 @@
       </div>
     </div>`;
             })
-            .join("") +
-          "</div>";
+            .join("");
 
         document.getElementById("r-members").textContent = fmtN(r.totalMembers);
         document.getElementById("r-active").textContent = fmtN(r.activeNow);
