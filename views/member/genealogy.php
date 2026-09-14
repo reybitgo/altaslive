@@ -335,7 +335,7 @@
     <?php elseif (Package::hasIndirectReferral((int)$user['package_id'])): ?>
       <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-          <span class="card-title">👥 Referral Network (10 Levels)</span>
+          <span class="card-title">👥 Referral Network</span>
           <span class="badge bg-secondary-subtle text-secondary"><?= count($indirect) ?> members</span>
         </div>
         <div class="card-body p-0">
