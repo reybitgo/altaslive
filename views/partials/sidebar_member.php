@@ -25,7 +25,26 @@ $nav = [
 ];
 
 // Staff accounts (admin/superadmin) are not themselves members — no upgrades.
+// Members only see the button when a plan-compatible higher-tier package exists.
+$canUpgrade = false;
 if (!Auth::isAdmin()) {
+  $curPkgId = (int)($user['package_id'] ?? 0);
+  $curFee   = 0.0;
+  $curPkg   = $curPkgId ? Package::find($curPkgId) : null;
+  if ($curPkg) {
+    $curFee = (float)$curPkg['entry_fee'];
+  }
+  foreach (Package::all(true) as $pkg) {
+    if ((int)$pkg['id'] !== $curPkgId
+        && (float)$pkg['entry_fee'] > $curFee
+        && Package::upgradeCompatible($curPkgId, (int)$pkg['id'])
+    ) {
+      $canUpgrade = true;
+      break;
+    }
+  }
+}
+if ($canUpgrade) {
   $nav[] = ['page' => 'upgrade', 'icon' => '⬆️', 'label' => 'Upgrade Package', 'pages' => ['upgrade']];
 }
 
