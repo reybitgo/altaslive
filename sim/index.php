@@ -2051,7 +2051,7 @@
       //  Each preset is a set of plans (with join mix) + global controls.
       //  Default mirrors tmp/pckgs/pckgs.json — the seeded live package
       //  lineup (Basic → Platinum, entry ₱5k–₱1M, per-plan binary/indirect/
-      //  DFI toggles, unilevel L1–L4, lifetime cap 3×–5× entry).
+      //  DFI toggles, unilevel L2–L5, lifetime cap 5× entry).
       // ══════════════════════════════════════════
       const PRESETS = {
         default: {
@@ -2072,12 +2072,12 @@
               capMult: 5,
               reactFee: 5000,
               reactWin: 15,
-              dfi: 20,
-              dfiDays: 1250,
+              dfi: 25,
+              dfiDays: 1000,
               binary: false,
               indirect: true,
               dfiOn: true,
-              levels: [0, 200, 100, 50, 10, 0, 0, 0, 0, 0, 0],
+              levels: [0, 0, 250, 150, 50, 50, 0, 0, 0, 0, 0],
             },
             {
               name: "Starter",
@@ -2086,7 +2086,7 @@
               pairBonus: 1500,
               pairCap: 5,
               directRef: 1000,
-              capMult: 3,
+              capMult: 5,
               reactFee: 10000,
               reactWin: 15,
               dfi: 33,
@@ -2102,7 +2102,7 @@
               entry: 10000,
               pairBonus: 0,
               pairCap: 0,
-              directRef: 1500,
+              directRef: 1000,
               capMult: 5,
               reactFee: 10000,
               reactWin: 15,
@@ -2111,7 +2111,7 @@
               binary: false,
               indirect: true,
               dfiOn: true,
-              levels: [0, 500, 300, 200, 100, 0, 0, 0, 0, 0, 0],
+              levels: [0, 0, 500, 300, 100, 100, 0, 0, 0, 0, 0],
             },
             {
               name: "Elite",
@@ -2119,7 +2119,7 @@
               entry: 20000,
               pairBonus: 0,
               pairCap: 0,
-              directRef: 2500,
+              directRef: 2000,
               capMult: 5,
               reactFee: 20000,
               reactWin: 15,
@@ -2128,7 +2128,7 @@
               binary: false,
               indirect: true,
               dfiOn: true,
-              levels: [0, 1000, 500, 300, 100, 0, 0, 0, 0, 0, 0],
+              levels: [0, 0, 1000, 600, 200, 200, 0, 0, 0, 0, 0],
             },
             {
               name: "Silver",
@@ -2136,7 +2136,7 @@
               entry: 50000,
               pairBonus: 0,
               pairCap: 0,
-              directRef: 6500,
+              directRef: 5000,
               capMult: 5,
               reactFee: 50000,
               reactWin: 15,
@@ -2145,7 +2145,7 @@
               binary: false,
               indirect: true,
               dfiOn: true,
-              levels: [0, 2500, 1000, 500, 200, 0, 0, 0, 0, 0, 0],
+              levels: [0, 0, 2500, 1500, 500, 500, 0, 0, 0, 0, 0],
             },
             {
               name: "Gold",
@@ -2153,7 +2153,7 @@
               entry: 100000,
               pairBonus: 0,
               pairCap: 0,
-              directRef: 12000,
+              directRef: 10000,
               capMult: 5,
               reactFee: 100000,
               reactWin: 15,
@@ -2162,7 +2162,7 @@
               binary: false,
               indirect: true,
               dfiOn: true,
-              levels: [0, 5000, 2000, 1000, 500, 0, 0, 0, 0, 0, 0],
+              levels: [0, 0, 5000, 3000, 1000, 1000, 0, 0, 0, 0, 0],
             },
             {
               name: "Diamond",
@@ -2170,7 +2170,7 @@
               entry: 500000,
               pairBonus: 0,
               pairCap: 0,
-              directRef: 60000,
+              directRef: 50000,
               capMult: 5,
               reactFee: 500000,
               reactWin: 15,
@@ -2179,7 +2179,7 @@
               binary: false,
               indirect: true,
               dfiOn: true,
-              levels: [0, 20000, 10000, 5000, 2000, 0, 0, 0, 0, 0, 0],
+              levels: [0, 0, 25000, 15000, 5000, 5000, 0, 0, 0, 0, 0],
             },
             {
               name: "Platinum",
@@ -2187,7 +2187,7 @@
               entry: 1000000,
               pairBonus: 0,
               pairCap: 0,
-              directRef: 120000,
+              directRef: 100000,
               capMult: 5,
               reactFee: 1000000,
               reactWin: 15,
@@ -2196,7 +2196,7 @@
               binary: false,
               indirect: true,
               dfiOn: true,
-              levels: [0, 40000, 20000, 10000, 5000, 0, 0, 0, 0, 0, 0],
+              levels: [0, 0, 50000, 30000, 10000, 10000, 0, 0, 0, 0, 0],
             },
           ],
         },
@@ -2365,12 +2365,12 @@
         capMult: 5,
         reactFee: 5000,
         reactWin: 15,
-        dfi: 20,
-        dfiDays: 1250,
+        dfi: 25,
+        dfiDays: 1000,
         binary: false,
         indirect: true,
         dfiOn: true,
-        levels: [0, 200, 100, 50, 10, 0, 0, 0, 0, 0, 0],
+        levels: [0, 0, 250, 150, 50, 50, 0, 0, 0, 0, 0],
       };
 
       const fmtN = (n) => Math.round(n).toLocaleString();
