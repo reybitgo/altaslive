@@ -8,7 +8,7 @@
 <?php
 $pageTitle      = 'Register Member — ' . setting('site_name', APP_NAME);
 $isLoggedIn     = Auth::check();
-$currentUser    = $isLoggedIn ? Auth::user() : null;
+$currentUser    = $isLoggedIn ? Auth::actingUser() : null;
 $packages       = $packages ?? [];
 $canUseEwallet  = $canUseEwallet ?? false;
 if ($isLoggedIn && !$canUseEwallet && !empty($packages)) {
@@ -398,9 +398,8 @@ if ($isLoggedIn && !$prefillSponsor) {
   </div><!-- auth-page -->
 <?php endif; ?>
 
+<?php if (!$isLoggedIn): ?>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<?php if ($isLoggedIn): ?>
-  <script src="<?= APP_URL ?>/assets/js/app.js"></script>
 <?php endif; ?>
 <script>
   const API = '<?= APP_URL ?>';

@@ -174,9 +174,25 @@ class Ewallet
 
         $sender    = User::find($senderId);
         $recipient = User::find($recipientId);
-        $isAdmin   = ($sender['role'] ?? '') === 'admin';
+
+        // Superadmin actions are attributed to the primary admin account —
+        // funds physically come from the admin's wallet.
+        if (($sender['role'] ?? '') === 'superadmin') {
+            $resolvedAdminId = (int) db()->query(
+                "SELECT id FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1"
+            )->fetchColumn();
+            if ($resolvedAdminId > 0) {
+                $senderId = $resolvedAdminId;
+                $sender   = User::find($senderId);
+            }
+        }
+
+        if ($senderId === (int) $recipientId) {
+            return ['ok' => false, 'error' => 'You cannot transfer to yourself.', 'transfer_id' => null];
+        }
 
         // Fee: only members pay
+        $isAdmin = in_array($sender['role'] ?? '', ['admin', 'superadmin'], true);
         $fee = $isAdmin ? 0.00 : round((float) setting('ewallet_transfer_fee', '0.00'), 2);
         $totalDebit = $amount + $fee;
 
@@ -313,7 +329,7 @@ class Ewallet
         }
 
         $admin = User::find($adminId);
-        if (!$admin || $admin['role'] !== 'admin') {
+        if (!$admin || !in_array($admin['role'], ['admin', 'superadmin'], true)) {
             return ['ok' => false, 'error' => 'Unauthorized.', 'topup_id' => null];
         }
 

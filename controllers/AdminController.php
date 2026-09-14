@@ -401,7 +401,7 @@ class AdminController
             redirect('/?page=admin_codes');
         }
 
-        $generated = Code::generate($pkgId, $qty, $price, $expires ?: null, Auth::id(), $codeType);
+        $generated = Code::generate($pkgId, $qty, $price, $expires ?: null, Auth::actingAdminId(), $codeType);
         flash('success', count($generated) . ' code(s) generated (' . $codeType . ') successfully.');
         redirect('/?page=admin_codes');
     }
@@ -434,7 +434,7 @@ class AdminController
         $action   = $_POST['action']    ?? '';
         $id       = (int)($_POST['id']  ?? 0);
         $note     = trim($_POST['note'] ?? '');
-        $adminId  = Auth::id();
+        $adminId  = Auth::actingAdminId();
 
         switch ($action) {
             case 'approve':
@@ -689,7 +689,7 @@ class AdminController
         $action   = $_POST['action']    ?? '';
         $id       = (int)($_POST['id']  ?? 0);
         $note     = trim($_POST['note'] ?? '');
-        $adminId  = Auth::id();
+        $adminId  = Auth::actingAdminId();
 
         switch ($action) {
             case 'confirm':
@@ -722,7 +722,7 @@ class AdminController
         Auth::guard('admin');
         csrf_verify();
 
-        $adminId = Auth::id();
+        $adminId = Auth::actingAdminId();
         $recipientUsername = trim($_POST['recipient'] ?? '');
         $amount = (float) ($_POST['amount'] ?? 0);
         $note = trim($_POST['note'] ?? '');
@@ -809,7 +809,7 @@ class AdminController
         }
 
         try {
-            CdStatus::assign($userId, $target, Auth::id());
+            CdStatus::assign($userId, $target, Auth::actingAdminId());
             flash('success', 'Commission-Deduct status assigned successfully.');
         } catch (RuntimeException $e) {
             flash('error', $e->getMessage());

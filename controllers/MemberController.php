@@ -10,6 +10,7 @@ class MemberController
     {
         Auth::guard('member');
         $user    = Auth::user();
+        $wallet  = Auth::actingUser();
         $summary = Commission::summary($user['id']);
         $status  = User::todayPairingStatus($user['id']);
         $recent  = Commission::recent($user['id'], 8);
@@ -764,7 +765,7 @@ class MemberController
     public function ewalletTransfer(): void
     {
         Auth::check() or redirect('/?page=login');
-        $user = Auth::user();
+        $user = Auth::actingUser();
         $fee = Auth::isAdmin() ? 0.00 : (float) setting('ewallet_transfer_fee', '0.00');
         $min = (float) setting('ewallet_min_transfer', '50.00');
         $dailyLimit  = (float) setting('ewallet_transfer_daily_limit', '5000.00');

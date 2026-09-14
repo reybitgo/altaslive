@@ -17,8 +17,10 @@ if (isset($_GET['page']) && $_GET['page'] === 'admin_user_view' && !empty($_GET[
 } else {
     // Fallback: should not happen if routed correctly
     $user = Auth::user();
+    // Superadmins act as an admin proxy — surface the acting admin's wallet.
+    $walletUser = Auth::isSuperadmin() ? (User::find(Auth::actingAdminId()) ?: $user) : $user;
 }
-$topbarBalance = fmt_money($user['ewallet_balance'] ?? 0);
+$topbarBalance = fmt_money(($walletUser ?? $user)['ewallet_balance'] ?? 0);
 $initials      = strtoupper(substr($user['username'] ?? 'U', 0, 1));
 $isMember      = ($user['role'] ?? '') === 'member';
 ?>
@@ -36,7 +38,7 @@ $isMember      = ($user['role'] ?? '') === 'member';
     <div class="topbar-title"><?= e($pageTitle ?? 'Dashboard') ?></div>
 
     <div class="d-flex align-items-center gap-2">
-        <?php if ($isMember): ?>
+        <?php if ($isMember || Auth::isSuperadmin()): ?>
             <div class="topbar-balance d-none d-sm-flex">
                 <span class="bal-label">Balance</span>
                 <span class="bal-amount" id="topbarBalance"><?= $topbarBalance ?></span>

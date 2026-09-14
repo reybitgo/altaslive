@@ -146,7 +146,7 @@ class AuthController
         $canUseEwallet = false;
         if (Auth::check() && !empty($packages)) {
             $minFee = min(array_map(fn($p) => (float)$p['entry_fee'], $packages));
-            $canUseEwallet = Ewallet::balance(Auth::id()) >= $minFee;
+            $canUseEwallet = Ewallet::balance(Auth::actingAdminId()) >= $minFee;
         }
 
         // Auto-find upline + position for referral mode
@@ -242,7 +242,7 @@ class AuthController
             redirect('/?page=login');
         }
 
-        $payerId = $wasLoggedIn ? (int)Auth::id() : 0;
+        $payerId = $wasLoggedIn ? Auth::actingAdminId() : 0;
 
         // ── Payment-specific validation ──
         $regCodeId = null;
@@ -349,7 +349,7 @@ class AuthController
                 'reg_code_id'        => $regCodeId,
                 'reg_payment_method' => $isReferralMode ? 'pending' : $paymentMethod,
                 'reg_paid_by'        => $regPaidBy,
-                'paid_by_username'   => $wasLoggedIn ? (Auth::user()['username'] ?? '') : '',
+                'paid_by_username'   => $wasLoggedIn ? (Auth::actingUser()['username'] ?? '') : '',
                 'sponsor_id'         => (int)$sponsor['id'],
                 'binary_parent_id'   => $upline ? (int)$upline['id'] : null,
                 'binary_position'    => $upline ? $position : null,
@@ -361,7 +361,7 @@ class AuthController
                 $_SESSION['user_id']   = $prevUserId;
                 $_SESSION['user_role'] = $prevUserRole;
                 flash('success', "Account @{$username} registered successfully." . ($isReferralMode ? ' Awaiting activation.' : ''));
-                redirect($prevUserRole === 'admin' ? '/?page=admin_users' : '/?page=dashboard');
+                redirect(in_array($prevUserRole, ['admin', 'superadmin'], true) ? '/?page=admin_users' : '/?page=dashboard');
             } else {
                 // Guest registering themselves — log them in as the new user
                 $newUser = User::find($newId);

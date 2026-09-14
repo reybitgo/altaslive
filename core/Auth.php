@@ -158,6 +158,44 @@ class Auth
         return (int)($_SESSION['user_id'] ?? 0);
     }
 
+    /**
+     * Effective admin account id for admin-attributed operations.
+     *
+     * Superadmin actions are attributed to the primary admin account
+     * (first user with role = 'admin'), so the superadmin's own wallet is
+     * never debited and every transaction record points to the admin.
+     */
+    public static function actingAdminId(): int
+    {
+        if (self::isSuperadmin()) {
+            $id = (int) db()->query(
+                "SELECT id FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1"
+            )->fetchColumn();
+            return $id > 0 ? $id : self::id();
+        }
+        return self::id();
+    }
+
+    /**
+     * Effective user row for wallet/fund display.
+     *
+     * Superadmins act as an admin proxy: wallet displays, payment sources and
+     * transaction attribution resolve to the primary admin account. Everyone
+     * else gets their own row.
+     */
+    public static function actingUser(): array
+    {
+        if (self::isSuperadmin()) {
+            static $acting = null;
+            if ($acting === null) {
+                $id = self::actingAdminId();
+                $acting = $id === self::id() ? self::user() : (User::find($id) ?: self::user());
+            }
+            return $acting;
+        }
+        return self::user();
+    }
+
     // ── Current User ──────────────────────────────────────────────────────────
 
     /**

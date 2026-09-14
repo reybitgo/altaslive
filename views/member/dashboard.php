@@ -159,14 +159,14 @@
     <!-- KPI Cards -->
     <div class="row g-3 mb-3">
       <?php
-      $withdrawable = (float) ($user['withdrawable_balance'] ?? 0);
-      $nonWithdrawable = (float) ($user['ewallet_balance'] ?? 0) - $withdrawable;
+      $withdrawable = (float) ($wallet['withdrawable_balance'] ?? 0);
+      $nonWithdrawable = (float) ($wallet['ewallet_balance'] ?? 0) - $withdrawable;
       $balanceSub = 'Withdraw →';
       if ($nonWithdrawable > 0) {
           $balanceSub = fmt_money($withdrawable) . ' withdrawable · ' . fmt_money($nonWithdrawable) . ' locked';
       }
       $cards = [
-        [$user['ewallet_balance'], 'E-Wallet Balance',   '💰', 'primary', 'primary', $balanceSub, 'payout'],
+        [$wallet['ewallet_balance'], 'E-Wallet Balance',   '💰', 'primary', 'primary', $balanceSub, 'payout'],
         [$summary['total_pairing'],  'Pairing Earnings', '🤝', 'success', 'success', fmt_money($status['matched_volume']) . ' matched lifetime', null],
         [$summary['total_direct'],   'Direct Referral',  '👥', 'orange',  'warning', null, 'genealogy&view=referral'],
         ...(Package::hasIndirectReferral((int)$user['package_id']) ? [
