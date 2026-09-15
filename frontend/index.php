@@ -497,7 +497,7 @@ $streamOxford = count($streamWords) > 2
       <div class="af-modal-header">
         <div>
           <h2 id="compliance-title">Compliance & Legal Disclosure</h2>
-          <p>Transparency statement — January 2025</p>
+          <p>Transparency statement — September 2026</p>
         </div>
         <button class="af-modal-close" onclick="closeModal('modal-compliance')" aria-label="Close">✕</button>
       </div>
@@ -508,7 +508,16 @@ $streamOxford = count($streamWords) > 2
         </div>
 
         <h3>1. Business Registration</h3>
-        <p><?= e($siteName) ?> is currently in the process of registering as a sole proprietorship with the Philippine Department of Trade and Industry (DTI). Business name registration application is pending as of January 2025. Upon approval, our DTI certificate number will be published here. <?= e($siteName) ?> operates from Santiago, Isabela, Philippines (postal code 3006).</p>
+        <p><?= e($siteName) ?> is registered as a sole proprietorship with the Philippine Department of Trade and Industry (DTI). In addition to the DTI business name registration, <?= e($siteName) ?> holds all required permits and certificates to operate as a poultry business. Copies of our legal documents are available in the <a href="#legalities" style="color:var(--green-mid);font-weight:600;" onclick="closeModal('modal-compliance')">Legalities</a> section.</p>
+        <ul>
+          <li><strong>DTI Business Name Registration</strong></li>
+          <li><strong>Business Registration</strong></li>
+          <li><strong>Mayor's Business Permit</strong> — issued by the local government unit</li>
+          <li><strong>Sanitary Permit</strong> — issued by the municipal health office</li>
+          <li><strong>Fire Safety Certificate</strong> — issued by the Bureau of Fire Protection</li>
+          <li><strong>DENR Environmental Compliance Certificate</strong> — issued by the Department of Environment and Natural Resources</li>
+        </ul>
+        <p><a href="#legalities" style="color:var(--green-mid);font-weight:600;" onclick="closeModal('modal-compliance')">View our Legal documents →</a></p>
 
         <h3>2. Nature of the Farm and Member Platform</h3>
         <p><?= e($siteName) ?> is a Philippine poultry operation with a member platform organized around farm entries. Received bulk payments are used to schedule actual poultry production, with chicks hatched according to the selected entry specification. The normal hatch lead time is 21 days. Members may take the chicks at hatch or choose to leave them with the farm for grow-out. The current grow-out arrangement provides a 15% return on eligible entries at completion of the applicable cycle. The separate member platform may also provide direct, binary, unilevel, or Loyalty Reward features according to package rules. <?= e($siteName) ?> is not a bank, lending institution, or securities issuer.</p>
@@ -538,7 +547,7 @@ $streamOxford = count($streamWords) > 2
         <p>For compliance concerns, legal inquiries, or to report a policy violation: <a href="mailto:support@altasfarm.com" style="color:var(--green-mid);">support@altasfarm.com</a><br>
           Mailing address: <?= e($siteName) ?>, Rang-ay, Cabatuan, Isabela 3315, Philippines</p>
 
-        <p class="meta-line">This disclosure is provided in good faith as part of <?= e($siteName) ?>'s commitment to operating transparently. Last reviewed: January 2025.</p>
+        <p class="meta-line">This disclosure is provided in good faith as part of <?= e($siteName) ?>'s commitment to operating transparently. Last reviewed: September 2026.</p>
       </div>
     </div>
   </div>
@@ -1237,8 +1246,7 @@ $streamOxford = count($streamWords) > 2
         <div class="footer-copy">
           © 2024–<script>
             document.write(new Date().getFullYear())
-          </script> <?= e($siteName) ?> · All rights reserved · Philippines 🇵🇭<br>
-          <span style="font-size:.75rem;opacity:.6;">Registered business name application pending · DTI — Isabela</span>
+          </script> <?= e($siteName) ?> · All rights reserved · Philippines 🇵🇭
         </div>
         <div class="footer-legal">
           <a href="#" onclick="openModal('modal-privacy');return false;">Privacy Policy</a>
