@@ -309,3 +309,28 @@ function toggleFaq(btn) {
     })
     .catch(function () {});
 })();
+
+/* ── Legalities image viewer ───────────────────────────── */
+function openLegalImg(imgEl) {
+  if (!imgEl) return;
+  var title = document.getElementById("legal-img-title");
+  if (title) title.textContent = imgEl.alt || "Certificate";
+  var full = document.getElementById("legalImgFull");
+  if (full) full.src = imgEl.src;
+  openModal("modal-legal-img");
+}
+document.addEventListener("click", function (e) {
+  var box = e.target.closest(".legal-img");
+  if (!box) return;
+  var img = box.querySelector("img");
+  if (img) openLegalImg(img);
+});
+document.addEventListener("keydown", function (e) {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  var t = e.target;
+  if (t.classList && t.classList.contains("legal-img")) {
+    e.preventDefault();
+    var img = t.querySelector("img");
+    if (img) openLegalImg(img);
+  }
+});

@@ -603,6 +603,21 @@ $streamOxford = count($streamWords) > 2
   </div>
 
 
+  <!-- ── Legalities Image Viewer Modal ───────────────────────────── -->
+  <div class="af-modal-backdrop" id="modal-legal-img" role="dialog" aria-modal="true" aria-labelledby="legal-img-title" onclick="closeModalOnBackdrop(event,'modal-legal-img')">
+    <div class="af-modal af-modal--image">
+      <div class="af-modal-header">
+        <div>
+          <h2 id="legal-img-title">Certificate</h2>
+        </div>
+        <button class="af-modal-close" onclick="closeModal('modal-legal-img')" aria-label="Close">✕</button>
+      </div>
+      <div class="af-modal-body af-modal-body--image">
+        <img id="legalImgFull" src="" alt="Full-size legal document">
+      </div>
+    </div>
+  </div>
+
   <!-- ════════════════════════════════════════════════════════════
      SITE HEADER (fixed wrapper: contact strip + nav)
 ════════════════════════════════════════════════════════════ -->
@@ -623,6 +638,7 @@ $streamOxford = count($streamWords) > 2
           <li><a href="#plan">Earn Plan</a></li>
           <li><a href="#packages">Packages</a></li>
           <li><a href="#why">Why Us</a></li>
+          <li><a href="#legalities">Legalities</a></li>
         </ul>
         <div class="nav-cta">
           <a href="<?= $base ?>/?page=login" class="nav-btn-login">Login</a>
@@ -645,6 +661,7 @@ $streamOxford = count($streamWords) > 2
     <a href="#plan" onclick="toggleMobileMenu()">Earn Plan</a>
     <a href="#packages" onclick="toggleMobileMenu()">Packages</a>
     <a href="#why" onclick="toggleMobileMenu()">Why Us</a>
+    <a href="#legalities" onclick="toggleMobileMenu()">Legalities</a>
     <div style="margin-top:2rem;display:flex;flex-direction:column;gap:1rem;">
       <a href="<?= $base ?>/?page=login" style="color:var(--gold);text-align:center;">Sign In</a>
       <a href="<?= $base ?>/?page=register" class="btn-gold" style="text-align:center;">Join Now</a>
@@ -1096,26 +1113,57 @@ $streamOxford = count($streamWords) > 2
   </section>
 
   <!-- ════════════════════════════════════════════════════════════
-     CTA
+     LEGALITIES
 ════════════════════════════════════════════════════════════ -->
-  <section class="cta-section">
-    <div class="cta-inner">
-      <?php if ($isFull): ?>
-        <div class="tag" style="background:rgba(224,52,52,.2);color:#fca5a5;">Registration Closed</div>
-        <h2>Registration Is Currently Closed.</h2>
-        <p>New accounts cannot be created at this time. If you are already a member, sign in to access your dashboard.</p>
-        <div class="cta-buttons">
-          <a href="<?= $base ?>/?page=login" class="btn-gold" style="font-size:1rem;padding:1rem 2.5rem;">Sign In →</a>
+  <section class="how" id="legalities">
+    <div class="container">
+      <div class="tag tag-green" style="background:rgba(212,160,23,.15);color:rgba(255,255,255,.7);">Legalities &amp; Compliance</div>
+      <h2 class="section-title">Operating With the Proper Documents.</h2>
+      <p class="section-lead"><?= e($siteName) ?> holds the required permits and registrations to operate as a legitimate poultry business in the Philippines. Below are our key business documents.</p>
+      <div class="steps-grid">
+        <div class="step-card fade-up">
+          <div class="legal-img" role="button" tabindex="0" aria-label="View DTI Business Name Registration certificate">
+            <img src="<?= $frontend ?>/img/legalities/dti.png" alt="DTI Business Name Registration" loading="lazy">
+          </div>
+          <div class="step-title">DTI Business Name Registration</div>
+          <div class="step-desc">Registered with the Department of Trade and Industry under the Philippines' business name registration system.</div>
         </div>
-      <?php else: ?>
-        <div class="tag" style="background:rgba(212,160,23,.2);color:var(--gold-light);">Open Community</div>
-        <h2><?= e($siteName) ?> — Grow the Farm With Us.</h2>
-        <p>Every entry contributes to the farm's continued growth. Start with the participation level that suits you, take part in the cycle, and use the options available through your selected entry.</p>
-        <div class="cta-buttons">
-          <a href="<?= $base ?>/?page=register" class="btn-gold" style="font-size:1rem;padding:1rem 2.5rem;">🌱 Register Now</a>
+        <div class="step-card fade-up">
+          <div class="legal-img" role="button" tabindex="0" aria-label="View Business Registration certificate">
+            <img src="<?= $frontend ?>/img/legalities/business_registration.png" alt="Business Registration" loading="lazy">
+          </div>
+          <div class="step-title">Business Registration</div>
+          <div class="step-desc">Duly registered with the relevant local and national agencies as required for Philippine business operations.</div>
         </div>
-        <a href="<?= $base ?>/?page=login" class="cta-login">Already a member? Sign in →</a>
-      <?php endif; ?>
+        <div class="step-card fade-up">
+          <div class="legal-img" role="button" tabindex="0" aria-label="View Mayor's Business Permit certificate">
+            <img src="<?= $frontend ?>/img/legalities/business_permit.png" alt="Business Permit" loading="lazy">
+          </div>
+          <div class="step-title">Mayor's Business Permit</div>
+          <div class="step-desc">Annual business permit issued by the local government unit (LGU) authorizing operations within the municipality.</div>
+        </div>
+        <div class="step-card fade-up">
+          <div class="legal-img" role="button" tabindex="0" aria-label="View Sanitary Permit certificate">
+            <img src="<?= $frontend ?>/img/legalities/sanitary_permit.png" alt="Sanitary Permit" loading="lazy">
+          </div>
+          <div class="step-title">Sanitary Permit</div>
+          <div class="step-desc">Issued by the municipal health office, confirming compliance with local sanitation and public health standards.</div>
+        </div>
+        <div class="step-card fade-up">
+          <div class="legal-img" role="button" tabindex="0" aria-label="View Fire Safety Certificate">
+            <img src="<?= $frontend ?>/img/legalities/fire_safety.png" alt="Fire Safety Certificate" loading="lazy">
+          </div>
+          <div class="step-title">Fire Safety Certificate</div>
+          <div class="step-desc">Certified by the Bureau of Fire Protection (BFP), verifying that the premises meet fire safety requirements.</div>
+        </div>
+        <div class="step-card fade-up">
+          <div class="legal-img" role="button" tabindex="0" aria-label="View DENR Environmental Compliance certificate">
+            <img src="<?= $frontend ?>/img/legalities/denr_certificate.png" alt="DENR Certificate" loading="lazy">
+          </div>
+          <div class="step-title">DENR Environmental Compliance</div>
+          <div class="step-desc">Environmental compliance certificate issued by the Department of Environment and Natural Resources (DENR).</div>
+        </div>
+      </div>
     </div>
   </section>
 

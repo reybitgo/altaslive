@@ -744,6 +744,31 @@ section {
   color: rgba(255, 255, 255, 0.6);
   line-height: 1.6;
 }
+/* Legalities image cards */
+.legal-img {
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 1.25rem;
+  background: rgba(255, 255, 255, 0.04);
+  cursor: zoom-in;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.legal-img:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+.legal-img:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+.legal-img img {
+  display: block;
+  width: 100%;
+  height: 180px;
+  object-fit: contain;
+  padding: 1rem;
+  background: transparent;
+}
 
 /* ── COMPENSATION PLAN ────────────────────────────────────── */
 .plan {
@@ -1762,6 +1787,22 @@ footer {
 .af-modal-body .warn-box p {
   margin: 0;
   color: #7a5c00;
+}
+
+/* Legalities full-size image modal */
+.af-modal--image {
+  max-width: 1500px;
+  width: 75vw;
+}
+.af-modal-body--image {
+  max-height: 82vh;
+  overflow: auto;
+  padding: 0;
+}
+.af-modal-body--image img {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 /* FAQ accordion */
