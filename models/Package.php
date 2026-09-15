@@ -47,10 +47,10 @@ class Package
      * Save or update a package with all v2 fields.
      *
      * @param array $data Package data including v2 fields:
-     *   - name, entry_fee, pairing_bonus, daily_pair_cap, direct_ref_bonus, status
-     *   - lifetime_cap_multiplier, reactivation_fee, reactivation_window_days
-     *   - daily_fixed_income, daily_fixed_income_days
-     *   - indirect_levels[1..10]
+*   - name, image, entry_fee, pairing_bonus, daily_pair_cap, direct_ref_bonus, status
+         *   - lifetime_cap_multiplier, reactivation_fee, reactivation_window_days
+         *   - daily_fixed_income, daily_fixed_income_days
+         *   - indirect_levels[1..10]
      * @param int|null $id Package ID for update, null for create
      */
     public static function save(array $data, ?int $id = null): int
@@ -59,6 +59,7 @@ class Package
 
         $fields = [
             'name'                     => $data['name'],
+            'image'                    => $data['image'] ?? null,
             'entry_fee'                => (float)($data['entry_fee'] ?? 0),
             'pairing_bonus'            => (float)($data['pairing_bonus'] ?? 0),
             'daily_pair_cap'           => (int)($data['daily_pair_cap'] ?? 3),

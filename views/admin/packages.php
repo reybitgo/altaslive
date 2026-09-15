@@ -122,8 +122,15 @@
               ?>
                 <tr>
                   <td style="padding-left:1.25rem;">
-                    <div class="fw-semibold"><?= e($pkg['name']) ?></div>
-                    <div class="text-muted" style="font-size:.7rem;">ID: <?= (int)$pkg['id'] ?></div>
+                    <div class="d-flex align-items-center gap-2">
+                      <?php if (!empty($pkg['image'])): ?>
+                        <img src="<?= APP_URL ?>/uploads/<?= e($pkg['image']) ?>" alt="" class="rounded" style="width:36px;height:36px;object-fit:cover;">
+                      <?php endif; ?>
+                      <div>
+                        <div class="fw-semibold"><?= e($pkg['name']) ?></div>
+                        <div class="text-muted" style="font-size:.7rem;">ID: <?= (int)$pkg['id'] ?></div>
+                      </div>
+                    </div>
                   </td>
                   <td class="text-end font-mono"><?= fmt_money($pkg['entry_fee']) ?></td>
                   <td class="text-end font-mono td-green"><?= fmt_money($pkg['pairing_bonus']) ?></td>
@@ -178,7 +185,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <form method="POST" action="<?= APP_URL ?>/?page=admin_save_package" id="packageForm">
+        <form method="POST" action="<?= APP_URL ?>/?page=admin_save_package" id="packageForm" enctype="multipart/form-data">
           <?= csrf_field() ?>
           <input type="hidden" name="package_id" id="packageId" value="<?= e($editPkg['id'] ?? '') ?>">
 
@@ -218,6 +225,21 @@
           <div class="mb-3">
             <label class="form-label">Package Name <span class="text-danger">*</span></label>
             <input type="text" name="name" id="pkgName" class="form-control" value="<?= e($editPkg['name'] ?? '') ?>" placeholder="e.g. Starter, Pro, Elite" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Package Image</label>
+            <?php if (!empty($editPkg['image'])): ?>
+              <div class="mb-2" id="pkgImageCurrentWrap">
+                <img src="<?= APP_URL ?>/uploads/<?= e($editPkg['image']) ?>" alt="Current package image" class="rounded" style="width:80px;height:80px;object-fit:cover;border:2px solid var(--border,rgba(255,255,255,.12));">
+                <div class="form-text mt-1">Current image</div>
+              </div>
+            <?php endif; ?>
+            <input type="file" name="package_image" id="pkgImageInput" class="form-control" accept="image/jpeg,image/png,image/webp">
+            <div class="form-text">JPG, PNG or WebP · max 5 MB<?= ($editPkg ?? null) ? '. Leave empty to keep current image' : '' ?>.</div>
+            <div class="mt-2 d-none" id="pkgImagePreviewWrap">
+              <img id="pkgImagePreview" src="" alt="New image preview" class="rounded" style="width:80px;height:80px;object-fit:cover;border:2px solid var(--border,rgba(255,255,255,.12));">
+            </div>
           </div>
 
           <div class="row g-3 mb-3">
@@ -351,11 +373,16 @@
       </div>
       <div class="modal-body">
 
-        <!-- Header: name + status + toggle badges -->
+        <!-- Header: image + name + status + toggle badges -->
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-          <div>
-            <h5 class="mb-1"><?= e($viewPkg['name']) ?></h5>
-            <span class="text-muted" style="font-size:.75rem;">ID: <?= (int)$viewPkg['id'] ?></span>
+          <div class="d-flex align-items-center gap-3">
+            <?php if (!empty($viewPkg['image'])): ?>
+              <img src="<?= APP_URL ?>/uploads/<?= e($viewPkg['image']) ?>" alt="<?= e($viewPkg['name']) ?>" class="rounded" style="width:64px;height:64px;object-fit:cover;border:2px solid var(--border,rgba(255,255,255,.12));">
+            <?php endif; ?>
+            <div>
+              <h5 class="mb-1"><?= e($viewPkg['name']) ?></h5>
+              <span class="text-muted" style="font-size:.75rem;">ID: <?= (int)$viewPkg['id'] ?></span>
+            </div>
           </div>
           <div class="d-flex align-items-center gap-2">
             <?php if ($viewPkg['status'] === 'active'): ?>
@@ -485,6 +512,30 @@
 <?php endif; ?>
 
 <script>
+  // ── Package image preview on file select ──
+  const pkgImageInput = document.getElementById('pkgImageInput');
+  const pkgImagePreview = document.getElementById('pkgImagePreview');
+  const pkgImagePreviewWrap = document.getElementById('pkgImagePreviewWrap');
+  const pkgImageCurrentWrap = document.getElementById('pkgImageCurrentWrap');
+
+  if (pkgImageInput) {
+    pkgImageInput.addEventListener('change', function() {
+      const file = this.files[0];
+      if (!file) {
+        pkgImagePreviewWrap.classList.add('d-none');
+        if (pkgImageCurrentWrap) pkgImageCurrentWrap.style.display = '';
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        pkgImagePreview.src = ev.target.result;
+        pkgImagePreviewWrap.classList.remove('d-none');
+      };
+      reader.readAsDataURL(file);
+      if (pkgImageCurrentWrap) pkgImageCurrentWrap.style.display = 'none';
+    });
+  }
+
   // ── Cap preview live update ──
   const entryInput = document.getElementById('pkgEntryFee');
   const multInput = document.getElementById('pkgCapMult');
@@ -550,6 +601,8 @@
     document.getElementById('packageId').value = '';
     document.getElementById('pkgSubmitBtn').textContent = '➕ Create Package';
     if (previewEl) previewEl.textContent = '₱0.00';
+    if (pkgImagePreviewWrap) pkgImagePreviewWrap.classList.add('d-none');
+    if (pkgImageCurrentWrap) pkgImageCurrentWrap.style.display = '';
     // Restore default toggle states for a new package (ON by default)
     document.getElementById('pairingEnabled').checked = true;
     document.getElementById('indirectRefEnabled').checked = true;

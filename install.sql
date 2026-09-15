@@ -10,6 +10,7 @@ USE u938213108_altas_db;
 CREATE TABLE packages (
   id                        INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name                      VARCHAR(80)      NOT NULL,
+  image                     VARCHAR(200)     NULL,
   entry_fee                 DECIMAL(12,2)    NOT NULL,
   pairing_bonus             DECIMAL(12,2)    NOT NULL,
   daily_pair_cap            TINYINT UNSIGNED NOT NULL DEFAULT 3,

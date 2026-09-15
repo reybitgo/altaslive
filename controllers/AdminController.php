@@ -312,9 +312,11 @@ class AdminController
         Auth::guard('admin');
         csrf_verify();
 
-        $id   = (int)($_POST['package_id'] ?? 0);
+        $id       = (int)($_POST['package_id'] ?? 0);
+        $existing = $id ? Package::find($id) : null;
         $data = [
             'name'             => trim($_POST['name']             ?? ''),
+            'image'            => $existing ? ($existing['image'] ?? null) : null,
             'entry_fee'        => (float)($_POST['entry_fee']      ?? 0),
             'pairing_bonus'    => (float)($_POST['pairing_bonus']  ?? 0),
             'daily_pair_cap'   => (int)($_POST['daily_pair_cap']   ?? 3),
@@ -362,6 +364,47 @@ class AdminController
         if ($data['daily_fixed_income_days'] < 1) {
             flash('error', 'Max DFI days must be at least 1.');
             redirect($backUrl);
+        }
+
+        // Handle package image upload (optional — old image kept when none selected)
+        if (!empty($_FILES['package_image']['tmp_name'])) {
+            $file    = $_FILES['package_image'];
+            $mime    = mime_content_type($file['tmp_name']);
+            $allowed = ['image/jpeg', 'image/png', 'image/webp'];
+
+            if (!in_array($mime, $allowed, true)) {
+                flash('error', 'Package image must be a JPG, PNG or WebP image.');
+                redirect($backUrl);
+            }
+            if ($file['size'] > 5 * 1024 * 1024) {
+                flash('error', 'Package image must be 5 MB or smaller.');
+                redirect($backUrl);
+            }
+            if (!empty($file['error'])) {
+                flash('error', 'Package image upload failed. Please try again.');
+                redirect($backUrl);
+            }
+
+            $uploadDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads'
+                       . DIRECTORY_SEPARATOR . 'packages' . DIRECTORY_SEPARATOR;
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+
+            $ext  = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'][$mime];
+            $name = 'package_' . ($id ?: 'new') . '_' . time() . '_' . mt_rand(1000, 9999) . '.' . $ext;
+            $dest = $uploadDir . $name;
+
+            if (move_uploaded_file($file['tmp_name'], $dest)) {
+                if ($existing && !empty($existing['image'])) {
+                    @unlink(dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads'
+                        . DIRECTORY_SEPARATOR . $existing['image']);
+                }
+                $data['image'] = 'packages/' . $name;
+            } else {
+                flash('error', 'Package image could not be saved. Please try again.');
+                redirect($backUrl);
+            }
         }
 
         Package::save($data, $id ?: null);
