@@ -10,8 +10,8 @@ $styleV   = @filemtime(__DIR__ . '/style.css')  ?: 20260914;
 $scriptV  = @filemtime(__DIR__ . '/script.js')  ?: 20260914;
 
 // ── Load live settings ──
-$siteName        = setting('site_name', 'AltasFarm');
-$siteTagline     = setting('site_tagline', 'Build Your Network. Grow Your Income.');
+$siteName        = 'Altas Farm';
+$siteTagline     = setting('site_tagline', 'Grow the farm. Share in the harvest.');
 $gcashEnabled    = setting('gcash_enabled', '1') === '1';
 $mayaEnabled     = setting('maya_enabled', '1') === '1';
 $minPayout       = (float) setting('min_payout', '500');
@@ -28,71 +28,80 @@ $pkgCount   = count($packages);
 $planFacts = [];
 $minEntry  = PHP_INT_MAX;
 foreach ($packages as $p) {
-    $id   = (int)$p['id'];
-    $fee  = (float)$p['entry_fee'];
-    if ($fee < $minEntry) $minEntry = $fee;
-    $planFacts[$id] = [
-        'name'        => (string)$p['name'],
-        'entry'       => $fee,
-        'binary'      => (int)$p['pairing_enabled'] === 1 && (float)$p['pairing_bonus'] > 0,
-        'pair_amount' => (float)$p['pairing_bonus'],
-        'pair_cap'    => (int)$p['daily_pair_cap'],
-        'indirect'    => (int)$p['indirect_referral_enabled'] === 1,
-        'direct_ref'  => (float)$p['direct_ref_bonus'],
-        'dfi'         => (int)$p['dfi_enabled'] === 1 && (float)$p['daily_fixed_income'] > 0,
-        'dfi_amount'  => (float)$p['daily_fixed_income'],
-        'dfi_days'    => (int)$p['daily_fixed_income_days'],
-        'cap_mult'    => (float)$p['lifetime_cap_multiplier'],
-        'react_fee'   => (float)$p['reactivation_fee'],
-        'react_days'  => (int)$p['reactivation_window_days'],
-        'cap_amount'  => round($fee * (float)$p['lifetime_cap_multiplier'], 2),
-        'pair_cap_amount' => round((float)$p['pairing_bonus'] * (int)$p['daily_pair_cap'], 2),
-        'levels'      => [],
-    ];
-    // Non-zero unilevel tiers for this package (primary detail-screen content)
-    if ((int)$p['indirect_referral_enabled'] === 1) {
-        $planFacts[$id]['levels'] = array_filter(
-            Package::getIndirectLevels($id),
-            fn($amt) => (float)$amt > 0
-        );
-        ksort($planFacts[$id]['levels']);
-    }
+  $id   = (int)$p['id'];
+  $fee  = (float)$p['entry_fee'];
+  if ($fee < $minEntry) $minEntry = $fee;
+  $planFacts[$id] = [
+    'name'        => (string)$p['name'],
+    'entry'       => $fee,
+    'binary'      => (int)$p['pairing_enabled'] === 1 && (float)$p['pairing_bonus'] > 0,
+    'pair_amount' => (float)$p['pairing_bonus'],
+    'pair_cap'    => (int)$p['daily_pair_cap'],
+    'indirect'    => (int)$p['indirect_referral_enabled'] === 1,
+    'direct_ref'  => (float)$p['direct_ref_bonus'],
+    'dfi'         => (int)$p['dfi_enabled'] === 1 && (float)$p['daily_fixed_income'] > 0,
+    'dfi_amount'  => (float)$p['daily_fixed_income'],
+    'dfi_days'    => (int)$p['daily_fixed_income_days'],
+    'cap_mult'    => (float)$p['lifetime_cap_multiplier'],
+    'react_fee'   => (float)$p['reactivation_fee'],
+    'react_days'  => (int)$p['reactivation_window_days'],
+    'cap_amount'  => round($fee * (float)$p['lifetime_cap_multiplier'], 2),
+    'pair_cap_amount' => round((float)$p['pairing_bonus'] * (int)$p['daily_pair_cap'], 2),
+    'levels'      => [],
+  ];
+  // Non-zero unilevel tiers for this package (primary detail-screen content)
+  if ((int)$p['indirect_referral_enabled'] === 1) {
+    $planFacts[$id]['levels'] = array_filter(
+      Package::getIndirectLevels($id),
+      fn($amt) => (float)$amt > 0
+    );
+    ksort($planFacts[$id]['levels']);
+  }
 }
 if ($minEntry === PHP_INT_MAX) $minEntry = 0;
 
 // Aggregate facts for framing copy
-$binaryCount   = 0; $indirectCount = 0; $dfiCount = 0;
-$maxDirectRef  = 0; $maxIndirect   = 0; $indirectBreakdown = '';
-$minPairAmt = PHP_INT_MAX; $maxPairAmt = 0;
-$minDfiAmt  = PHP_INT_MAX; $maxDfiAmt  = 0; $minDfiDays = PHP_INT_MAX; $maxDfiDays = 0;
-$minCapMult = PHP_INT_MAX; $maxCapMult = 0;
+$binaryCount   = 0;
+$indirectCount = 0;
+$dfiCount = 0;
+$maxDirectRef  = 0;
+$maxIndirect   = 0;
+$indirectBreakdown = '';
+$minPairAmt = PHP_INT_MAX;
+$maxPairAmt = 0;
+$minDfiAmt  = PHP_INT_MAX;
+$maxDfiAmt  = 0;
+$minDfiDays = PHP_INT_MAX;
+$maxDfiDays = 0;
+$minCapMult = PHP_INT_MAX;
+$maxCapMult = 0;
 foreach ($planFacts as $id => $f) {
-    if ($f['binary']) {
-        $binaryCount++;
-        $minPairAmt = min($minPairAmt, $f['pair_amount']);
-        $maxPairAmt = max($maxPairAmt, $f['pair_amount']);
+  if ($f['binary']) {
+    $binaryCount++;
+    $minPairAmt = min($minPairAmt, $f['pair_amount']);
+    $maxPairAmt = max($maxPairAmt, $f['pair_amount']);
+  }
+  if ($f['indirect']) {
+    $indirectCount++;
+    $lvls = Package::getIndirectLevels($id);
+    $thisMax = !empty($lvls) ? (float)max($lvls) : 0;
+    if ($thisMax > $maxIndirect) {
+      $maxIndirect = $thisMax;
+      $parts = [];
+      foreach ($lvls as $lv => $amt) if ((float)$amt > 0) $parts[] = "Level $lv " . fmt_money($amt);
+      $indirectBreakdown = implode(' · ', $parts);
     }
-    if ($f['indirect']) {
-        $indirectCount++;
-        $lvls = Package::getIndirectLevels($id);
-        $thisMax = !empty($lvls) ? (float)max($lvls) : 0;
-        if ($thisMax > $maxIndirect) {
-            $maxIndirect = $thisMax;
-            $parts = [];
-            foreach ($lvls as $lv => $amt) if ((float)$amt > 0) $parts[] = "Level $lv " . fmt_money($amt);
-            $indirectBreakdown = implode(' · ', $parts);
-        }
-    }
-    if ($f['dfi']) {
-        $dfiCount++;
-        $minDfiAmt  = min($minDfiAmt, $f['dfi_amount']);
-        $maxDfiAmt  = max($maxDfiAmt, $f['dfi_amount']);
-        $minDfiDays = min($minDfiDays, $f['dfi_days']);
-        $maxDfiDays = max($maxDfiDays, $f['dfi_days']);
-    }
-    $maxDirectRef = max($maxDirectRef, $f['direct_ref']);
-    $minCapMult   = min($minCapMult, $f['cap_mult']);
-    $maxCapMult   = max($maxCapMult, $f['cap_mult']);
+  }
+  if ($f['dfi']) {
+    $dfiCount++;
+    $minDfiAmt  = min($minDfiAmt, $f['dfi_amount']);
+    $maxDfiAmt  = max($maxDfiAmt, $f['dfi_amount']);
+    $minDfiDays = min($minDfiDays, $f['dfi_days']);
+    $maxDfiDays = max($maxDfiDays, $f['dfi_days']);
+  }
+  $maxDirectRef = max($maxDirectRef, $f['direct_ref']);
+  $minCapMult   = min($minCapMult, $f['cap_mult']);
+  $maxCapMult   = max($maxCapMult, $f['cap_mult']);
 }
 $anyBinary   = $binaryCount   > 0;
 $anyIndirect = $indirectCount > 0;
@@ -105,18 +114,18 @@ $minCapMult  = $minCapMult === PHP_INT_MAX ? 0 : $minCapMult;
 // Feature bullets for any package (single source of truth for cards & matrix)
 function pkg_features(array $f): array
 {
-    return [
-        ['Binary pairing', $f['binary'], $f['binary'] ? fmt_money($f['pair_amount']) . ' per pair · cap ' . number_format($f['pair_cap']) . '/day' : ''],
-        ['Unilevel referral', $f['indirect'], $f['indirect'] ? 'generational bonuses through your sponsor chain' : ''],
-        ['Daily fixed income', $f['dfi'], $f['dfi'] ? fmt_money($f['dfi_amount']) . '/day for ' . number_format($f['dfi_days']) . ' days' : ''],
-        ['Direct referral bonus', $f['direct_ref'] > 0, $f['direct_ref'] > 0 ? fmt_money($f['direct_ref']) . ' per recruit' : ''],
-        ['Lifetime income cap', true, fmt_money($f['cap_mult']) . '× entry fee'],
-    ];
+  return [
+    ['Binary pairing', $f['binary'], $f['binary'] ? fmt_money($f['pair_amount']) . ' per pair · cap ' . number_format($f['pair_cap']) . '/day' : ''],
+    ['Unilevel referral', $f['indirect'], $f['indirect'] ? 'generational bonuses through your sponsor chain' : ''],
+    ['Loyalty reward', $f['dfi'], $f['dfi'] ? fmt_money($f['dfi_amount']) . '/day for ' . number_format($f['dfi_days']) . ' days' : ''],
+    ['Direct referral bonus', $f['direct_ref'] > 0, $f['direct_ref'] > 0 ? fmt_money($f['direct_ref']) . ' per recruit' : ''],
+    ['Lifetime income cap', true, fmt_money($f['cap_mult']) . '× entry fee'],
+  ];
 }
 
 // Registration gate (system-enforced seat limit, not a marketing claim)
 $isFull = (int) db()->query("SELECT COUNT(*) FROM users WHERE role = 'member'")->fetchColumn()
-        >= (int) setting('seat_limit', '1000');
+  >= (int) setting('seat_limit', '1000');
 
 // Build payout methods list
 $payoutMethods = ['USDT TRC20', 'USDT BEP20'];
@@ -133,7 +142,7 @@ $streamWords = [];
 if ($anyBinary) $streamWords[] = 'binary pairing';
 $streamWords[] = 'direct referral';
 if ($anyIndirect) $streamWords[] = 'unilevel referral';
-if ($anyDfi)      $streamWords[] = 'daily fixed income';
+if ($anyDfi)      $streamWords[] = 'loyalty reward';
 $streamText = implode(', ', $streamWords);
 $streamOxford = count($streamWords) > 2
   ? implode(', ', array_slice($streamWords, 0, -1)) . ', and ' . end($streamWords)
@@ -147,17 +156,17 @@ $streamOxford = count($streamWords) > 2
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
 
   <!-- ── Primary SEO ── -->
-  <title><?= e($siteName) ?> — Philippine Poultry Network</title>
-  <meta name="description" content="<?= e($siteName) ?> is a Philippine poultry network with multiple entry packages. Each package opens its own earning streams (<?= $streamOxford ?>), paid out via <?= $payoutMethodsText ?>.">
-  <meta name="keywords" content="<?= e($siteName) ?>, Philippine poultry network, poultry MLM Philippines, entry packages, binary pairing package, unilevel referral, daily fixed income, USDT payout, USDT TRC20, USDT BEP20, farm investment Philippines, poultry farming community, bayanihan network">
+  <title><?= e($siteName) ?> — Farm-Grown Poultry &amp; Shared Growth</title>
+  <meta name="description" content="<?= e($siteName) ?> is a Philippine poultry operation built around real chicken production, farm entries, scheduled production, grow-out options, and a structured member platform.">
+  <meta name="keywords" content="<?= e($siteName) ?>, Philippine poultry farm, chicken and egg production Philippines, farm entries, poultry production, farm grow-out, poultry community, referral program, GCash, Maya, USDT">
   <meta name="robots" content="index, follow">
   <meta name="author" content="<?= e($siteName) ?>">
   <link rel="canonical" href="<?= $base ?>/">
 
-  <!-- ── Open Graph (ScamAdviser reads this) ── -->
+  <!-- ── Open Graph ── -->
   <meta property="og:type" content="website">
-  <meta property="og:title" content="<?= e($siteName) ?> — Philippine Poultry Network">
-  <meta property="og:description" content="A community of Filipino farmers and networkers backed by real Philippine poultry operations. Multiple entry packages — binary pairing, unilevel referral, and daily fixed income. <?= $payoutMethodsText ?> payouts.">
+  <meta property="og:title" content="<?= e($siteName) ?> — Farm-Grown Poultry &amp; Shared Growth">
+  <meta property="og:description" content="Real poultry production organized through farm entries, with scheduled production, optional grow-out, and a member platform built around shared farm growth.">
   <meta property="og:url" content="<?= $base ?>/">
   <meta property="og:site_name" content="<?= e($siteName) ?>">
   <meta property="og:locale" content="en_PH">
@@ -165,8 +174,8 @@ $streamOxford = count($streamWords) > 2
 
   <!-- ── Twitter Card ── -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="<?= e($siteName) ?> — Philippine Poultry Network">
-  <meta name="twitter:description" content="Real farms. <?= $payoutMethodsText ?> payouts. Entry packages with binary, unilevel & daily income. Philippines.">
+  <meta name="twitter:title" content="<?= e($siteName) ?> — Farm-Grown Poultry &amp; Shared Growth">
+  <meta name="twitter:description" content="A working poultry model built around real farm entries, production cycles, optional grow-out, and a member community that helps the farm grow.">
   <meta name="twitter:image" content="<?= $base ?>/hero-bg.jpg">
 
   <!-- ── PWA ── -->
@@ -186,7 +195,7 @@ $streamOxford = count($streamWords) > 2
       "name": "<?= e($siteName) ?>",
       "url": "<?= $base ?>",
       "logo": "<?= $base ?>/logo.png",
-      "description": "A Philippine poultry network connecting real farm investment with multiple entry packages — binary pairing, unilevel referral, and daily fixed income — paying out via <?= $payoutMethodsText ?>.",
+      "description": "A Philippine poultry operation built around real chicken production, farm entries, production cycles, and a structured member participation and referral system.",
       "foundingDate": "2024",
       "foundingLocation": {
         "@type": "Place",
@@ -244,7 +253,7 @@ $streamOxford = count($streamWords) > 2
           "name": "What is <?= e($siteName) ?>?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "<?= e($siteName) ?> is a poultry referral network backed by real Philippine operations. Members pick an entry package, and each package opens its own earning streams (<?= $streamOxford ?>). Payouts are made via <?= $payoutMethodsText ?>."
+            "text": "<?= e($siteName) ?> is a Philippine poultry operation and member network built around farm entries and organized production. Members choose an entry, participate in the corresponding farm cycle, and may have access to additional package features through the member platform."
           }
         },
         {
@@ -294,23 +303,23 @@ $streamOxford = count($streamWords) > 2
 
         <div class="faq-item">
           <button class="faq-q" onclick="toggleFaq(this)">What is <?= e($siteName) ?>?</button>
-          <div class="faq-a"><?= e($siteName) ?> is a poultry referral network backed by real Philippine operations. Members pick an entry package, and each package opens its own earning streams — <?= $streamOxford ?> — paid out via <?= $payoutMethodsText ?>.</div>
+          <div class="faq-a"><?= e($siteName) ?> is a Philippine poultry operation built around actual chicken production and farm entries. Each entry corresponds to a defined participation level, with the farm managing the underlying production cycle. The member platform also provides package-based community and earning features.</div>
         </div>
 
         <div class="faq-item">
           <button class="faq-q" onclick="toggleFaq(this)">How do I join <?= e($siteName) ?>?</button>
-          <div class="faq-a">You need a valid registration code from an existing member (your sponsor) or from the <?= e($siteName) ?> admin team. Once you have a code, register at altasfarm.com, pick your entry package and sponsor, and place your account — choosing a left or right binary position when the package includes binary pairing. Your account is confirmed immediately upon successful registration and payment.</div>
+          <div class="faq-a">You need a valid registration code from an existing member or from the <?= e($siteName) ?> admin team. Once you have a code, register at altasfarm.com, select your farm entry and sponsor, and place your account. Where a package includes binary pairing, you may also select the corresponding left or right position. Your account is confirmed after successful registration and payment.</div>
         </div>
 
         <div class="faq-item">
           <button class="faq-q" onclick="toggleFaq(this)">How much does it cost to join?</button>
-          <div class="faq-a">There are <?= $pkgCount ?> active packages, from <?= fmt_money($minEntry) ?>. There are no recurring fees and no hidden charges. Each package carries its own earning features — you pick the one that suits your goals.</div>
+          <div class="faq-a">There are <?= $pkgCount ?> active farm packages, from <?= fmt_money($minEntry) ?>. Each entry is a defined participation level with its own poultry order specification and applicable platform features. There are no recurring fees attached to the entry itself.</div>
         </div>
 
         <div class="faq-item">
           <button class="faq-q" onclick="toggleFaq(this)">How are commissions earned?</button>
           <div class="faq-a">
-            Your earning streams depend on the package you choose:
+            The farm and the member platform work together, but they are not the same thing. Your entry funds an actual poultry order, while any referral or commission features are determined separately by the package you choose:
             <ul style="margin-top:.5rem;">
               <?php if ($anyBinary): ?>
                 <li><strong>Binary Pairing Bonus:</strong> Packages with binary pairing pay <?= fmt_money($minPairAmt) ?>–<?= fmt_money($maxPairAmt) ?> each time a left-right pair forms in your binary downline, within each package's own daily cap.</li>
@@ -320,16 +329,16 @@ $streamOxford = count($streamWords) > 2
                 <li><strong>Unilevel Bonus:</strong> Packages with unilevel referral pay generational bonuses through your sponsor chain.</li>
               <?php endif; ?>
               <?php if ($anyDfi): ?>
-                <li><strong>Daily Fixed Income:</strong> Packages that carry it pay a fixed daily amount for a set number of days.</li>
+                <li><strong>Loyalty Reward:</strong> Selected entries include a loyalty reward as the farm's way of giving back to members who choose to support its continued growth.</li>
               <?php endif; ?>
             </ul>
-            All commissions are credited to your e-wallet in real time on the triggering event (registration), not on a batch schedule.
+            Farm production follows its own physical schedule; platform commissions, when applicable, are credited according to the triggering event and package rules rather than being tied to the hatch date.
           </div>
         </div>
 
         <div class="faq-item">
           <button class="faq-q" onclick="toggleFaq(this)">How are payouts made?</button>
-          <div class="faq-a">All earnings are paid via <?= $payoutMethodsText ?>. You submit a withdrawal request through your member dashboard and provide your wallet address.<?php if ($gcashEnabled || $mayaEnabled): ?> Local members can also receive payouts through GCash or Maya for convenience.<?php endif; ?> This flexibility makes the network borderless and accessible to OFW members and international participants.</div>
+          <div class="faq-a">Withdrawable platform earnings are requested through your member dashboard and paid via <?= $payoutMethodsText ?>. Farm participation and any related settlements follow the applicable farm terms and production schedule.<?php if ($gcashEnabled || $mayaEnabled): ?> Local members can use GCash or Maya for convenience.<?php endif; ?></div>
         </div>
 
         <div class="faq-item">
@@ -381,11 +390,11 @@ $streamOxford = count($streamWords) > 2
         <h3>3. Membership and Multiple Accounts</h3>
         <p>Each entry into <?= e($siteName) ?> is a single account with its own package and binary position (where applicable). Members are permitted to register more than one account — every account carries its own entry fee and earns independently through the streams of its own package. Registration must always be made with accurate personal information; accounts created to manipulate the binary structure, generate fraudulent referrals, or otherwise abuse the earning system are subject to suspension and forfeiture of balances.</p>
 
-        <h3>4. Entry Fee and Package</h3>
-        <p>Members select from the entry packages offered at the time of registration. Each package has its own one-time entry fee, which is non-refundable upon confirmed registration and placement. The fee covers your platform account, access to the earning streams included in your chosen package, and participation in the network's poultry-backed operations.</p>
+        <h3>4. Farm Entry and Package</h3>
+        <p>Members select from the farm entries offered at the time of registration. Each entry carries a defined poultry order specification and a one-time amount. The farm uses received bulk payments to schedule and produce the corresponding chicks. The member account also carries the platform features associated with the selected package.</p>
 
-        <h3>5. Commissions and Earning Structure</h3>
-        <p>Members earn through the commission streams included in their chosen package, which may include a binary pairing bonus, direct and unilevel referral bonuses, and a daily fixed income. Fees, bonus amounts, and caps vary by package and are published in the Packages section of the website. Commissions are credited to your platform e-wallet in real time on the triggering event. <?= e($siteName) ?> reserves the right to verify and withhold commissions suspected of being generated through fraud, duplicate accounts, or system manipulation.</p>
+        <h3>5. Farm Cycle and Platform Earnings</h3>
+        <p>The physical farm cycle begins when the farm receives the bulk payment for an entry and schedules the corresponding chicks for hatching. The normal hatch lead time is 21 days. A member may receive the chicks according to the entry specification or elect the farm grow-out option, under which the farm raises the birds toward marketable size. The current grow-out arrangement provides a 15% return on an eligible entry when the grow-out cycle is completed, according to the applicable farm terms. Selected entries may also include a Loyalty Reward cycle. This is not presented as a fixed-income product; it is the farm's way of giving back to members who choose to support the farm's growth with their entry. Referral commissions, where applicable, remain separate and are credited according to their package rules.</p>
 
         <h3>6. Payouts</h3>
         <p>All payouts are made via <?= $payoutMethodsText ?>. The minimum withdrawal amount is <?= fmt_money($minPayout) ?>. Withdrawals are processed within 24–72 business hours. <?= e($siteName) ?> is not liable for losses caused by incorrect wallet addresses or account details provided by the member. Ensure your payout details are correct before submitting a withdrawal request — blockchain transactions are irreversible.</p>
@@ -397,10 +406,10 @@ $streamOxford = count($streamWords) > 2
         <p><?= e($siteName) ?> may suspend or terminate any account found in violation of these Terms, at its sole discretion, without prior notice. Suspended accounts forfeit any pending or unclaimed wallet balance. Terminated members are not entitled to a refund of their entry fee.</p>
 
         <h3>9. Limitation of Liability</h3>
-        <p><?= e($siteName) ?> does not guarantee any specific income or return on your entry fee. Earnings depend entirely on network activity and the binary structure. Participation in <?= e($siteName) ?> involves inherent financial risk. <?= e($siteName) ?> is not liable for income tax obligations arising from your earnings — members are responsible for their own tax compliance under Philippine law (NIRC) or the laws of their country of residence.</p>
+        <p>Farm production and platform earnings are distinct. A grow-out settlement is governed by the specific farm arrangement attached to the eligible entry and depends on completion of the underlying production cycle. Platform commissions depend on their respective package rules and triggering activity and are not a guarantee of future income. Participation carries financial and operational risk. Members remain responsible for their own tax obligations under applicable law.</p>
 
         <div class="warn-box">
-          <p><strong>Income Disclaimer:</strong> Earnings from <?= e($siteName) ?> depend on your own activity, your network's growth, and the overall pace of registration. Past performance of other members is not indicative of your potential results. Do not invest funds you cannot afford to lose.</p>
+          <p><strong>Important:</strong> <?= e($siteName) ?> combines a real poultry production cycle with a separate member platform. Farm grow-out settlements are tied to the completion of the applicable production cycle and its stated terms. Referral and commission earnings depend on package rules and member or network activity and should not be presented as guaranteed income.</p>
         </div>
 
         <h3>10. Changes to Terms</h3>
@@ -501,13 +510,13 @@ $streamOxford = count($streamWords) > 2
         <h3>1. Business Registration</h3>
         <p><?= e($siteName) ?> is currently in the process of registering as a sole proprietorship with the Philippine Department of Trade and Industry (DTI). Business name registration application is pending as of January 2025. Upon approval, our DTI certificate number will be published here. <?= e($siteName) ?> operates from Santiago, Isabela, Philippines (postal code 3006).</p>
 
-        <h3>2. Nature of the Network</h3>
-        <p><?= e($siteName) ?> is a multi-package referral network. Each entry package carries its own set of earning features, which may include binary pairing bonuses, direct and unilevel referral bonuses, and a daily fixed income. It is backed by a real poultry operation — meaning the entry fee is partially invested in Philippine broiler farming activities. The network is not a bank, not a lending institution, and not a securities issuer. It does not offer guaranteed returns.</p>
+        <h3>2. Nature of the Farm and Member Platform</h3>
+        <p><?= e($siteName) ?> is a Philippine poultry operation with a member platform organized around farm entries. Received bulk payments are used to schedule actual poultry production, with chicks hatched according to the selected entry specification. The normal hatch lead time is 21 days. Members may take the chicks at hatch or choose to leave them with the farm for grow-out. The current grow-out arrangement provides a 15% return on eligible entries at completion of the applicable cycle. The separate member platform may also provide direct, binary, unilevel, or Loyalty Reward features according to package rules. <?= e($siteName) ?> is not a bank, lending institution, or securities issuer.</p>
 
         <p>The compensation structure involves referral-based commissions that are dependent on new member registrations. Where binary pairing is part of a package, registrations placed later in a leg create fewer pairing opportunities than early ones. Members who join later in a mature leg will have fewer pairing opportunities than early members. This is a structural characteristic of binary networks that members must understand before joining.</p>
 
         <div class="warn-box">
-          <p><strong>Important:</strong> <?= e($siteName) ?> is not registered with the Philippine Securities and Exchange Commission (SEC) as an investment company or securities dealer. It operates as a referral-based community network, not as a registered investment vehicle. Participation is voluntary and carries financial risk.</p>
+          <p><strong>Important:</strong> <?= e($siteName) ?> is a poultry operation with a member platform, not a bank, lending institution, or securities dealer. The farm component involves actual poultry production and defined production cycles. Separate referral and commission features are governed by package rules and carry their own risks.</p>
         </div>
 
         <h3>3. Anti-Money Laundering (AML)</h3>
@@ -522,8 +531,8 @@ $streamOxford = count($streamWords) > 2
         <h3>6. USDT / Cryptocurrency Disclosure</h3>
         <p>All payouts on <?= e($siteName) ?> are made in USDT (Tether) on the TRON network (TRC20) or the BNB Smart Chain (BEP20), at the member's choice. USDT is a stablecoin pegged to the US Dollar. While USDT is designed to maintain a 1:1 peg, cryptocurrency carries inherent risks including de-pegging events, blockchain network congestion, and wallet loss. <?= e($siteName) ?> is not liable for losses arising from cryptocurrency market conditions. Members are responsible for the security of their own USDT wallets.</p>
 
-        <h3>7. Income Disclaimer</h3>
-        <p>Earnings from <?= e($siteName) ?> are not guaranteed. The amount a member earns depends on their own referral activity, the activity of their network, and the overall pace of registrations. <?= e($siteName) ?> does not represent, warrant, or imply that any specific income level is achievable. Do not invest funds you cannot afford to lose.</p>
+        <h3>7. Earnings Disclosure</h3>
+        <p>The 15% grow-out return described on this site refers to the current farm arrangement for eligible grow-out entries and is tied to completion of the underlying production cycle. Separate platform commissions are not guaranteed and depend on package rules, qualifying activity, and network conditions. No member should rely on referral earnings as a guaranteed source of income.</p>
 
         <h3>8. Reporting and Contact</h3>
         <p>For compliance concerns, legal inquiries, or to report a policy violation: <a href="mailto:support@altasfarm.com" style="color:var(--green-mid);">support@altasfarm.com</a><br>
@@ -574,7 +583,7 @@ $streamOxford = count($streamWords) > 2
         <div class="highlight-box">
           <p>For urgent account issues (locked account, incorrect withdrawal address), include your registered email and member ID in your message for faster resolution.</p>
         </div>
-</div>
+      </div>
 
     </div>
   </div>
@@ -647,13 +656,13 @@ $streamOxford = count($streamWords) > 2
 ════════════════════════════════════════════════════════════ -->
   <section class="hero" id="hero">
     <div class="hero-content fade-up">
-      <div class="hero-eyebrow">🐓 Philippine Poultry Network · Est. 2024</div>
+      <div class="hero-eyebrow">🐓 Philippine Poultry Farm · Est. 2024</div>
       <h1 class="hero-title">
-        Real Farming.<br>
-        <span>Shared Income.</span>
+        Real Poultry.<br>
+        <span>Shared Growth.</span>
       </h1>
       <p class="hero-desc">
-        <?= e($siteName) ?> ties a real poultry operation to a multi-package referral network. Pick the package that suits you, bring in your team, and earn through the streams your package includes — all tracked in real time on your dashboard.
+        <?= e($siteName) ?> is built around a real poultry operation. Members participate through farm entries that correspond to actual production, while the platform keeps farm participation, community activity, and package features organized in one place. The idea is simple: support something tangible, let the farm do what it does best, and grow alongside it.
       </p>
       <div class="hero-actions">
         <a href="<?= $base ?>/?page=register" class="btn-gold">🌱 Get Started</a>
@@ -665,29 +674,23 @@ $streamOxford = count($streamWords) > 2
           <div class="hero-stat-label">Entry Packages</div>
         </div>
         <div>
-          <div class="hero-stat-val">Real-time</div>
-          <div class="hero-stat-label">Commissions</div>
+          <div class="hero-stat-val">Real</div>
+          <div class="hero-stat-label">Farm Production</div>
         </div>
         <div>
           <div class="hero-stat-val">Real</div>
-          <div class="hero-stat-label">Farm Products</div>
+          <div class="hero-stat-label">Poultry Production</div>
         </div>
       </div>
     </div>
 
     <div class="hero-badge fade-up">
-      <div style="font-family:var(--serif);font-size:1.4rem;font-weight:700;color:#fff;margin-bottom:.5rem;">Entry Packages From</div>
+      <div style="font-family:var(--serif);font-size:1.4rem;font-weight:700;color:#fff;margin-bottom:.5rem;">Farm Entries From</div>
       <div style="font-family:var(--mono);font-size:2rem;font-weight:500;color:var(--gold);"><?= fmt_money($minEntry) ?></div>
-      <?php $offerRows = [];
-        if ($anyBinary) $offerRows[] = 'Binary Pairing';
-        $offerRows[] = 'Direct Referral';
-        if ($anyIndirect) $offerRows[] = 'Unilevel Referral';
-        if ($anyDfi) $offerRows[] = 'Daily Fixed Income';
-      ?>
       <div style="height:1px;background:rgba(255,255,255,.1);margin:1rem 0;"></div>
-      <div style="font-family:var(--serif);font-size:1.4rem;font-weight:700;color:#fff;margin-bottom:.5rem;"><?= $anyBinary ? $binaryCount . ' Binary Packages' : $pkgCount . ' Packages' ?></div>
+      <div style="font-family:var(--serif);font-size:1.4rem;font-weight:700;color:#fff;margin-bottom:.5rem;"><?= $pkgCount ?> Farm Packages</div>
       <div style="font-family:var(--mono);font-size:.85rem;font-weight:400;color:var(--gold);display:flex;flex-direction:column;gap:.25rem;margin-bottom:1rem;">
-        <div><?= implode(' · ', $offerRows) ?></div>
+        <div>Production · Grow-Out · Community</div>
       </div>
       <div style="height:1px;background:rgba(255,255,255,.1);margin:0 0 1rem;"></div>
       <a href="#packages" class="btn-outline" style="font-size:.8rem;padding:.5rem 1rem;border-color:rgba(255,255,255,.4);color:#fff;">Compare Packages →</a>
@@ -739,7 +742,7 @@ $streamOxford = count($streamWords) > 2
     'Philippine Farms',
     'Binary Pairing',
     'Unilevel Referral',
-    'Daily Fixed Income',
+    'Loyalty Reward',
     'Direct Referral Bonus',
     'Bayanihan Network',
     'Open Community',
@@ -767,22 +770,23 @@ $streamOxford = count($streamWords) > 2
           <div class="about-img">
             <img src="<?= $frontend ?>/about.jpg" alt="Rhode Island Red and Australorp chickens on the <?= e($siteName) ?> partner farm" loading="lazy">
           </div>
-          <div class="about-chip">Multiple<small>Accounts per Member</small></div>
+          <div class="about-chip">Farm Entries<small>Chicks per Order</small></div>
         </div>
         <div class="fade-up">
           <div class="tag">Our Story</div>
-          <h2 class="section-title">Small on Purpose. Solid by Design.</h2>
+          <h2 class="section-title">A Working Farm at the Center of It All.</h2>
           <p class="section-lead">
-            Most networks dilute as they grow. <?= e($siteName) ?> chose a different path: multiple entry packages, each with its own earning features, so you pick the one that fits the way you want to grow. A community that knows its people moves deliberately. It holds.
+            <?= e($siteName) ?> begins with something tangible: poultry. Members place farm entries that are used to support actual chicken production, while the platform organizes participation, referrals, and package-based earnings around that underlying farm activity. The aim is straightforward: grow the farm through participation, keep the process visible, and let each batch move through a defined production cycle.
           </p>
           <ul class="about-features">
-            <li>Backed by real, operating Philippine poultry farms in Isabela</li>
-            <li>Commissions fire the instant a new member registers</li>
-            <li>Every package has its own earning features — binary pairing, referral, fixed income</li>
-            <li>Payouts in GCash, Maya, USDT TRC20, or USDT BEP20 — borderless, no bank required</li>
+            <li>Entries are connected to actual chicken production and planned farm activity</li>
+            <li>Each entry follows the farm's scheduled production cycle</li>
+            <li>Members may participate directly or make use of the farm's grow-out option where available</li>
+            <li>Selected entries may include a Loyalty Reward as the farm gives back to participating members</li>
+            <li>Production is organized in recurring batches to support steady farm growth</li>
           </ul>
           <div style="margin-top:2rem;">
-            <a href="<?= $base ?>/?page=register" class="btn-primary">Secure Your Place →</a>
+            <a href="<?= $base ?>/?page=register" class="btn-primary">Start a Farm Entry →</a>
           </div>
         </div>
       </div>
@@ -795,48 +799,48 @@ $streamOxford = count($streamWords) > 2
   <section class="how" id="how">
     <div class="container">
       <div class="tag tag-green" style="background:rgba(76,175,80,.15);color:rgba(255,255,255,.7);">Simple Process</div>
-      <h2 class="section-title">How <?= e($siteName) ?> Works</h2>
-      <p class="section-lead">Easy steps from your first registration to your first withdrawal. Choose the package that suits you, build your network, and withdraw anytime.</p>
+      <h2 class="section-title">How the Farm Model Works</h2>
+      <p class="section-lead">The process starts with a farm entry and continues through a real poultry production cycle, with the member platform keeping your participation, package, and eligible earnings organized along the way.</p>
       <div class="steps-grid">
         <div class="step-card fade-up">
           <div class="step-num">01</div>
-          <div class="step-icon">🎟️</div>
-          <div class="step-title">Get Your Code</div>
-          <div class="step-desc">Obtain a registration code from your sponsor or through our admin-approved channels. Choose the package that fits your goals.</div>
+          <div class="step-icon">🐣</div>
+          <div class="step-title">Choose Your Farm Entry</div>
+          <div class="step-desc">Select the entry package that fits your intended level of participation. Your entry defines the farm order and the package features attached to your account.</div>
         </div>
         <div class="step-card fade-up">
           <div class="step-num">02</div>
-          <div class="step-icon">📝</div>
-          <div class="step-title">Register &amp; Place</div>
-          <div class="step-desc">Create your account, choose your package and sponsor, and place it — selecting a left or right position when your package includes binary pairing.</div>
+          <div class="step-icon">📋</div>
+          <div class="step-title">Farm Production</div>
+          <div class="step-desc">Your entry is incorporated into the farm's production schedule. The farm handles the underlying poultry cycle while your participation is recorded in your account.</div>
         </div>
         <div class="step-card fade-up">
           <div class="step-num">03</div>
-          <div class="step-icon">👥</div>
-          <div class="step-title">Build Your Team</div>
-          <div class="step-desc">Share your referral link and bring in your network. Every direct referral earns you up to <?= fmt_money($maxDirectRef) ?> — credited the moment they register.</div>
+          <div class="step-icon">🌾</div>
+          <div class="step-title">Choose Your Participation</div>
+          <div class="step-desc">Depending on the entry, you may take the poultry associated with your participation or continue with the farm's grow-out option.</div>
         </div>
-<?php if ($anyBinary): ?>
+        <?php if ($anyBinary): ?>
           <div class="step-card fade-up">
             <div class="step-num">04</div>
             <div class="step-icon">👥</div>
-            <div class="step-title">Earn Pair Bonuses</div>
-            <div class="step-desc">On packages with binary pairing, a left-right pair forming anywhere beneath you fires <?= fmt_money($minPairAmt) ?>–<?= fmt_money($maxPairAmt) ?> to your wallet in real time, within each package's own daily cap.</div>
+            <div class="step-title">Let the Farm Grow It</div>
+            <div class="step-desc">Where grow-out is available, the farm continues the production work on your behalf. It is a simple way to remain part of the farm cycle without managing the birds yourself.</div>
           </div>
         <?php endif; ?>
         <?php if ($anyIndirect): ?>
           <div class="step-card fade-up">
             <div class="step-num"><?= $anyBinary ? '05' : '04' ?></div>
             <div class="step-icon">🔗</div>
-            <div class="step-title">Unilevel Royalties</div>
-            <div class="step-desc">Packages with unilevel referral pay generational bonuses through your sponsor chain — passive income that compounds as your wider network grows.</div>
+            <div class="step-title">Grow the Community</div>
+            <div class="step-desc">The referral side helps expand the farm. Depending on the package, member activity may also generate direct, binary, unilevel, or Loyalty Reward credits according to the selected package.</div>
           </div>
         <?php endif; ?>
         <div class="step-card fade-up">
           <div class="step-num"><?= ($anyBinary ? 1 : 0) + ($anyIndirect ? 1 : 0) + 4 ?></div>
           <div class="step-icon">₮</div>
-          <div class="step-title">Withdraw Earnings</div>
-          <div class="step-desc">All earnings settle via <?= $payoutMethodsText ?>. Whether you are in the Philippines or abroad, your wallet receives the same way — no remittance fees, no cut, no geography.</div>
+          <div class="step-title">Track &amp; Receive</div>
+          <div class="step-desc">Farm participation and eligible platform earnings are recorded in your account. Withdrawable balances can be requested through <?= $payoutMethodsText ?>, subject to the applicable package and payout rules.</div>
         </div>
       </div>
     </div>
@@ -848,43 +852,43 @@ $streamOxford = count($streamWords) > 2
   <section class="plan" id="plan">
     <div class="container">
       <div class="plan-header">
-        <div class="tag">Compensation Plan</div>
-        <h2 class="section-title">Packages That Fit the Way You Play.</h2>
-        <p class="section-lead">No single path for everyone. Each package opens its own combination of earning streams — binary pairing, direct &amp; unilevel referral, and a daily fixed income. Pick the package that suits you.</p>
+        <div class="tag">Participation Plan</div>
+        <h2 class="section-title">Entries Designed Around the Farm.</h2>
+        <p class="section-lead">Each package represents a different level of participation in the farm and carries its own platform features. The farm side is built around actual poultry production, while the member side records referrals, commissions, and account balances.</p>
       </div>
       <div class="plan-grid">
         <div class="plan-card fade-up">
           <div class="plan-card-icon">🤝</div>
-          <div class="plan-card-title">Binary Pairing Bonus</div>
-          <div class="plan-card-amount"><?= fmt_money($minPairAmt) ?> – <?= fmt_money($maxPairAmt) ?></div>
-          <div class="plan-card-desc">Available on packages with binary pairing. Earn <?= fmt_money($minPairAmt) ?>–<?= fmt_money($maxPairAmt) ?> every time a left-right pair forms anywhere in your binary downline, within each package's own daily cap — a ceiling that keeps payouts consistent and the network stable.</div>
+          <div class="plan-card-title">Farm Production Cycle</div>
+          <div class="plan-card-amount">Defined by entry</div>
+          <div class="plan-card-desc">Each farm entry corresponds to a defined production arrangement. The farm manages the underlying poultry cycle and keeps the member participation tied to the selected package.</div>
         </div>
         <div class="plan-card featured fade-up">
           <div class="plan-card-icon">👥</div>
-          <div class="plan-card-title">Direct Referral Bonus</div>
-          <div class="plan-card-amount">Up to <?= fmt_money($maxDirectRef) ?></div>
-          <div class="plan-card-desc">Credited instantly every time someone you referred registers. There is no artificial ceiling — your referrals keep your network growing.</div>
+          <div class="plan-card-title">Farm Grow-Out</div>
+          <div class="plan-card-amount">Where available</div>
+          <div class="plan-card-desc">Where the grow-out option applies, the farm continues raising the poultry through its production cycle. The applicable settlement is governed by the terms of the selected entry.</div>
         </div>
         <?php if ($anyIndirect): ?>
           <div class="plan-card fade-up">
             <div class="plan-card-icon">🔗</div>
-            <div class="plan-card-title">Unilevel Bonus</div>
-            <div class="plan-card-amount">Up to <?= fmt_money($maxIndirect) ?></div>
-            <div class="plan-card-desc">Packages with unilevel referral pay generational bonuses through your sponsor chain. Passive income that compounds as your wider network grows — with no ceiling on how far it can run.</div>
+            <div class="plan-card-title">Community Referral</div>
+            <div class="plan-card-amount">Package-based</div>
+            <div class="plan-card-desc">The referral network exists to help grow participation in the farm. Depending on the package, direct, binary, and unilevel bonuses may be available and are calculated by the platform.</div>
           </div>
         <?php endif; ?>
         <?php if ($anyDfi): ?>
           <div class="plan-card fade-up">
             <div class="plan-card-icon">📅</div>
-            <div class="plan-card-title">Daily Fixed Income</div>
-            <div class="plan-card-amount"><?= fmt_money($minDfiAmt) ?> – <?= fmt_money($maxDfiAmt) ?><small style="font-size:.6em;display:block;color:var(--muted);">/ day</small></div>
-            <div class="plan-card-desc">Packages that carry it pay a fixed daily amount for <?= number_format($minDfiDays) ?>–<?= number_format($maxDfiDays) ?> days. A predictable baseline on top of your network earnings.</div>
+            <div class="plan-card-title">Loyalty Reward</div>
+            <div class="plan-card-amount">Package-based</div>
+            <div class="plan-card-desc">Selected entries may include a Loyalty Reward. It is simply the farm's way of giving back to members who have chosen to support its growth. The reward follows the terms of the applicable entry and is tracked by the platform.</div>
           </div>
         <?php endif; ?>
       </div>
       <?php if ($anyIndirect && $indirectBreakdown !== ''): ?>
         <div class="plan-note">
-          <strong>Unilevel Breakdown:</strong> <?= $indirectBreakdown ?> per member registration.
+          <strong>Referral detail:</strong> <?= $indirectBreakdown ?> per qualifying member registration. These platform commissions are separate from the physical poultry production cycle.
         </div>
       <?php endif; ?>
 
@@ -894,10 +898,10 @@ $streamOxford = count($streamWords) > 2
           <thead>
             <tr style="text-align:left;background:rgba(255,255,255,.04);">
               <th style="padding:.85rem 1rem;border-bottom:2px solid var(--gold);color:#6b4c2a;font-weight:600;">Package</th>
-              <th style="padding:.85rem 1rem;border-bottom:2px solid var(--gold);text-align:center;color:#6b4c2a;font-weight:600;">Entry</th>
+              <th style="padding:.85rem 1rem;border-bottom:2px solid var(--gold);text-align:center;color:#6b4c2a;font-weight:600;">Farm Entry</th>
               <th style="padding:.85rem 1rem;border-bottom:2px solid var(--gold);text-align:center;color:#6b4c2a;font-weight:600;">Binary Pairing</th>
               <th style="padding:.85rem 1rem;border-bottom:2px solid var(--gold);text-align:center;color:#6b4c2a;font-weight:600;">Unilevel</th>
-              <th style="padding:.85rem 1rem;border-bottom:2px solid var(--gold);text-align:center;color:#6b4c2a;font-weight:600;">Daily Fixed Income</th>
+              <th style="padding:.85rem 1rem;border-bottom:2px solid var(--gold);text-align:center;color:#6b4c2a;font-weight:600;">Loyalty Reward</th>
               <th style="padding:.85rem 1rem;border-bottom:2px solid var(--gold);text-align:center;color:#6b4c2a;font-weight:600;">Direct Ref</th>
               <th style="padding:.85rem 1rem;border-bottom:2px solid var(--gold);text-align:right;color:#6b4c2a;font-weight:600;">Lifetime Cap</th>
             </tr>
@@ -939,17 +943,17 @@ $streamOxford = count($streamWords) > 2
     <div class="container">
       <div class="packages-header">
         <div class="tag">Packages</div>
-        <h2 class="section-title">Choose the Package That Suits You</h2>
+        <h2 class="section-title">Choose Your Farm Entry</h2>
         <p class="section-lead" style="margin:0 auto;">
-          <?= e($siteName) ?> offers <?= $pkgCount ?> entry packages, from <?= fmt_money($minEntry) ?>. Pick the one that fits your goals — each package carries its own earning features.
+          <?= e($siteName) ?> offers <?= $pkgCount ?> farm packages, from <?= fmt_money($minEntry) ?>. Each entry corresponds to a defined participation level and carries its own platform features.
         </p>
       </div>
 
       <div class="closed-banner fade-up">
         <div class="closed-banner-icon">➕</div>
         <div class="closed-banner-text">
-          <strong>One community. As many accounts as you like.</strong>
-          <span>Every account carries a package of your choosing — its own entry fee, its own earning features. There is no ceiling on how many accounts a member may hold.</span>
+          <strong>One farm. Multiple levels of participation.</strong>
+          <span>Each entry represents a defined level of participation in the farm and carries its own package features. Choose the level that suits you and take part in the farm's ongoing production cycle.</span>
         </div>
       </div>
 
@@ -966,6 +970,9 @@ $streamOxford = count($streamWords) > 2
               </div>
               <div class="pkg-price" style="font-size:1.75rem;margin:.5rem 0;"><?= fmt_money($f['entry']) ?> <small style="font-size:.5em;">one-time</small></div>
               <ul class="pkg-features" style="margin:1rem 0;padding-left:1.2rem;font-size:.85rem;">
+                <li>Farm entry — <?= fmt_money($f['entry']) ?> one-time</li>
+                <li>Participation in a defined farm production cycle</li>
+                <li>Grow-out option available on eligible entries</li>
                 <?php foreach (pkg_features($f) as [$lbl, $isOn, $detail]): ?>
                   <li style="<?= $isOn ? '' : 'opacity:.55;' ?>">
                     <span style="<?= $isOn ? '' : 'text-decoration:line-through;' ?>"><?= $lbl ?></span>
@@ -1002,36 +1009,36 @@ $streamOxford = count($streamWords) > 2
         </div>
         <div class="fade-up">
           <div class="tag">Why <?= e($siteName) ?></div>
-          <h2 class="section-title">Constraints Are the Point</h2>
-          <p class="section-lead">There is no artificial ceiling here — <?= e($siteName) ?> stays intact through deliberate design. A community that knows its people moves with the kind of collective care that Filipinos call bayanihan.</p>
+          <h2 class="section-title">Built Around Real Production.</h2>
+          <p class="section-lead">The model is intentionally straightforward: actual poultry production first, supported by an organized member platform. Farm entries help support continued production, while the digital side keeps participation and eligible earnings easy to follow.</p>
           <div class="why-items">
             <div class="why-item">
               <div class="why-icon">⚡</div>
               <div>
-                <div class="why-item-title">Real-Time Commission Firing</div>
-                <div class="why-item-desc">Every bonus fires the instant a new member registers. No batch processing, no overnight queues — commissions are computed and credited on registration itself.</div>
+                <div class="why-item-title">Real Farm Activity</div>
+                <div class="why-item-desc">The model starts with actual poultry production. Farm entries support the ongoing work of keeping birds, batches, and farm activity moving forward.</div>
               </div>
             </div>
             <div class="why-item">
               <div class="why-icon">🌳</div>
               <div>
-                <div class="why-item-title">Live Binary Tree Visualization</div>
-                <div class="why-item-desc">Your dashboard shows your binary network in real time. You see exactly where each account sits and how your legs are growing.</div>
+                <div class="why-item-title">A Real Production Cycle</div>
+                <div class="why-item-desc">Each entry follows an actual farm schedule. The physical work happens on the farm, while your account keeps the corresponding participation organized.</div>
               </div>
             </div>
             <div class="why-item">
               <div class="why-icon">₮</div>
               <div>
-                <div class="why-item-title">USDT TRC20 & BEP20 — No Geography, No Bank</div>
-                <div class="why-item-desc">Payouts settle via <?= $payoutMethodsText ?>. Whether you are in the Philippines or working abroad, your wallet receives the same way — no remittance cut, no delay.</div>
+                <div class="why-item-title">Grow-Out by Choice</div>
+                <div class="why-item-desc">Where available, the farm can continue the grow-out work for you. That keeps the emphasis where it belongs: on production, not on managing every step yourself.</div>
               </div>
             </div>
             <?php if ($anyDfi): ?>
               <div class="why-item">
                 <div class="why-icon">📅</div>
                 <div>
-                  <div class="why-item-title">Daily Fixed Income</div>
-                  <div class="why-item-desc">Packages that carry it pay a fixed daily amount for a set number of days — from <?= fmt_money($minDfiAmt) ?>/day up to <?= fmt_money($maxDfiAmt) ?>/day — a predictable baseline on top of your network earnings.</div>
+                  <div class="why-item-title">Member Platform Features</div>
+                  <div class="why-item-desc">Selected entries may include a Loyalty Reward. This is the farm's way of giving back to members who support its growth, and it is tracked separately from referral activity.</div>
                 </div>
               </div>
             <?php endif; ?>
@@ -1047,40 +1054,40 @@ $streamOxford = count($streamWords) > 2
   <section class="testi" id="testimonials">
     <div class="container">
       <div class="testi-header">
-        <div class="tag">From the Network</div>
-        <h2 class="section-title">What Early Members Say</h2>
+        <div class="tag">The Farm Model</div>
+        <h2 class="section-title">What Makes Altas Farm Different</h2>
       </div>
       <div class="testi-grid">
         <div class="testi-card fade-up">
           <div class="testi-stars">★★★★★</div>
-          <div class="testi-quote">"Ang importante sa akin, may totoong farm sa likod nito. May manok, may produkto, may operasyon sa Isabela — hindi tulad ng ibang networking na wala kang mahahawakan."</div>
+          <div class="testi-quote">The starting point is tangible: a real poultry operation producing actual chickens and eggs. The platform is built around helping that production grow through organized farm entries.</div>
           <div class="testi-author">
             <div class="testi-avatar" style="background:#2d6a35;">R</div>
             <div style="margin-top:auto;flex-shrink:0;">
-              <div class="testi-name">Roger A.</div>
-              <div class="testi-role">Member since Jan 2024 · Isabela</div>
+              <div class="testi-name">Farm First</div>
+              <div class="testi-role">Actual poultry production</div>
             </div>
           </div>
         </div>
         <div class="testi-card fade-up">
           <div class="testi-stars">★★★★★</div>
-          <div class="testi-quote">"Ang daily fixed income ang pinaka-gusto ko — alam kong may papasok araw-araw. Hindi malaki, pero sigurado. Yung tipong pampahinga ng isip."</div>
+          <div class="testi-quote">Every entry begins with something tangible: a real farm production cycle, managed on the ground and recorded through the member platform.</div>
           <div class="testi-author">
             <div class="testi-avatar" style="background:#d4a017;color:#1a3a1e;">M</div>
             <div style="margin-top:auto;flex-shrink:0;">
-              <div class="testi-name">Maria Santos</div>
-              <div class="testi-role">Member since Mar 2024 · Batangas</div>
+              <div class="testi-name">Farm Cycle</div>
+              <div class="testi-role">Production and scheduling</div>
             </div>
           </div>
         </div>
         <div class="testi-card fade-up">
           <div class="testi-stars">★★★★★</div>
-          <div class="testi-quote">"Ang commission dito totoo ang real-time — pagka-register ng bagong member, andiyan na agad sa wallet ko. Hindi na ako naghihintay ng bahagi o linggo."</div>
+          <div class="testi-quote">Where grow-out is available, members can leave the production work with the farm and remain part of the cycle without taking on the day-to-day work themselves.</div>
           <div class="testi-author">
             <div class="testi-avatar" style="background:#6b4c2a;">J</div>
             <div style="margin-top:auto;flex-shrink:0;">
-              <div class="testi-name">Jose Dela Cruz</div>
-              <div class="testi-role">Member since Feb 2024 · Nueva Ecija</div>
+              <div class="testi-name">Grow-Out Option</div>
+              <div class="testi-role">Farm-managed grow-out</div>
             </div>
           </div>
         </div>
@@ -1102,8 +1109,8 @@ $streamOxford = count($streamWords) > 2
         </div>
       <?php else: ?>
         <div class="tag" style="background:rgba(212,160,23,.2);color:var(--gold-light);">Open Community</div>
-        <h2><?= e($siteName) ?> — One Community. Many Packages.</h2>
-        <p>The network keeps growing. Register one account or several — each account carries the package you chose for it, and earns through that package's own streams from day one.</p>
+        <h2><?= e($siteName) ?> — Grow the Farm With Us.</h2>
+        <p>Every entry contributes to the farm's continued growth. Start with the participation level that suits you, take part in the cycle, and use the options available through your selected entry.</p>
         <div class="cta-buttons">
           <a href="<?= $base ?>/?page=register" class="btn-gold" style="font-size:1rem;padding:1rem 2.5rem;">🌱 Register Now</a>
         </div>
@@ -1122,7 +1129,7 @@ $streamOxford = count($streamWords) > 2
         <!-- Brand column -->
         <div>
           <div class="footer-brand-name" itemprop="name"><?= e($siteName) ?></div>
-          <div class="footer-brand-desc" itemprop="description"><a href="mailto:support@altasfarm.com" style="color:rgba(255,255,255,.75);">support@altasfarm.com</a><br>Mon–Sat, 8 AM–6 PM PST</div>
+          <div class="footer-brand-desc" itemprop="description">Real poultry production, farm entries, recurring production cycles, and grow-out participation.<br><a href="mailto:support@altasfarm.com" style="color:rgba(255,255,255,.75);">support@altasfarm.com</a><br>Mon–Sat, 8 AM–6 PM PST</div>
 
           <!-- Address (machine-readable for ScamAdviser / Schema) -->
           <address itemprop="address" itemscope itemtype="https://schema.org/PostalAddress"
@@ -1207,9 +1214,9 @@ $streamOxford = count($streamWords) > 2
     /* ── Package-details modal data (built server-side) ── */
     window.PKG_DETAILS = <?= json_encode($planFacts, JSON_PRESERVE_ZERO_FRACTION) ?>;
     window.PKG_GLOBALS = <?= json_encode([
-        'site_name'    => $siteName,
-        'min_payout'   => $minPayout,
-    ]) ?>;
+                            'site_name'    => $siteName,
+                            'min_payout'   => $minPayout,
+                          ]) ?>;
   </script>
 
   <script>
