@@ -275,7 +275,18 @@ function openPkgDetails(id) {
   if (sub)
     sub.textContent = 'Full breakdown for the "' + pkg.name + '" package';
   const body = document.getElementById("pkgDetailsBody");
-  if (body) body.innerHTML = levelsHtml + earnHtml + settleHtml;
+  if (body)
+    body.innerHTML =
+      (pkg.image_url
+        ? '<div class="pkg-dl-img"><img src="' +
+          pkg.image_url +
+          '" alt="' +
+          pkg.name +
+          '"></div>'
+        : "") +
+      levelsHtml +
+      earnHtml +
+      settleHtml;
   openModal("modal-pkg-details");
 }
 

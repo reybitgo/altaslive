@@ -1882,6 +1882,17 @@ footer {
 }
 
 /* ── Package Details Button + Modal ─────────────────────── */
+.pkg-dl-img {
+  text-align: center;
+  margin-bottom: 1.25rem;
+}
+.pkg-dl-img img {
+  width: 100%;
+  max-width: 340px;
+  height: auto;
+  border-radius: var(--radius);
+  border: 2px solid var(--border-color);
+}
 .pkg-title-row {
   display: flex;
   align-items: center;

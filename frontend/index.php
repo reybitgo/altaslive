@@ -33,6 +33,9 @@ foreach ($packages as $p) {
   if ($fee < $minEntry) $minEntry = $fee;
   $planFacts[$id] = [
     'name'        => (string)$p['name'],
+    'image_url'   => !empty($p['image'])
+      ? $base . '/uploads/' . $p['image']
+      : $frontend . '/pkg-starter.jpg',
     'entry'       => $fee,
     'binary'      => (int)$p['pairing_enabled'] === 1 && (float)$p['pairing_bonus'] > 0,
     'pair_amount' => (float)$p['pairing_bonus'],
@@ -987,7 +990,7 @@ $streamOxford = count($streamWords) > 2
         <?php foreach ($planFacts as $id => $f): ?>
           <div class="pkg-single fade-up" style="display:flex;flex-direction:column;border:2px solid var(--border-color);border-radius:var(--radius);overflow:hidden;">
             <div class="pkg-img">
-              <img src="<?= $frontend ?>/pkg-starter.jpg" alt="<?= e($f['name']) ?>" loading="lazy">
+              <img src="<?= e($f['image_url']) ?>" alt="<?= e($f['name']) ?>" loading="lazy">
             </div>
             <div class="pkg-body" style="display:flex;flex-direction:column;flex:1;padding:1.5rem;">
               <div class="pkg-title-row">
