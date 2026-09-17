@@ -1721,14 +1721,14 @@
                 <div class="si-hint">Lower = more concentrated at cheapest tier; higher = more spread</div>
               </div>
             </div>
-<div class="si-hint">
-                Computes each plan's join % automatically — equal split,
-                weighted by inverse entry fee, or bell curve (half-normal
-                distribution peaking at cheapest tier). Bell curve reserves
-                exactly 1 account for the priciest plan and 2 for the
-                second-priciest, so no tier is ever null. Auto-normalized to
-                100%.
-              </div>
+            <div class="si-hint">
+              Computes each plan's join % automatically — equal split,
+              weighted by inverse entry fee, or bell curve (half-normal
+              distribution peaking at cheapest tier). Bell curve reserves
+              exactly 1 account for the priciest plan and 2 for the
+              second-priciest, so no tier is ever null. Auto-normalized to
+              100%.
+            </div>
           </div>
         </div>
       </div>
@@ -1770,17 +1770,17 @@
             <div class="ctrl-row">
               <input
                 type="range"
-id="s-npd"
-                  min="1"
-                  max="2000"
-                  step="1"
-                  value="15"
+                id="s-npd"
+                min="1"
+                max="2000"
+                step="1"
+                value="15"
                 oninput="syncFromSlider('npd')" />
               <input
                 type="number"
                 class="num-input"
-id="n-npd"
-                  value="15"
+                id="n-npd"
+                value="15"
                 min="1"
                 max="2000"
                 step="1"
@@ -1794,17 +1794,17 @@ id="n-npd"
             <div class="ctrl-row">
               <input
                 type="range"
-id="s-depth"
-                  min="1"
-                  max="10"
-                  step="1"
-                  value="5"
+                id="s-depth"
+                min="1"
+                max="10"
+                step="1"
+                value="5"
                 oninput="syncFromSlider('depth')" />
               <input
                 type="number"
                 class="num-input"
-id="n-depth"
-                  value="5"
+                id="n-depth"
+                value="5"
                 min="1"
                 max="10"
                 step="1"
@@ -2190,11 +2190,11 @@ id="n-depth"
     //  DFI toggles, unilevel L2–L5, lifetime cap 5× entry).
     // ══════════════════════════════════════════
     const PRESETS = {
-default: {
-          pcost: 30,
-          maxm: 2000,
-          npd: 15,
-          depth: 5,
+      default: {
+        pcost: 30,
+        maxm: 2000,
+        npd: 15,
+        depth: 5,
         reactrate: 100,
         directOn: true,
         plans: [{
@@ -2212,7 +2212,7 @@ default: {
             binary: false,
             indirect: true,
             dfiOn: true,
-            levels: [0, 0, 250, 150, 50, 50, 0, 0, 0, 0, 0],
+            levels: [0, 250, 150, 100, 75, 62.5, 56.5, 37.5, 12.5, 6],
           },
           {
             name: "Starter",
@@ -2229,7 +2229,7 @@ default: {
             binary: true,
             indirect: false,
             dfiOn: true,
-            levels: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            levels: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
           },
           {
             name: "Pro",
@@ -2246,7 +2246,7 @@ default: {
             binary: false,
             indirect: true,
             dfiOn: true,
-            levels: [0, 0, 500, 300, 100, 100, 0, 0, 0, 0, 0],
+            levels: [0, 500, 300, 200, 150, 125, 113, 75, 25, 12],
           },
           {
             name: "Elite",
@@ -2263,7 +2263,7 @@ default: {
             binary: false,
             indirect: true,
             dfiOn: true,
-            levels: [0, 0, 1000, 600, 200, 200, 0, 0, 0, 0, 0],
+            levels: [0, 1000, 600, 400, 300, 250, 226, 150, 50, 24],
           },
           {
             name: "Silver",
@@ -2280,7 +2280,7 @@ default: {
             binary: false,
             indirect: true,
             dfiOn: true,
-            levels: [0, 0, 2500, 1500, 500, 500, 0, 0, 0, 0, 0],
+            levels: [0, 2500, 1500, 1000, 750, 625, 565, 375, 125, 60],
           },
           {
             name: "Gold",
@@ -2297,7 +2297,7 @@ default: {
             binary: false,
             indirect: true,
             dfiOn: true,
-            levels: [0, 0, 5000, 3000, 1000, 1000, 0, 0, 0, 0, 0],
+            levels: [0, 5000, 3000, 2000, 1500, 1250, 1130, 750, 250, 120],
           },
           {
             name: "Diamond",
@@ -2314,7 +2314,7 @@ default: {
             binary: false,
             indirect: true,
             dfiOn: true,
-            levels: [0, 0, 25000, 15000, 5000, 5000, 0, 0, 0, 0, 0],
+            levels: [0, 25000, 15000, 10000, 7500, 6250, 5650, 3750, 1250, 600],
           },
           {
             name: "Platinum",
@@ -2331,7 +2331,7 @@ default: {
             binary: false,
             indirect: true,
             dfiOn: true,
-            levels: [0, 0, 50000, 30000, 10000, 10000, 0, 0, 0, 0, 0],
+            levels: [0, 50000, 30000, 20000, 15000, 12500, 11300, 7500, 2500, 1200],
           },
         ],
       },
@@ -2357,7 +2357,7 @@ default: {
             binary: true,
             indirect: true,
             dfiOn: true,
-            levels: [0, 300, 200, 150, 100, 100, 50, 50, 50, 50, 50],
+            levels: [0, 500, 300, 200, 150, 125, 113, 75, 25, 12],
           },
           {
             name: "Power",
@@ -2374,7 +2374,7 @@ default: {
             binary: true,
             indirect: true,
             dfiOn: true,
-            levels: [0, 800, 600, 450, 300, 300, 150, 150, 150, 150, 150],
+            levels: [0, 2500, 1500, 1000, 750, 625, 565, 375, 125, 60],
           },
         ],
       },
@@ -2400,7 +2400,7 @@ default: {
           binary: true,
           indirect: true,
           dfiOn: true,
-          levels: [0, 150, 100, 75, 50, 50, 25, 25, 25, 25, 25],
+          levels: [0, 250, 150, 100, 75, 62.5, 56.5, 37.5, 12.5, 6],
         }, ],
       },
       highcap: {
@@ -2425,7 +2425,7 @@ default: {
           binary: true,
           indirect: true,
           dfiOn: true,
-          levels: [0, 400, 300, 200, 150, 150, 100, 100, 100, 100, 100],
+          levels: [0, 1000, 600, 400, 300, 250, 226, 150, 50, 24],
         }, ],
       },
       highref: {
@@ -2446,11 +2446,11 @@ default: {
           reactFee: 5000,
           reactWin: 20,
           dfi: 150,
-          dfiDays: 90,
-          binary: false,
-          indirect: true,
-          dfiOn: true,
-          levels: [0, 800, 600, 450, 300, 300, 150, 150, 150, 150, 150],
+dfiDays: 90,
+            binary: false,
+            indirect: true,
+            dfiOn: true,
+            levels: [0, 500, 300, 200, 150, 125, 113, 75, 25, 12],
         }, ],
       },
       fixedheavy: {
@@ -2475,7 +2475,7 @@ default: {
           binary: true,
           indirect: true,
           dfiOn: true,
-          levels: [0, 100, 75, 50, 25, 25, 0, 0, 0, 0, 0],
+          levels: [0, 500, 300, 200, 150, 125, 113, 75, 25, 12],
         }, ],
       },
     };
@@ -2496,15 +2496,15 @@ default: {
       binary: false,
       indirect: true,
       dfiOn: true,
-      levels: [0, 0, 250, 150, 50, 50, 0, 0, 0, 0, 0],
+      levels: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     };
 
-const fmtN = (n) => Math.round(n).toLocaleString();
-      const fmtP = (n) => "₱" + fmtN(n);
-      const fmtMix = (m) =>
-        m >= 10
-          ? Math.round(m) + "%"
-          : Math.round(m * 100) / 100 + "%";
+    const fmtN = (n) => Math.round(n).toLocaleString();
+    const fmtP = (n) => "₱" + fmtN(n);
+    const fmtMix = (m) =>
+      m >= 10 ?
+      Math.round(m) + "%" :
+      Math.round(m * 100) / 100 + "%";
 
     function clamp(v, min, max) {
       return Math.min(max, Math.max(min, v));
@@ -2898,9 +2898,9 @@ const fmtN = (n) => Math.round(n).toLocaleString();
         return isFinite(v) ? v : 0;
       };
       const name = (row.querySelector(".plan-name").value || "").trim();
-      const levels = [0];
+      const levels = [];
       for (let l = 1; l <= 10; l++)
-        levels.push(numV(`input[data-lv="${l}"]`));
+        levels[l - 1] = numV(`input[data-lv="${l}"]`);
       return {
         name: name || "Plan",
         mix: clamp(Math.round(numV(".mix-num")), 0, 100),
@@ -2963,7 +2963,7 @@ const fmtN = (n) => Math.round(n).toLocaleString();
       });
       for (let l = 1; l <= 10; l++) {
         const input = row.querySelector(`input[data-lv="${l}"]`);
-        if (input) input.value = cfg.levels[l] || 0;
+        if (input) input.value = cfg.levels[l - 1] || 0;
       }
       setFlagClass(row);
     }
@@ -3202,7 +3202,7 @@ const fmtN = (n) => Math.round(n).toLocaleString();
         if (pl.indirect) {
           const levels = Math.min(idx, depth, 10);
           for (let lv = 1; lv <= levels; lv++) {
-            const b = pl.levels[lv];
+            const b = pl.levels[lv - 1];
             if (b > 0) creditEarner(idx - lv, b, "uni", acc);
           }
         }
@@ -3445,7 +3445,7 @@ const fmtN = (n) => Math.round(n).toLocaleString();
         weighted.entry += f * pl.entry;
         weighted.direct += f * (directOn ? pl.directRef : 0);
         let u = 0;
-        for (let lv = 1; lv <= Math.min(depth, 10); lv++) u += pl.levels[lv];
+        for (let lv = 1; lv <= Math.min(depth, 10); lv++) u += pl.levels[lv - 1];
         weighted.uni += f * u;
         weighted.dfi += f * (pl.dfiOn ? pl.dfi : 0);
       });
