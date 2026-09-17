@@ -295,9 +295,17 @@ class AdminController
     public function packages(): void
     {
         Auth::guard('admin');
-        $packages = Package::all();
-        $editPkg  = null;
-        $viewPkg  = null;
+        $page        = max(1, (int)($_GET['pg'] ?? 1));
+        $perPage     = max(5, (int)($_GET['per_page'] ?? 10));
+        $packages    = paginate(
+            'SELECT * FROM packages ORDER BY entry_fee ASC',
+            [],
+            $page,
+            $perPage
+        );
+        $allPackages = Package::all();
+        $editPkg     = null;
+        $viewPkg     = null;
         if (isset($_GET['edit'])) {
             $editPkg = Package::withLevels((int)$_GET['edit']);
         }

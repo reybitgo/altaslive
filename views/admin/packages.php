@@ -53,10 +53,10 @@
 
     <!-- Stats Row -->
     <?php
-      $totalPkg  = count($packages);
-      $activePkg = count(array_filter($packages, fn($p) => ($p['status'] ?? '') === 'active'));
+      $totalPkg  = count($allPackages);
+      $activePkg = count(array_filter($allPackages, fn($p) => ($p['status'] ?? '') === 'active'));
       $inactivePkg = $totalPkg - $activePkg;
-      $binaryPkg = count(array_filter($packages, fn($p) => (int)($p['pairing_enabled'] ?? 1) === 1));
+      $binaryPkg = count(array_filter($allPackages, fn($p) => (int)($p['pairing_enabled'] ?? 1) === 1));
     ?>
     <div class="row g-2 mb-3">
       <div class="col-6 col-md-3">
@@ -87,9 +87,20 @@
 
     <!-- Full-width Packages Table -->
     <div class="card">
-      <div class="card-header d-flex justify-content-between align-items-center">
+      <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
         <span class="card-title">📦 All Packages</span>
-        <span class="text-muted" style="font-size:.75rem;">🌳 binary · 🔗 indirect · 📅 DFI</span>
+        <div class="d-flex align-items-center gap-3">
+          <span class="text-muted" style="font-size:.75rem;">🌳 binary · 🔗 indirect · 📅 DFI</span>
+          <form method="GET" action="<?= APP_URL ?>/" class="d-flex align-items-center gap-2 m-0">
+            <input type="hidden" name="page" value="admin_packages">
+            <label for="perPageSelect" class="form-label mb-0 text-muted" style="font-size:.78rem;white-space:nowrap;">Rows</label>
+            <select id="perPageSelect" name="per_page" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
+              <?php foreach ([5, 10, 25, 50, 100] as $n): ?>
+                <option value="<?= $n ?>" <?= $perPage === $n ? 'selected' : '' ?>><?= $n ?></option>
+              <?php endforeach; ?>
+            </select>
+          </form>
+        </div>
       </div>
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
@@ -106,7 +117,7 @@
             </tr>
           </thead>
           <tbody>
-            <?php if (empty($packages)): ?>
+            <?php if (empty($packages['data'])): ?>
               <tr>
                 <td colspan="8" class="text-center py-5 text-muted">
                   <div style="font-size:2rem;opacity:.3;margin-bottom:.5rem;">📦</div>
@@ -115,7 +126,7 @@
                 </td>
               </tr>
             <?php else: ?>
-              <?php foreach ($packages as $pkg):
+              <?php foreach ($packages['data'] as $pkg):
                 $lifetimeCap = (float)$pkg['entry_fee'] * (float)$pkg['lifetime_cap_multiplier'];
                 $hasDfi = (float)$pkg['daily_fixed_income'] > 0;
                 $dfiOn = $hasDfi && (int)$pkg['dfi_enabled'] === 1;
@@ -170,6 +181,9 @@
           </tbody>
         </table>
       </div>
+      <?php if (!empty($packages['total_pages']) && $packages['total_pages'] > 1): ?>
+        <div class="card-footer"><?= pagination_links($packages, APP_URL . '/?page=admin_packages&per_page=' . $perPage) ?></div>
+      <?php endif; ?>
     </div>
   </div>
 </div>

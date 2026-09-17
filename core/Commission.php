@@ -29,7 +29,8 @@ class Commission
         int $newUserId,
         int $parentId,
         string $position,          // 'left' | 'right'
-        bool $incrementCounts = true
+        bool $incrementCounts = true,
+        bool $payOut = true        // false = structure-only backfill (no pairing settlements)
     ): void {
         if ($parentId <= 0) return;
         $pdo  = db();
@@ -114,7 +115,9 @@ class Commission
 
             // Only fire pairing bonuses if the NEW user is a paid member.
             // CD-sourced and pending users increment leg counts but don't trigger payouts.
-            if ($newUserIsPaid && $ancestor && $newVolume > 0) {
+            // With $payOut=false (structure-only backfill) counts/volumes are kept
+            // but no pairing money is settled — it carries forward instead.
+            if ($payOut && $newUserIsPaid && $ancestor && $newVolume > 0) {
                 $available = min((float)$ancestor['left_pair_volume'], (float)$ancestor['right_pair_volume']);
                 $processed = (float)$ancestor['pairs_volume_paid'] + (float)$ancestor['pairs_volume_flushed'];
                 $newSettle = $available - $processed;
