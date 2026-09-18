@@ -29,7 +29,8 @@ class Commission
         int $newUserId,
         int $parentId,
         string $position,          // 'left' | 'right'
-        bool $incrementCounts = true
+        bool $incrementCounts = true,
+        bool $payOut = true        // false = structure-only backfill (no pairing settlements)
     ): void {
         if ($parentId <= 0) return;
         $pdo  = db();
@@ -114,7 +115,9 @@ class Commission
 
             // Only fire pairing bonuses if the NEW user is a paid member.
             // CD-sourced and pending users increment leg counts but don't trigger payouts.
-            if ($newUserIsPaid && $ancestor && $newVolume > 0) {
+            // With $payOut=false (structure-only backfill) counts/volumes are kept
+            // but no pairing money is settled — it carries forward instead.
+            if ($payOut && $newUserIsPaid && $ancestor && $newVolume > 0) {
                 $available = min((float)$ancestor['left_pair_volume'], (float)$ancestor['right_pair_volume']);
                 $processed = (float)$ancestor['pairs_volume_paid'] + (float)$ancestor['pairs_volume_flushed'];
                 $newSettle = $available - $processed;
@@ -166,6 +169,136 @@ class Commission
             $cur  = isset($up['binary_parent_id']) ? (int)$up['binary_parent_id'] : null;
             if (!$cur) break;
         }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  REAL-TIME PAIRING SETTLEMENT (catch-up / live payout)
+    //  processBinaryPlacement settles ancestors incrementally as members are
+    //  placed. After a STRUCTURE-ONLY backfill (payOut=false) the matched volume
+    //  was carried forward instead of paid. These methods re-run the exact same
+    //  settlement math (available − processed, daily cap, flush) for any member
+    //  right now, so carried volume is paid out in real time — same rules as the
+    //  live path (CD split, lifetime cap, e-wallet credit).
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Settle a single member's currently matched-but-unpaid pair volume.
+     *
+     * @param int      $userId       Member to settle.
+     * @param int|null $sourceUserId Attribution for commissions rows (null = system).
+     * @param bool     $apply        false = dry-run (compute only, no writes).
+     * @return array   {ok, pay, flush, settle, skip}
+     */
+    public static function settlePendingPairVolume(int $userId, ?int $sourceUserId = null, bool $apply = true): array
+    {
+        $pdo = db();
+        $st = $pdo->prepare("
+            SELECT u.id, u.left_pair_volume, u.right_pair_volume,
+                   u.pairs_volume_paid, u.pairs_volume_flushed, u.pairs_volume_today,
+                   u.daily_cap_bypass, u.status,
+                   p.pairing_bonus, p.daily_pair_cap, p.pairing_enabled
+            FROM   users u
+            LEFT JOIN packages p ON p.id = u.package_id
+            WHERE  u.id = ?
+        ");
+        $st->execute([$userId]);
+        $u = $st->fetch();
+        if (!$u) {
+            return ['ok' => false, 'user_id' => $userId, 'settle' => 0.00, 'pay' => 0.00, 'flush' => 0.00, 'skip' => 'user not found'];
+        }
+
+        $base = ['ok' => true, 'user_id' => $userId, 'settle' => 0.00, 'pay' => 0.00, 'flush' => 0.00, 'skip' => null];
+
+        // Same gates as the live ancestor path in processBinaryPlacement()
+        if ($u['status'] !== 'active' || (float)$u['pairing_bonus'] <= 0 || (int)$u['pairing_enabled'] !== 1) {
+            $base['skip'] = 'not eligible (inactive / pairing disabled / zero pair bonus)';
+            return $base;
+        }
+        if (!CapEngine::isActiveForPairs($userId)) {
+            $base['skip'] = 'capped / perminact — resumes on reactivation';
+            return $base;
+        }
+
+        $available = min((float)$u['left_pair_volume'], (float)$u['right_pair_volume']);
+        $processed = (float)$u['pairs_volume_paid'] + (float)$u['pairs_volume_flushed'];
+        $newSettle = $available - $processed;
+        $base['settle'] = $newSettle;
+        if ($newSettle <= 0) {
+            $base['skip'] = 'no unmatched matching volume';
+            return $base;
+        }
+
+        if (!empty($u['daily_cap_bypass'])) {
+            $capRemaining = $newSettle; // unlimited daily cap
+        } else {
+            $dailyCapPesos = (float)$u['daily_pair_cap'] * (float)$u['pairing_bonus'];
+            $capRemaining  = $dailyCapPesos - (float)$u['pairs_volume_today'];
+        }
+        $payNow   = min($newSettle, max(0, $capRemaining));
+        $flushNow = $newSettle - $payNow;
+        $base['pay']   = $payNow;
+        $base['flush'] = $flushNow;
+
+        if (!$apply) {
+            return $base; // dry-run
+        }
+
+        // Credit the matched volume immediately (CD split, cap, e-wallet inside)
+        if ($payNow > 0) {
+            self::creditPairing($userId, $payNow, 1, $sourceUserId);
+        }
+        if ($flushNow > 0) {
+            self::recordFlush($userId, $flushNow, $sourceUserId);
+        }
+
+        // Update volume counters in one atomic statement
+        $pdo->prepare("
+            UPDATE users
+            SET pairs_volume_paid    = pairs_volume_paid    + :pay,
+                pairs_volume_flushed = pairs_volume_flushed + :flush,
+                pairs_volume_today   = pairs_volume_today   + :pay2
+            WHERE id = :id
+        ")->execute([
+            ':pay'   => $payNow,
+            ':flush' => $flushNow,
+            ':pay2'  => $payNow,
+            ':id'    => $userId,
+        ]);
+
+        return $base;
+    }
+
+    /**
+     * Sweep every eligible active member and settle all pending matched volume.
+     *
+     * @param int|null $sourceUserId Attribution for commissions rows.
+     * @param bool     $apply        false = dry-run (compute only).
+     * @return array   {checked, pay, flush, users[]}
+     */
+    public static function settleAllPendingPairVolumes(?int $sourceUserId = null, bool $apply = true): array
+    {
+        $ids = db()->query("
+            SELECT u.id
+            FROM   users u
+            LEFT JOIN packages p ON p.id = u.package_id
+            WHERE  u.status = 'active'
+              AND  p.pairing_enabled = 1 AND p.pairing_bonus > 0
+              AND  LEAST(u.left_pair_volume, u.right_pair_volume)
+                   > (u.pairs_volume_paid + u.pairs_volume_flushed)
+            ORDER BY u.id
+        ")->fetchAll(PDO::FETCH_COLUMN);
+
+        $summary = ['checked' => 0, 'pay' => 0.00, 'flush' => 0.00, 'users' => []];
+        foreach ($ids as $id) {
+            $r = self::settlePendingPairVolume((int)$id, $sourceUserId, $apply);
+            $summary['checked']++;
+            $summary['pay']   += $r['pay'];
+            $summary['flush'] += $r['flush'];
+            if ($r['pay'] > 0 || $r['flush'] > 0) {
+                $summary['users'][(int)$id] = ['settle' => $r['settle'], 'pay' => $r['pay'], 'flush' => $r['flush']];
+            }
+        }
+        return $summary;
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -249,14 +382,8 @@ class Commission
         // 5. CD ledger
         if ($cdPortion > 0 && $cdStatusId) {
             CdStatus::recordLedger(
-                $sponsorId,
-                $cdStatusId,
-                $commId,
-                'direct_referral',
-                $bonus,
-                $cdPortion,
-                $actualWallet,
-                $newUserId
+                $sponsorId, $cdStatusId, $commId, 'direct_referral',
+                $bonus, $cdPortion, $actualWallet, $newUserId
             );
         }
 
@@ -377,14 +504,8 @@ class Commission
                 // 5. CD ledger
                 if ($cdPortion > 0 && $cdStatusId) {
                     CdStatus::recordLedger(
-                        $cur,
-                        $cdStatusId,
-                        $commId,
-                        'indirect_referral',
-                        $bonus,
-                        $cdPortion,
-                        $actualWallet,
-                        $newUserId
+                        $cur, $cdStatusId, $commId, 'indirect_referral',
+                        $bonus, $cdPortion, $actualWallet, $newUserId
                     );
                 }
 
@@ -422,7 +543,7 @@ class Commission
         int $userId,
         float $amount,
         int $pairs,
-        int $sourceId
+        ?int $sourceId = null
     ): void {
         $pdo = db();
 
@@ -477,14 +598,8 @@ class Commission
         // 6. CD ledger audit trail
         if ($cdPortion > 0 && $cdStatusId) {
             CdStatus::recordLedger(
-                $userId,
-                $cdStatusId,
-                $commId,
-                'pairing',
-                $amount,
-                $cdPortion,
-                $actualWallet,
-                $sourceId
+                $userId, $cdStatusId, $commId, 'pairing',
+                $amount, $cdPortion, $actualWallet, $sourceId
             );
         }
 
@@ -494,7 +609,7 @@ class Commission
         }
     }
 
-    private static function recordFlush(int $userId, float $matchedVolume, int $sourceId): void
+    private static function recordFlush(int $userId, float $matchedVolume, ?int $sourceId = null): void
     {
         db()->prepare("
             INSERT INTO commissions
