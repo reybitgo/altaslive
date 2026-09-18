@@ -15,6 +15,11 @@
 // CHANGE THIS to a long random string (e.g. 32+ chars from random.org)
 $cronKey = 'secret12345678';
 
+// ── Maintenance switch ───────────────────────────────────────────────────────
+// Set to false to completely disable this cron job (maintenance mode).
+// When false, the script exits without touching the database.
+$midnightResetEnabled = true;
+
 // ── Validate key ────────────────────────────────────────────────────────────
 $providedKey = $_GET['key'] ?? '';
 if ($providedKey !== $cronKey) {
@@ -87,6 +92,14 @@ function log_info(string $m, string $f): void  { log_line('INFO ', $m, $f); }
 function log_ok(string $m,   string $f): void  { log_line('OK   ', $m, $f); }
 function log_warn(string $m, string $f): void  { log_line('WARN ', $m, $f); }
 function log_error(string $m, string $f): void { log_line('ERROR', $m, $f); }
+
+// ── Maintenance gate ─────────────────────────────────────────────────────────
+if (!$midnightResetEnabled) {
+    log_warn('Midnight reset DISABLED via $midnightResetEnabled — maintenance mode, skipping.', $logFile);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo "Midnight reset disabled (maintenance mode). Nothing was run.\n";
+    exit(0);
+}
 
 // ── Run ─────────────────────────────────────────────────────────────────────
 $startTime = microtime(true);

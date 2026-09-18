@@ -19,3 +19,4 @@
 [2026-09-12 16:51:28 PST] [INFO ] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [2026-09-12 16:51:28 PST] [OK   ] Reset complete. Duration: 743ms
 [2026-09-12 16:51:28 PST] [INFO ] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[2026-09-18 10:01:09 PST] [WARN ] Midnight reset DISABLED via $midnightResetEnabled — maintenance mode, skipping.
