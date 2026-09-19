@@ -94,3 +94,10 @@ $isMember      = ($user['role'] ?? '') === 'member';
         <?php endif; ?>
     </div>
 </div>
+<?php if (defined('MEMBER_MAINTENANCE_BANNER') && MEMBER_MAINTENANCE_BANNER && !Auth::isAdmin()): ?>
+  <div class="alert alert-warning mb-0 rounded-0 no-print"
+       role="alert"
+       style="position:sticky;top:var(--topbar-h);z-index:1029;border:0;border-bottom:1px solid rgba(245,158,11,.4);padding:.6rem 1.5rem;font-size:.85rem;text-align:center;">
+    ⚠️ <strong>System Currently Under Maintenance</strong>
+  </div>
+<?php endif; ?>

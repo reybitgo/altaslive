@@ -23,6 +23,11 @@ define('APP_URL',  'http://localhost/altaslive');  // No trailing slash
 define('APP_NAME', 'Live Altas Farm');
 define('APP_ENV',  'development');            // 'development' | 'production'
 
+// ── Member Maintenance Banner ────────────────────────────────────────────────
+// true → persistent warning banner on all member pages (rendered in topbar.php).
+// Independent of maintenance_mode in index.php (hard site-wide 503 block).
+define('MEMBER_MAINTENANCE_BANNER', true);
+
 // ── Error display ────────────────────────────────────────────────────────────
 if (APP_ENV === 'development') {
     ini_set('display_errors', 1);
