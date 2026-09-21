@@ -172,15 +172,25 @@ try {
     }
 
     // ── 7. v3: Daily Fixed Income payout ──────────────────────────────────────
-    $dfiResult = DailyFixedIncome::processDailyPayout();
-    if ($dfiAvailable) {
-        if (($dfiResult['reason'] ?? '') === 'disabled') {
-            log_warn('DFI payout: Globally disabled via settings.', $logFile);
-        } else {
-            log_ok("DFI payout: {$dfiResult['paid']} paid to {$dfiResult['processed']} member(s), {$dfiResult['skipped']} skipped.", $logFile);
-        }
+    // DFI is skipped entirely once the member seat limit is reached: no new
+    // joins are possible, so the company stops accruing new fixed-income
+    // liability (matches the sim's max-members cutoff). Members simply do not
+    // receive a payout on these nights; dfi_days_used is not advanced because
+    // the increment happens only inside processDailyPayout() when paid.
+    if (isSeatLimitReached()) {
+        $dfiResult = ['processed' => 0, 'paid' => 0.00, 'skipped' => 0, 'reason' => 'seat_limit'];
+        log_warn('DFI payout: SKIPPED — member seat limit reached (no new joins possible).', $logFile);
     } else {
-        log_warn('DFI payout: DailyFixedIncome.php missing — check deployment.', $logFile);
+        $dfiResult = DailyFixedIncome::processDailyPayout();
+        if ($dfiAvailable) {
+            if (($dfiResult['reason'] ?? '') === 'disabled') {
+                log_warn('DFI payout: Globally disabled via settings.', $logFile);
+            } else {
+                log_ok("DFI payout: {$dfiResult['paid']} paid to {$dfiResult['processed']} member(s), {$dfiResult['skipped']} skipped.", $logFile);
+            }
+        } else {
+            log_warn('DFI payout: DailyFixedIncome.php missing — check deployment.', $logFile);
+        }
     }
 
     // ── 8. Summary ────────────────────────────────────────────────────────────
