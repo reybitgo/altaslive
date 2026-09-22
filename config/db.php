@@ -14,8 +14,8 @@ date_default_timezone_set('Asia/Manila');
 
 define('DB_HOST', 'localhost');
 define('DB_PORT', '3306');
-define('DB_NAME', 'u938213108_altas4_db');
-define('DB_USER', 'u938213108_altas4_admin');
+define('DB_NAME', 'u938213108_altas6_db');
+define('DB_USER', 'u938213108_altas6_admin');
 define('DB_PASS', '2v$J#?M^&F:');
 
 // ── Application Configuration ───────────────────────────────────────────────

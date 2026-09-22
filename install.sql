@@ -1,3 +1,4 @@
+-- Active: 1761477309529@@127.0.0.1@3306@u938213108_altas6_db
 -- ============================================================
 --  MLM BINARY SYSTEM — FULL SCHEMA + SEED DATA (v2)
 --  Run once: mysql -u root -p DATABASE < install.sql
