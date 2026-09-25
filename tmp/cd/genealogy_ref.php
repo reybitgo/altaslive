@@ -1357,7 +1357,7 @@
                                 <label class="form-label">Registration Code <span class="text-danger">*</span></label>
                                 <div class="input-group">
                                     <input type="text" id="rm_reg_code" name="reg_code" class="form-control font-mono"
-                                        placeholder="XXXX-XXXX-XXXX or CD-XXXX-XXXX-XXXX" maxlength="18"
+                                        placeholder="XXXX-XXXX-XXXX" maxlength="18"
                                         style="text-transform:uppercase;letter-spacing:2px;font-size:1rem;" required>
                                     <button type="button" class="btn btn-outline-primary" id="rm_validateCodeBtn">Validate</button>
                                 </div>

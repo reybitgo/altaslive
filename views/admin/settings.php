@@ -104,6 +104,16 @@
                                     </span>
                                 </div>
                             </div>
+                            <div class="mb-0 mt-3">
+                                <label class="form-label">🆓 Free Registration</label>
+                                <select name="free_registration_enabled" class="form-select">
+                                    <option value="1" <?= setting('free_registration_enabled', '1') === '1' ? 'selected' : '' ?>>🟢 On — Anyone can start free (pending) registration</option>
+                                    <option value="0" <?= setting('free_registration_enabled', '1') !== '1' ? 'selected' : '' ?>>🔴 Off — Free registration disabled; codes/e-wallet only</option>
+                                </select>
+                                <div class="form-text">
+                                    When Off, free/pending signups are blocked. Referral links then require immediate payment via a registration code or e-wallet.
+                                </div>
+                            </div>
                         </div>
                         <div class="card-footer border-top-0 pt-0">
                             <button type="submit" class="btn btn-primary w-100">💾 Save Settings</button>

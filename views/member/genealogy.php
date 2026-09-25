@@ -996,6 +996,7 @@
   const IMP_QUERY='<?= is_imp_session() ? '&imp=' . e(session_id()) : '' ?>';
   const CURRENT_USER='<?= e($user["username"]) ?>';
   const REGISTRAR_HAS_BINARY=<?= $pairingEnabled ? 'true' : 'false' ?>;
+  const RM_FREE_ENABLED=<?= setting('free_registration_enabled', '1') === '1' ? 'true' : 'false' ?>;
   let rmBinaryMode='manual',rmAutoSuggestion=null,rmAutoActive=false;
 
   function rmTogglePw(id,btn){const el=document.getElementById(id);el.type=el.type==='password'?'text':'password';btn.textContent=el.type==='password'?'👁':'🙈';}
@@ -1078,7 +1079,11 @@
     const form=document.getElementById('regModalForm');
     form.reset();
     regCodeData={};regSelectedPkg={};regUsernameOk=false;regSlotData={};regCurrentStep=1;
-    document.getElementById('rm_referralMode').value='1';
+    if (RM_FREE_ENABLED) {
+      document.getElementById('rm_referralMode').value='1';
+    } else {
+      document.getElementById('rm_referralMode').value='';
+    }
     document.getElementById('rm_upline_username').value=data.username||'';
     document.getElementById('rm_upline_display').textContent='@'+(data.username||'—');
     document.getElementById('rm_sponsor_username').value=CURRENT_USER;
@@ -1086,12 +1091,22 @@
     document.getElementById('rm_sponsorInput').value=CURRENT_USER;
     regSponsorOk=true;
     regSetHint('rm_sponsorHint','Sponsor is valid.',true);
-    document.getElementById('rm_codeSection').style.display='none';
-    document.getElementById('rm_packageSection').style.display='none';
-    document.getElementById('rm_packageInfo').classList.add('d-none');
-    document.getElementById('rm_validatedCode').value='';
-    document.getElementById('rm_reg_code').removeAttribute('required');
-    document.getElementById('rm_toStep2Btn').disabled=false;
+    if (RM_FREE_ENABLED) {
+      document.getElementById('rm_codeSection').style.display='none';
+      document.getElementById('rm_packageSection').style.display='none';
+      document.getElementById('rm_packageInfo').classList.add('d-none');
+      document.getElementById('rm_validatedCode').value='';
+      document.getElementById('rm_reg_code').removeAttribute('required');
+      document.getElementById('rm_toStep2Btn').disabled=false;
+    } else {
+      // Free registration is disabled → open in the paid (code) flow.
+      document.getElementById('rm_codeSection').style.display='block';
+      document.getElementById('rm_packageSection').style.display='none';
+      document.getElementById('rm_packageInfo').classList.add('d-none');
+      document.getElementById('rm_validatedCode').value='';
+      document.getElementById('rm_reg_code').setAttribute('required','');
+      document.getElementById('rm_toStep2Btn').disabled=true;
+    }
     const pkgCard=document.getElementById('rm_packageCard');
     if(pkgCard)pkgCard.classList.add('d-none');
     document.querySelectorAll('#rm_step2 input[name="password"],#rm_step2 input[name="password_confirm"]').forEach(p=>{p.value='';p.type='password';});
@@ -1331,9 +1346,11 @@ document.querySelectorAll('[name="payment_method"]').forEach(r=>{
           <p class="text-muted mb-3" style="font-size:.85rem;">Choose payment method and package for the new member.</p>
           <div class="mb-3">
             <label class="form-label">Payment Method <span class="text-danger">*</span></label>
-            <div class="position-toggle" style="grid-template-columns:1fr 1fr 1fr;">
+            <div class="position-toggle" style="grid-template-columns:<?= setting('free_registration_enabled', '1') === '1' ? '1fr 1fr 1fr' : '1fr 1fr' ?>;">
+              <?php if (setting('free_registration_enabled', '1') === '1'): ?>
               <div class="position-option"><input type="radio" id="rm_pay_free" name="payment_method" value="free" checked required><label class="position-label" for="rm_pay_free">🎁 Free</label></div>
-              <div class="position-option"><input type="radio" id="rm_pay_code" name="payment_method" value="code"><label class="position-label" for="rm_pay_code">🎫 Code</label></div>
+              <?php endif; ?>
+              <div class="position-option"><input type="radio" id="rm_pay_code" name="payment_method" value="code" <?= setting('free_registration_enabled', '1') === '1' ? '' : 'checked' ?>><label class="position-label" for="rm_pay_code">🎫 Code</label></div>
               <div class="position-option"><input type="radio" id="rm_pay_ewallet" name="payment_method" value="ewallet"><label class="position-label" for="rm_pay_ewallet">💳 E-Wallet</label></div>
             </div>
           </div>
@@ -1341,7 +1358,7 @@ document.querySelectorAll('[name="payment_method"]').forEach(r=>{
             <div class="mb-3">
               <label class="form-label">Registration Code <span class="text-danger">*</span></label>
               <div class="input-group">
-                <input type="text" id="rm_reg_code" name="reg_code" class="form-control font-mono" placeholder="XXXX-XXXX-XXXX or CD-XXXX-XXXX-XXXX" maxlength="18" style="text-transform:uppercase;letter-spacing:2px;font-size:1rem;" required>
+                <input type="text" id="rm_reg_code" name="reg_code" class="form-control font-mono" placeholder="XXXX-XXXX-XXXX" maxlength="18" style="text-transform:uppercase;letter-spacing:2px;font-size:1rem;" required>
                 <button type="button" class="btn btn-outline-primary" id="rm_validateCodeBtn">Validate</button>
               </div>
               <div class="form-text" id="rm_codeHint"></div>

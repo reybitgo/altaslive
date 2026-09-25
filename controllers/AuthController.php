@@ -139,8 +139,15 @@ class AuthController
 
         // Pass pre-filled sponsor from ?sponsor= param
         $prefillSponsor = trim($_GET['sponsor'] ?? '');
-        $isReferralMode = isset($_GET['ref']) && $_GET['ref'] === '1';
-        $packages       = Package::all(true); // active packages only
+        $refIntent      = isset($_GET['ref']) && $_GET['ref'] === '1';
+        $freeEnabled    = setting('free_registration_enabled', '1') === '1';
+        // Pending (free) referral flow is only offered when free registration is
+        // enabled. When disabled, referral links degrade to paid registration:
+        // the sponsor + binary placement stay prefilled, but the member must
+        // pay now with a code or e-wallet.
+        $isReferralMode  = $refIntent && $freeEnabled;
+        $degradedReferral = $refIntent && !$freeEnabled;
+        $packages        = Package::all(true); // active packages only
 
         // Can the logged-in user afford e-wallet registration?
         $canUseEwallet = false;
@@ -164,7 +171,7 @@ class AuthController
         $prefillUpline    = '';
         $prefillPosition  = 'left';
         $referralDefers   = false;
-        if ($isReferralMode && $prefillSponsor) {
+        if (($isReferralMode || $degradedReferral) && $prefillSponsor) {
             $sponsorUser = User::findByUsername($prefillSponsor);
             if ($sponsorUser) {
                 if (User::isValidBinaryUpline((int)$sponsorUser['id'])) {
@@ -172,18 +179,18 @@ class AuthController
                     if ($auto) {
                         $prefillUpline   = $auto['upline_username'];
                         $prefillPosition = $auto['position'];
-                    } else {
+                    } elseif ($isReferralMode) {
                         // Tree is full under this sponsor — can't use referral mode
                         $isReferralMode = false;
                     }
-                } else {
+                } elseif ($isReferralMode) {
                     // Sponsor has no binary (or is not active). The referral
                     // still works, but binary placement is deferred until the
                     // member activates — they then use Auto (network-wide)
                     // or Manual for a binary package.
                     $referralDefers = true;
                 }
-            } else {
+            } elseif ($isReferralMode) {
                 $isReferralMode = false;
             }
         } else {
@@ -265,6 +272,14 @@ class AuthController
         // referral_mode flag wasn't submitted (e.g. JS-disabled guest).
         if ($paymentMethod === 'free' && !$isReferralMode) {
             $isReferralMode = true;
+        }
+
+        // ── Free-registration gate ──
+        // Silently blocks any free/pending attempt when disabled (UI never
+        // exposes it in that state, but forged POSTs must not create pending
+        // accounts).
+        if ($isReferralMode && setting('free_registration_enabled', '1') !== '1') {
+            redirect('/?page=register');
         }
 
         $payerId = $wasLoggedIn ? Auth::actingAdminId() : 0;

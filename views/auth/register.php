@@ -17,9 +17,11 @@ if ($isLoggedIn && !$canUseEwallet && !empty($packages)) {
 }
 $prefillSponsor = $prefillSponsor ?? trim($_GET['sponsor'] ?? '');
 $isReferralMode = ($isReferralMode ?? false);
+$freeEnabled    = setting('free_registration_enabled', '1') === '1';
+$degradedReferral = ($degradedReferral ?? false);
 $prefillUpline   = $prefillUpline   ?? '';
 $prefillPosition = $prefillPosition ?? 'left';
-$lockSponsor     = $isReferralMode;
+$lockSponsor     = $isReferralMode || $degradedReferral;
 // Auto-prefill sponsor with current user's username for both members AND admins
 if ($isLoggedIn && !$prefillSponsor) {
   $prefillSponsor = $currentUser['username'];
@@ -126,13 +128,15 @@ if (!$isLoggedIn && !$prefillSponsor) {
                     <!-- Payment Method Toggle (logged-in only) -->
                     <div class="mb-3">
                       <label class="form-label">Payment Method <span class="text-danger">*</span></label>
-                      <div class="position-toggle" style="grid-template-columns:1fr 1fr 1fr;">
+                      <div class="position-toggle" style="grid-template-columns:<?= $freeEnabled ? '1fr 1fr 1fr' : '1fr 1fr' ?>;">
+                        <?php if ($freeEnabled): ?>
                         <div class="position-option">
                           <input type="radio" id="pay_free" name="payment_method" value="free" checked required>
                           <label class="position-label" for="pay_free">🎁 Free</label>
                         </div>
+                        <?php endif; ?>
                         <div class="position-option">
-                          <input type="radio" id="pay_code" name="payment_method" value="code">
+                          <input type="radio" id="pay_code" name="payment_method" value="code" <?= $freeEnabled ? '' : 'checked' ?>>
                           <label class="position-label" for="pay_code">🎫 Code</label>
                         </div>
                         <div class="position-option">
@@ -142,9 +146,12 @@ if (!$isLoggedIn && !$prefillSponsor) {
                       </div>
                     </div>
                   <?php else: ?>
-                    <p class="text-muted mb-3" style="font-size:.85rem;">Choose how to create your account — start free or pay with a registration code.</p>
+                    <?php if ($freeEnabled): ?>
+                    <p class="text-muted mb-3" style="font-size:.85rem;">
+                      Choose how to create your account — start free or pay with a registration code.
+                    </p>
 
-                    <!-- Payment Method Toggle (guest: Free default) -->
+                    <!-- Payment Method Toggle (guest) -->
                     <div class="mb-3">
                       <div class="position-toggle" style="grid-template-columns:1fr 1fr;">
                         <div class="position-option">
@@ -157,6 +164,9 @@ if (!$isLoggedIn && !$prefillSponsor) {
                         </div>
                       </div>
                     </div>
+                    <?php else: ?>
+                    <input type="hidden" name="payment_method" value="code">
+                    <?php endif; ?>
                   <?php endif; ?>
 
                   <!-- Code Input -->
@@ -165,7 +175,7 @@ if (!$isLoggedIn && !$prefillSponsor) {
                       <label class="form-label">Registration Code <span class="text-danger">*</span></label>
                       <div class="input-group">
                         <input type="text" id="reg_code" name="reg_code" class="form-control font-mono"
-                          placeholder="XXXX-XXXX-XXXX or CD-XXXX-XXXX-XXXX" maxlength="18"
+                          placeholder="XXXX-XXXX-XXXX" maxlength="18"
                           style="text-transform:uppercase;letter-spacing:2px;font-size:1rem;">
                         <button type="button" class="btn btn-outline-primary" id="validateCodeBtn">Validate</button>
                       </div>
@@ -458,6 +468,7 @@ if (!$isLoggedIn && !$prefillSponsor) {
   const PREFILL_SPONSOR = <?= json_encode($prefillSponsor) ?>;
   const PKG_COUNT = <?= (int)count($packages) ?>;
   const IS_REFERRAL_MODE = <?= $isReferralMode ? 'true' : 'false' ?>;
+  const FREE_ENABLED = <?= $freeEnabled ? 'true' : 'false' ?>;
   const PREFILL_UPLINE = <?= json_encode($prefillUpline) ?>;
   const PREFILL_POSITION = <?= json_encode($prefillPosition) ?>;
   const REFERRAL_DEFERS = <?= (($referralDefers ?? false) === true) ? 'true' : 'false' ?>;

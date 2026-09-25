@@ -547,6 +547,7 @@ class AdminController
             'ewallet_min_transfer',
             'ewallet_transfer_daily_limit',
             'ewallet_transfer_weekly_limit',
+            'free_registration_enabled',
             'seat_limit',
         ];
         $pdo = db();
