@@ -8,21 +8,22 @@
 <?php
 // === Load the correct user based on ?id= (for admin view) ===
 if (isset($_GET['page']) && $_GET['page'] === 'admin_user_view' && !empty($_GET['id']) && Auth::isAdmin()) {
-    $user = getUserById((int)$_GET['id']);
+    $topbarUser = getUserById((int)$_GET['id']);
 
-    if (!$user) {
+    if (!$topbarUser) {
         flash('error', 'User not found.');
         redirect('/?page=admin_users');
     }
+    $walletUser = $topbarUser;
 } else {
     // Fallback: should not happen if routed correctly
-    $user = Auth::user();
+    $topbarUser = Auth::user();
     // Superadmins act as an admin proxy — surface the acting admin's wallet.
-    $walletUser = Auth::isSuperadmin() ? (User::find(Auth::actingAdminId()) ?: $user) : $user;
+    $walletUser = Auth::isSuperadmin() ? (User::find(Auth::actingAdminId()) ?: $topbarUser) : $topbarUser;
 }
-$topbarBalance = fmt_money(($walletUser ?? $user)['ewallet_balance'] ?? 0);
-$initials      = strtoupper(substr($user['username'] ?? 'U', 0, 1));
-$isMember      = ($user['role'] ?? '') === 'member';
+$topbarBalance = fmt_money($walletUser['ewallet_balance'] ?? 0);
+$initials      = strtoupper(substr($topbarUser['username'] ?? 'U', 0, 1));
+$isMember      = ($topbarUser['role'] ?? '') === 'member';
 ?>
 <div class="topbar-wrapper no-print">
     <!-- Hamburger (mobile only — triggers offcanvas) -->
@@ -43,7 +44,7 @@ $isMember      = ($user['role'] ?? '') === 'member';
                 <span class="bal-label">Balance</span>
                 <span class="bal-amount" id="topbarBalance"><?= $topbarBalance ?></span>
             </div>
-            <?php if (!empty($user['cd_active'])): ?>
+            <?php if (!empty($topbarUser['cd_active'])): ?>
                 <div class="topbar-balance" style="background:linear-gradient(135deg,#fef3c7,#fffbeb);border-color:rgba(245,158,11,0.3);">
                     <span class="bal-label" style="color:#d97706;">CD</span>
                     <span class="bal-amount" style="color:#d97706;font-size:.8rem;">⏳ Active</span>
@@ -54,9 +55,9 @@ $isMember      = ($user['role'] ?? '') === 'member';
         <div class="dropdown">
             <button class="topbar-balance border-0 dropdown-toggle" type="button"
                 data-bs-toggle="dropdown" aria-expanded="false"
-                title="<?= e($user['username'] ?? '') ?>" style="cursor:pointer;">
+                title="<?= e($topbarUser['username'] ?? '') ?>" style="cursor:pointer;">
                 <span class="bal-label"><?= Auth::isAdmin() ? 'Admin' : 'User' ?></span>
-                <span class="bal-amount">@<?= e($user['username'] ?? '') ?></span>
+                <span class="bal-amount">@<?= e($topbarUser['username'] ?? '') ?></span>
             </button>
             <ul class="dropdown-menu dropdown-menu-end shadow-sm rounded-3 py-1 mt-1" style="min-width:160px;font-size:.82rem;">
                 <li>

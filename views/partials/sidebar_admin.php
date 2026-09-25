@@ -7,13 +7,13 @@
 ?>
 <?php
 $cp = current_page();
-$user = Auth::user();
-$initial = strtoupper(substr($user['username'] ?? 'A', 0, 1));
+$adminUser = Auth::user();
+$initial = strtoupper(substr($adminUser['username'] ?? 'A', 0, 1));
 
 $pendingPayouts = (int)db()->query("SELECT COUNT(*) FROM payout_requests WHERE status='pending'")->fetchColumn();
 $pendingMembers = (int)db()->query("SELECT COUNT(*) FROM users WHERE role='member' AND status='pending'")->fetchColumn();
 
-function renderAdminNav($cp, $user, $initial, $pendingPayouts, $pendingMembers)
+function renderAdminNav($cp, $adminUser, $initial, $pendingPayouts, $pendingMembers)
 { ?>
   <div class="sidebar-brand">
     <div class="brand-icon">
@@ -98,7 +98,7 @@ function renderAdminNav($cp, $user, $initial, $pendingPayouts, $pendingMembers)
         <?= $initial ?>
       </div>
       <div class="user-info">
-        <div class="user-name"><?= e($user['full_name'] ?: $user['username']) ?></div>
+        <div class="user-name"><?= e($adminUser['full_name'] ?: $adminUser['username']) ?></div>
         <div class="user-role">Administrator</div>
       </div>
     </div>
@@ -107,7 +107,7 @@ function renderAdminNav($cp, $user, $initial, $pendingPayouts, $pendingMembers)
 
 <!-- Desktop sidebar -->
 <div class="sidebar d-none d-lg-flex flex-column">
-  <?php renderAdminNav($cp, $user, $initial, $pendingPayouts, $pendingMembers); ?>
+  <?php renderAdminNav($cp, $adminUser, $initial, $pendingPayouts, $pendingMembers); ?>
 </div>
 
 <!-- Mobile offcanvas -->
@@ -118,6 +118,6 @@ function renderAdminNav($cp, $user, $initial, $pendingPayouts, $pendingMembers)
       data-bs-dismiss="offcanvas" aria-label="Close"></button>
   </div>
   <div class="offcanvas-body p-0 d-flex flex-column" style="overflow-y:auto;">
-    <?php renderAdminNav($cp, $user, $initial, $pendingPayouts, $pendingMembers); ?>
+    <?php renderAdminNav($cp, $adminUser, $initial, $pendingPayouts, $pendingMembers); ?>
   </div>
 </div>
