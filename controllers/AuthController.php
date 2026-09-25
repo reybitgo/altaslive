@@ -149,19 +149,39 @@ class AuthController
             $canUseEwallet = Ewallet::balance(Auth::actingAdminId()) >= $minFee;
         }
 
+        // Does the logged-in registrar participate in the binary network?
+        // Binary-less registrars never pre-place members at registration —
+        // free signups defer to activation, direct binary packages use
+        // auto-select (or a manual override).
+        $registrarHasBinary = false;
+        if (Auth::check()) {
+            $registrarHasBinary = User::isPrimaryAdmin((int)(Auth::actingUser()['id'] ?? 0))
+                || Auth::isSuperadmin()
+                || Package::hasPairing((int)(Auth::actingUser()['package_id'] ?? 0));
+        }
+
         // Auto-find upline + position for referral mode
         $prefillUpline    = '';
         $prefillPosition  = 'left';
+        $referralDefers   = false;
         if ($isReferralMode && $prefillSponsor) {
             $sponsorUser = User::findByUsername($prefillSponsor);
             if ($sponsorUser) {
-                $auto = self::findNextBinarySlot((int)$sponsorUser['id']);
-                if ($auto) {
-                    $prefillUpline   = $auto['upline_username'];
-                    $prefillPosition = $auto['position'];
+                if (User::isValidBinaryUpline((int)$sponsorUser['id'])) {
+                    $auto = self::findNextBinarySlot((int)$sponsorUser['id']);
+                    if ($auto) {
+                        $prefillUpline   = $auto['upline_username'];
+                        $prefillPosition = $auto['position'];
+                    } else {
+                        // Tree is full under this sponsor — can't use referral mode
+                        $isReferralMode = false;
+                    }
                 } else {
-                    // Tree is full under this sponsor — can't use referral mode
-                    $isReferralMode = false;
+                    // Sponsor has no binary (or is not active). The referral
+                    // still works, but binary placement is deferred until the
+                    // member activates — they then use Auto (network-wide)
+                    // or Manual for a binary package.
+                    $referralDefers = true;
                 }
             } else {
                 $isReferralMode = false;
@@ -236,10 +256,15 @@ class AuthController
         $uplineU       = strtolower(trim($_POST['upline_username']  ?? ''));
         $position      = $_POST['binary_position']                   ?? '';
 
-        // ── Guests can only use registration codes ──
-        if (!$wasLoggedIn && !$isReferralMode && $paymentMethod !== 'code') {
+        // ── Guests can only register free (pending) or with registration codes ──
+        if (!$wasLoggedIn && !$isReferralMode && $paymentMethod === 'ewallet') {
             flash('error', 'Please log in to use e-wallet registration.');
             redirect('/?page=login');
+        }
+        // Free always follows the pending/referral flow, even if the hidden
+        // referral_mode flag wasn't submitted (e.g. JS-disabled guest).
+        if ($paymentMethod === 'free' && !$isReferralMode) {
+            $isReferralMode = true;
         }
 
         $payerId = $wasLoggedIn ? Auth::actingAdminId() : 0;
@@ -311,7 +336,13 @@ class AuthController
             redirect('/?page=register');
         }
 
-        // ── Binary placement (skipped for non-binary packages) ──
+        // ── Binary placement ──
+        //   Free:     only binary registrars place (Has Binary toggle ON);
+        //             binary-less registrars defer to activation (unplaced pending).
+        //   Direct:   binary packages always require placement — a binary registrar
+        //             places manually (toggle locked ON), a binary-less registrar
+        //             uses network-wide auto-select or picks their own upline.
+        //             Auto-select may return nothing → the member becomes a binary root.
         $upline         = null;
         $pairingEnabled = true;
         if (!$isReferralMode && $packageId > 0) {
@@ -319,24 +350,65 @@ class AuthController
             $pairingEnabled = $pkg ? Package::hasPairing($packageId) : true;
         }
 
-        if ($isReferralMode || $pairingEnabled) {
-            $upline = User::findByUsername($uplineU);
-            if (!$upline) {
-                flash('error', 'Binary upline username not found.');
-                redirect('/?page=register');
-            }
-            if (!Package::hasPairing((int)$upline['package_id'])) {
-                flash('error', 'The selected binary upline is not part of the binary network.');
-                redirect('/?page=register');
-            }
+        $hasBinary          = ($_POST['has_binary'] ?? '0') === '1';
+        $binaryMode         = $_POST['binary_mode'] ?? 'manual';
+        $registrarHasBinary = $wasLoggedIn && (
+            User::isPrimaryAdmin((int)(Auth::actingUser()['id'] ?? 0))
+            || Auth::isSuperadmin()
+            || Package::hasPairing((int)(Auth::actingUser()['package_id'] ?? 0))
+        );
+        // True referral links (?ref=1) render a hidden ref_link=1 marker and
+        // always use the sponsor-anchored, pre-filled placement.
+        $forceReferralAnchor = ($_POST['ref_link'] ?? '') === '1';
 
-            if (!in_array($position, ['left', 'right'])) {
-                flash('error', 'Invalid binary position.');
-                redirect('/?page=register');
-            }
-            if (!User::isSlotFree((int)$upline['id'], $position)) {
-                flash('error', "The {$position} position under @{$uplineU} is already occupied.");
-                redirect('/?page=register');
+        if ($isReferralMode) {
+            // Free / pending flow:
+            //  - Real referral links (?ref=1) from a binary sponsor keep the
+            //    sponsor-anchored placement; from a non-binary sponsor the
+            //    upline field is empty → member registers UNPLACED and chooses
+            //    their binary connection at activation (network-wide Auto by default).
+            //  - Regular-page / genealogy-modal free signups place only when a
+            //    binary registrar keeps the Has Binary toggle ON.
+            $requirePlacement = ($forceReferralAnchor && !empty($uplineU))
+                || ($registrarHasBinary && $hasBinary);
+        } elseif ($packageId > 0 && $pairingEnabled) {
+            // Direct registration into a binary package.
+            $requirePlacement = true;
+        } else {
+            // Free referral registration — only a binary registrar may place
+            // (and only when the Has Binary toggle is ON).
+            $requirePlacement = $registrarHasBinary && $hasBinary;
+        }
+
+        if ($requirePlacement) {
+            $useAuto = !$isReferralMode && !$registrarHasBinary && $binaryMode === 'auto';
+            if ($useAuto) {
+                $auto = User::findNextBinarySlotNetworkWide(0);
+                if ($auto) {
+                    $upline   = User::find((int)$auto['upline_id']);
+                    $position = $auto['position'];
+                }
+                // If auto-select finds nothing, $upline stays null → member becomes
+                // a binary network root (active, no placement).
+            } else {
+                $upline = User::findByUsername($uplineU);
+                if (!$upline) {
+                    flash('error', 'Binary upline username not found.');
+                    redirect('/?page=register');
+                }
+                if (!User::isValidBinaryUpline((int)$upline['id'])) {
+                    flash('error', 'The selected binary upline is not part of the binary network or is not an active member.');
+                    redirect('/?page=register');
+                }
+
+                if (!in_array($position, ['left', 'right'])) {
+                    flash('error', 'Invalid binary position.');
+                    redirect('/?page=register');
+                }
+                if (!User::isSlotFree((int)$upline['id'], $position)) {
+                    flash('error', "The {$position} position under @{$uplineU} is already occupied.");
+                    redirect('/?page=register');
+                }
             }
         }
 
@@ -442,13 +514,13 @@ class AuthController
         $username = strtolower(trim($_GET['username'] ?? ''));
         $position = $_GET['position'] ?? '';
 
-        // Only pairing-enabled members can host binary placements
+        // Only active pairing members (or the default admin root) can host binary placements
         $user = User::findByUsername($username);
         if (!$user) {
             json_response(['valid' => false, 'message' => 'User not found.']);
         }
-        if (!Package::hasPairing((int)$user['package_id'])) {
-            json_response(['valid' => false, 'message' => 'That member is not part of the binary network.']);
+        if (!User::isValidBinaryUpline((int)$user['id'])) {
+            json_response(['valid' => false, 'message' => 'That member is not an active binary upline.']);
         }
 
         $leftFree  = User::isSlotFree((int)$user['id'], 'left');
@@ -461,6 +533,27 @@ class AuthController
             'right_free' => $rightFree,
             'slot_ok'    => $position ? ($position === 'left' ? $leftFree : $rightFree) : null,
             'message'    => "Found @{$user['username']} — Left: " . ($leftFree ? '✓ Free' : '✗ Taken') . ', Right: ' . ($rightFree ? '✓ Free' : '✗ Taken'),
+        ]);
+    }
+
+    /** AJAX: suggest the next network-wide binary slot (preview only — the
+     *  authoritative run always happens server-side at do_register/do_activate). */
+    public function ajaxAutoSelectUpline(): void
+    {
+        $excludeId = max(0, (int)($_GET['exclude_id'] ?? 0));
+        $slot      = User::findNextBinarySlotNetworkWide($excludeId);
+
+        if (!$slot) {
+            json_response([
+                'valid'   => false,
+                'message' => 'No binary position is currently available. The member will register as a binary network root.',
+            ]);
+        }
+
+        json_response([
+            'valid'           => true,
+            'upline_username' => $slot['upline_username'],
+            'position'        => $slot['position'],
         ]);
     }
 

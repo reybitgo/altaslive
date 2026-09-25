@@ -16,6 +16,8 @@
     <?= render_flash() ?>
 
     <?php
+    $allPlans = User::isPrimaryAdmin((int)$user['id']) || Auth::isSuperadmin();
+    $isBinary = $allPlans || Package::hasPairing((int)($user['package_id'] ?? 0));
     $pendingReactivation = false;
     if (($status['cap_status'] ?? 'active') === 'capped') {
         $pendingReactivation = (int)db()->query("SELECT COUNT(*) FROM reactivations WHERE user_id = {$user['id']} AND status = 'pending'")->fetchColumn() > 0;
@@ -32,7 +34,9 @@
               <div>
                 <h5 class="fw-700 mb-1">Account Pending Activation</h5>
                 <p class="text-muted mb-0" style="font-size:.8rem;">
-                  Your binary position is reserved. Activate your account with a registration code or e-wallet to unlock all earning features.
+                  <?= $isBinary
+                      ? 'Your binary position is reserved. Activate your account with a registration code or e-wallet to unlock all earning features.'
+                      : 'Activate your account with a registration code or e-wallet to unlock all earning features.' ?>
                 </p>
               </div>
             </div>
@@ -167,9 +171,11 @@
       }
       $cards = [
         [$wallet['ewallet_balance'], 'E-Wallet Balance',   '💰', 'primary', 'primary', $balanceSub, 'payout'],
-        [$summary['total_pairing'],  'Pairing Earnings', '🤝', 'success', 'success', fmt_money($status['matched_volume']) . ' matched lifetime', null],
+        ...($isBinary ? [
+          [$summary['total_pairing'], 'Pairing Earnings', '🤝', 'success', 'success', fmt_money($status['matched_volume']) . ' matched lifetime', null],
+        ] : []),
         [$summary['total_direct'],   'Direct Referral',  '👥', 'orange',  'warning', null, 'genealogy&view=referral'],
-        ...(Package::hasIndirectReferral((int)$user['package_id']) ? [
+        ...(($allPlans || Package::hasIndirectReferral((int)$user['package_id'])) ? [
           [$summary['total_indirect'], 'Indirect Referral', '🔗', 'purple',  'purple',  'Up to 10 levels', null],
         ] : []),
       ];
@@ -273,6 +279,7 @@
       </div>
     </div>
 
+    <?php if ($isBinary): ?>
     <div class="row g-3 mb-3">
       <!-- Pairing cap widget -->
       <div class="col-12 col-md-6">
@@ -344,6 +351,7 @@
         </div>
       </div>
     </div>
+    <?php endif; ?>
 
     <!-- Recent Activity -->
     <div class="card">
@@ -360,14 +368,14 @@
           <?php else: foreach ($recent as $item):
             $isCredit = $item['status'] === 'credited';
             $typeMap  = ['pairing' => ['🤝', '#ecfdf5', 'var(--success)'], 'direct_referral' => ['👥', '#fff7ed', 'var(--orange)'], 'daily_fixed_income' => ['📅', '#eff6ff', 'var(--primary)']];
-            if (Package::hasIndirectReferral((int)$user['package_id'])) {
+            if ($allPlans || Package::hasIndirectReferral((int)$user['package_id'])) {
                 $typeMap['indirect_referral'] = ['🔗', '#f5f3ff', 'var(--purple)'];
             }
             [$icon, $bg, $col] = $typeMap[$item['type']] ?? ['💬', '#f4f6fb', 'var(--muted)'];
             $typeName = match ($item['type']) {
               'pairing' => 'Pairing Bonus',
               'direct_referral' => 'Direct Referral',
-              'indirect_referral' => Package::hasIndirectReferral((int)$user['package_id']) ? 'Indirect — Lvl ' . $item['level'] : $item['type'],
+              'indirect_referral' => ($allPlans || Package::hasIndirectReferral((int)$user['package_id'])) ? 'Indirect — Lvl ' . $item['level'] : $item['type'],
               'daily_fixed_income' => 'Daily Fixed Income',
               default => $item['type']
             };

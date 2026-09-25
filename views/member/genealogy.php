@@ -332,7 +332,7 @@
         </div>
       </div>
 
-    <?php elseif (Package::hasIndirectReferral((int)$user['package_id'])): ?>
+    <?php elseif ($showIndirect): ?>
       <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
           <span class="card-title">👥 Referral Network</span>
@@ -995,17 +995,82 @@
   const APP_URL_JS='<?= APP_URL ?>';
   const IMP_QUERY='<?= is_imp_session() ? '&imp=' . e(session_id()) : '' ?>';
   const CURRENT_USER='<?= e($user["username"]) ?>';
+  const REGISTRAR_HAS_BINARY=<?= $pairingEnabled ? 'true' : 'false' ?>;
+  let rmBinaryMode='manual',rmAutoSuggestion=null,rmAutoActive=false;
 
   function rmTogglePw(id,btn){const el=document.getElementById(id);el.type=el.type==='password'?'text':'password';btn.textContent=el.type==='password'?'👁':'🙈';}
 
   function rmSetBinaryEnabled(on){
     regBinaryEnabled=!!on;
-    const sec=document.getElementById('rm_binarySection');
-    if(sec)sec.style.display=regBinaryEnabled?'block':'none';
     const left=document.getElementById('rm_pos_left'),right=document.getElementById('rm_pos_right');
     if(left)left.required=regBinaryEnabled;
     if(right)right.required=regBinaryEnabled;
     if(!regBinaryEnabled&&left&&right){left.checked=false;right.checked=false;document.getElementById('rm_binary_position').value='';document.getElementById('rm_position_display').textContent='N/A';}
+  }
+
+  function rmCurrentPairing(){
+    const method=document.querySelector('[name="payment_method"]:checked')?.value||'code';
+    if(method==='code') return !!(regCodeData&&regCodeData.pairing_enabled);
+    if(regSelectedPkg.pairing_enabled===true||regSelectedPkg.pairing_enabled===false) return regSelectedPkg.pairing_enabled;
+    const single=document.getElementById('rm_packageId');
+    if(single) return single.dataset.pairing!=='0';
+    const sel=document.getElementById('rm_packageSelect');
+    if(sel&&sel.value) return sel.options[sel.selectedIndex].dataset.pairing==='1';
+    return true;
+  }
+
+  function rmRefreshAutoPreview(){
+    const hint=document.getElementById('rm_autoPreviewHint');
+    if(!hint)return;
+    hint.textContent='Finding the best position…';
+    rmAutoSuggestion=null;
+    fetch(APP_URL_JS+'/?page=auto_select_upline'+IMP_QUERY)
+      .then(r=>r.json())
+      .then(d=>{
+        if(!d.valid){rmAutoSuggestion={valid:false};hint.textContent=d.message||'No position available — the member will become a binary network root.';return;}
+        rmAutoSuggestion=d;
+        hint.textContent='Auto will place this member under @'+d.upline_username+' ('+d.position.charAt(0).toUpperCase()+d.position.slice(1)+').';
+      })
+      .catch(()=>{rmAutoSuggestion={valid:false};hint.textContent='Could not load placement suggestion.';});
+  }
+
+  function rmApplyBinary(){
+    const sec=document.getElementById('rm_binarySection');
+    if(!sec)return;
+    const method=document.querySelector('[name="payment_method"]:checked')?.value||'code';
+    const pairing=rmCurrentPairing();
+    const toggle=document.getElementById('rm_hasBinary');
+    const modeSec=document.getElementById('rm_binaryModeSection');
+    const manualSec=document.getElementById('rm_manualSection');
+    const isAuto=document.querySelector('[name="binary_mode"]:checked')?.value==='auto';
+    let showAny=false,showManual=false;
+    rmAutoActive=false;
+    if(modeSec)modeSec.style.display='none';
+
+    if(method==='free'){
+      if(toggle){
+        toggle.disabled=false;
+        document.getElementById('rm_hasBinaryHint').textContent='Toggle ON to connect the member to the binary network now. Toggle OFF to defer the binary connection until the member activates.';
+        showAny=showManual=toggle.checked&&REGISTRAR_HAS_BINARY;
+      }
+    }else if(pairing){
+      if(REGISTRAR_HAS_BINARY){
+        if(toggle){toggle.checked=true;toggle.disabled=true;document.getElementById('rm_hasBinaryHint').textContent='Binary placement is required for this package.';}
+        showAny=showManual=true;
+      }else{
+        if(toggle){toggle.checked=true;toggle.disabled=true;}
+        showAny=true;
+        showManual=!isAuto;
+        rmAutoActive=isAuto;
+        rmBinaryMode=isAuto?'auto':'manual';
+        if(modeSec)modeSec.style.display='block';
+        if(isAuto)rmRefreshAutoPreview();
+      }
+    }
+
+    sec.style.display=showAny?'block':'none';
+    if(manualSec)manualSec.style.display=showManual?'block':'none';
+    rmSetBinaryEnabled(showManual);
   }
 
   function openRegisterModal(data){
@@ -1053,6 +1118,7 @@
       document.getElementById('rm_pos_label_left').classList.add('opacity-50');
     }
     regGoStep(1);
+    rmApplyBinary();
     new bootstrap.Modal(modal).show();
   }
 
@@ -1089,19 +1155,29 @@
       });
     });
 
+    document.querySelectorAll('[name="binary_mode"]').forEach(r=>{
+      r.addEventListener('change',function(){
+        rmBinaryMode=this.value;
+        rmApplyBinary();
+      });
+    });
+    const rmToggleEl=document.getElementById('rm_hasBinary');
+    if(rmToggleEl){
+      rmToggleEl.addEventListener('change',rmApplyBinary);
+    }
+
 document.querySelectorAll('[name="payment_method"]').forEach(r=>{
       r.addEventListener('change',function(){
         regResetCodeState();
         const v=this.value,isFree=v==='free';
         document.getElementById('rm_codeSection').style.display='none';
         document.getElementById('rm_packageSection').style.display='none';
-        document.getElementById('rm_referralMode').value=isFree?'':'';
+        document.getElementById('rm_referralMode').value=isFree?'1':'';
         const codeInput=document.getElementById('rm_reg_code');
         if(isFree){document.getElementById('rm_toStep2Btn').disabled=false;codeInput.removeAttribute('required');}
-        else if(v==='ewallet'){document.getElementById('rm_packageSection').style.display='block';document.getElementById('rm_toStep2Btn').disabled=PACKAGES.length!==1;codeInput.removeAttribute('required');
-          if(PACKAGES.length===1){rmSetBinaryEnabled(PACKAGES[0].pairing_enabled);}
-        }
+        else if(v==='ewallet'){document.getElementById('rm_packageSection').style.display='block';document.getElementById('rm_toStep2Btn').disabled=PACKAGES.length!==1;codeInput.removeAttribute('required');}
         else{document.getElementById('rm_codeSection').style.display='block';document.getElementById('rm_toStep2Btn').disabled=true;codeInput.setAttribute('required','');}
+        rmApplyBinary();
       });
     });
 
@@ -1114,7 +1190,7 @@ document.querySelectorAll('[name="payment_method"]').forEach(r=>{
       try{
         const fd=new FormData();fd.append('code',code);fd.append('csrf_token',CSRF_TOKEN);
         const d=await(await fetch(APP_URL_JS+'/?page=validate_code'+IMP_QUERY,{method:'POST',body:fd})).json();
-        if(d.valid){regCodeData=d;rmSetBinaryEnabled(d.pairing_enabled!==false);document.getElementById('rm_pkgName').textContent=d.package_name;document.getElementById('rm_pkgDetails').textContent='Entry: '+d.entry_fee+' · Pair volume: '+d.volume+' · Cap: '+d.cap_pesos+'/day';document.getElementById('rm_packageInfo').classList.remove('d-none');document.getElementById('rm_validatedCode').value=code;document.getElementById('rm_toStep2Btn').disabled=false;regSetHint('rm_codeHint','✓ Code is valid!',true);}
+        if(d.valid){regCodeData=d;rmApplyBinary();document.getElementById('rm_pkgName').textContent=d.package_name;document.getElementById('rm_pkgDetails').textContent='Entry: '+d.entry_fee+' · Pair volume: '+d.volume+' · Cap: '+d.cap_pesos+'/day';document.getElementById('rm_packageInfo').classList.remove('d-none');document.getElementById('rm_validatedCode').value=code;document.getElementById('rm_toStep2Btn').disabled=false;regSetHint('rm_codeHint','✓ Code is valid!',true);}
         else{regSetHint('rm_codeHint',d.message||'Invalid code.',false);}
       }catch(e){regSetHint('rm_codeHint','Network error.',false);}
       this.disabled=false;this.textContent='Validate';
@@ -1129,9 +1205,9 @@ document.querySelectorAll('[name="payment_method"]').forEach(r=>{
 
     const rmPackageSelect=document.getElementById('rm_packageSelect');
     if(rmPackageSelect){rmPackageSelect.addEventListener('change',function(){
-      if(!this.value){document.getElementById('rm_packageCard')?.classList.add('d-none');document.getElementById('rm_toStep2Btn').disabled=true;return;}
+      if(!this.value){document.getElementById('rm_packageCard')?.classList.add('d-none');document.getElementById('rm_toStep2Btn').disabled=true;rmApplyBinary();return;}
       const opt=this.options[this.selectedIndex];regSelectedPkg={id:this.value,name:opt.dataset.name,fee:opt.dataset.fee,bonus:opt.dataset.bonus,cap:opt.dataset.cap,pairing_enabled:opt.dataset.pairing==='1'};
-      rmSetBinaryEnabled(regSelectedPkg.pairing_enabled);
+      rmApplyBinary();
       const card=document.getElementById('rm_packageCard');if(card){document.getElementById('rm_pkgCardName').textContent=regSelectedPkg.name;document.getElementById('rm_pkgCardDetails').textContent='Entry: '+regSelectedPkg.fee+' · Bonus: '+regSelectedPkg.bonus+' · Cap: '+regSelectedPkg.cap+' pairs/day';card.classList.remove('d-none');}
       regSetHint('rm_packageHint','✓ Package selected.',true);document.getElementById('rm_toStep2Btn').disabled=false;
     });}
@@ -1185,10 +1261,13 @@ document.querySelectorAll('[name="payment_method"]').forEach(r=>{
       }
       document.getElementById('rm_rev_username').textContent='@'+username;
       document.getElementById('rm_rev_sponsor').textContent='@'+(document.getElementById('rm_sponsorInput').value.trim()||CURRENT_USER);
-      const uRow=document.getElementById('rm_rev_uplineRow');if(uRow)uRow.style.display=regBinaryEnabled?'':'none';
-      document.getElementById('rm_rev_upline').textContent='@'+(document.getElementById('rm_upline_username').value||'—');
-      const pRow=document.getElementById('rm_rev_positionRow');if(pRow)pRow.style.display=regBinaryEnabled?'':'none';
-      document.getElementById('rm_rev_position').textContent=document.getElementById('rm_position_display').textContent;
+      const showBinary=regBinaryEnabled||rmAutoActive;
+      const uRow=document.getElementById('rm_rev_uplineRow');if(uRow)uRow.style.display=showBinary?'':'none';
+      document.getElementById('rm_rev_upline').textContent=rmAutoActive
+        ?(rmAutoSuggestion?'@'+rmAutoSuggestion.upline_username+' (auto)':'(auto)')
+        :('@'+(document.getElementById('rm_upline_username').value||'—'));
+      const pRow=document.getElementById('rm_rev_positionRow');if(pRow)pRow.style.display=showBinary?'':'none';
+      document.getElementById('rm_rev_position').textContent=rmAutoActive?'Auto (network)':document.getElementById('rm_position_display').textContent;
       regGoStep(3);
     });
 
@@ -1291,18 +1370,38 @@ document.querySelectorAll('[name="payment_method"]').forEach(r=>{
           <div id="rm_packageInfo" class="code-verified d-none"><span style="font-size:1.2rem;">✅</span><div><div class="fw-bold" id="rm_pkgName"></div><div style="font-size:.75rem;margin-top:2px;" id="rm_pkgDetails"></div></div></div>
 
           <div id="rm_binarySection">
-            <div class="slot-status" style="margin-bottom:1rem;">
-              <span>↙ Upline: <strong id="rm_upline_display">—</strong></span>
-              <span>Position: <strong id="rm_position_display">—</strong></span>
-            </div>
-            <div style="font-size:.78rem;color:var(--muted);margin-bottom:1rem;">Sponsor: <strong id="rm_sponsor_display">—</strong></div>
-
-            <!-- Position Selection -->
+            <?php if ($pairingEnabled): ?>
             <div class="mb-3">
-              <label class="form-label">Binary Position <span class="text-danger">*</span></label>
+              <label class="form-label">Binary Placement</label>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="rm_hasBinary" name="has_binary" value="1" checked>
+                <label class="form-check-label" for="rm_hasBinary">Has Binary</label>
+              </div>
+              <div class="form-text" id="rm_hasBinaryHint">Toggle ON to connect the member to the binary network now. Toggle OFF to defer the binary connection until the member activates.</div>
+            </div>
+            <?php endif; ?>
+            <div id="rm_binaryModeSection" style="display:none;" class="mb-3">
+              <label class="form-label">Binary Connection</label>
               <div class="position-toggle" style="grid-template-columns:1fr 1fr;">
-                <div class="position-option"><input type="radio" id="rm_pos_left" name="binary_position_radio" value="left" required><label class="position-label" id="rm_pos_label_left" for="rm_pos_left">↙ Left</label></div>
-                <div class="position-option"><input type="radio" id="rm_pos_right" name="binary_position_radio" value="right"><label class="position-label" id="rm_pos_label_right" for="rm_pos_right">↘ Right</label></div>
+                <div class="position-option"><input type="radio" id="rm_mode_auto" name="binary_mode" value="auto" checked><label class="position-label" for="rm_mode_auto">✨ Auto</label></div>
+                <div class="position-option"><input type="radio" id="rm_mode_manual" name="binary_mode" value="manual"><label class="position-label" for="rm_mode_manual">🖐 Manual</label></div>
+              </div>
+              <p class="form-text" id="rm_autoPreviewHint">Auto places the new member at the best available position in the network.</p>
+            </div>
+            <div id="rm_manualSection">
+              <div class="slot-status" style="margin-bottom:1rem;">
+                <span>↙ Upline: <strong id="rm_upline_display">—</strong></span>
+                <span>Position: <strong id="rm_position_display">—</strong></span>
+              </div>
+              <div style="font-size:.78rem;color:var(--muted);margin-bottom:1rem;">Sponsor: <strong id="rm_sponsor_display">—</strong></div>
+
+              <!-- Position Selection -->
+              <div class="mb-3">
+                <label class="form-label">Binary Position <span class="text-danger">*</span></label>
+                <div class="position-toggle" style="grid-template-columns:1fr 1fr;">
+                  <div class="position-option"><input type="radio" id="rm_pos_left" name="binary_position_radio" value="left" required><label class="position-label" id="rm_pos_label_left" for="rm_pos_left">↙ Left</label></div>
+                  <div class="position-option"><input type="radio" id="rm_pos_right" name="binary_position_radio" value="right"><label class="position-label" id="rm_pos_label_right" for="rm_pos_right">↘ Right</label></div>
+                </div>
               </div>
             </div>
           </div>

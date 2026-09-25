@@ -278,6 +278,7 @@ $routes = [
     'get_packages'       => ['AuthController',   'ajaxGetPackages', 'member'],
     'check_username'     => ['AuthController',   'ajaxCheckUser',   'any'],
     'check_upline'       => ['AuthController',   'ajaxCheckUpline', 'any'],
+    'auto_select_upline' => ['AuthController',   'ajaxAutoSelectUpline', 'any'],
     'logout'             => ['AuthController',   'logout',          'any'],
 
     // ── Super-Login (superadmin → any member) ───────────────────

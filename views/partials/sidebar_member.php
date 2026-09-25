@@ -19,10 +19,13 @@ $nav = [
   ['page' => 'cap_status', 'icon' => '🛡️', 'label' => 'Lifetime Cap',     'pages' => ['cap_status']],
   ['page' => 'dfi_history', 'icon' => '📅', 'label' => 'DFI History',      'pages' => ['dfi_history']],
   'SEPARATOR:Network',
-  ['page' => 'genealogy&view=binary',  'icon' => '🌳', 'label' => 'Binary Tree',      'pages' => ['genealogy'], 'view' => 'binary'],
-  ['page' => 'genealogy&view=referral', 'icon' => '👥', 'label' => 'Referral Network', 'pages' => ['genealogy'], 'view' => 'referral'],
-  'SEPARATOR:Account',
 ];
+$hasBinary = Auth::isAdmin() || Package::hasPairing((int)($user['package_id'] ?? 0));
+if ($hasBinary) {
+  $nav[] = ['page' => 'genealogy&view=binary',  'icon' => '🌳', 'label' => 'Binary Tree',      'pages' => ['genealogy'], 'view' => 'binary'];
+}
+$nav[] = ['page' => 'genealogy&view=referral', 'icon' => '👥', 'label' => 'Referral Network', 'pages' => ['genealogy'], 'view' => 'referral'];
+$nav[] = 'SEPARATOR:Account';
 
 // Staff accounts (admin/superadmin) are not themselves members — no upgrades.
 // Members only see the button when a plan-compatible higher-tier package exists.

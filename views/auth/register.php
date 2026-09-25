@@ -24,6 +24,10 @@ $lockSponsor     = $isReferralMode;
 if ($isLoggedIn && !$prefillSponsor) {
   $prefillSponsor = $currentUser['username'];
 }
+// Guests default to admin sponsor
+if (!$isLoggedIn && !$prefillSponsor) {
+  $prefillSponsor = 'admin';
+}
 ?>
 <?php if ($isLoggedIn): ?>
   <?php require 'views/partials/head.php'; ?>
@@ -109,6 +113,7 @@ if ($isLoggedIn && !$prefillSponsor) {
                 <?= csrf_field() ?>
                 <?php if ($isReferralMode): ?>
                   <input type="hidden" name="referral_mode" value="1">
+                  <input type="hidden" name="ref_link" value="1">
                 <?php else: ?>
                   <input type="hidden" name="referral_mode" id="referralMode" value="">
                 <?php endif; ?>
@@ -137,8 +142,21 @@ if ($isLoggedIn && !$prefillSponsor) {
                       </div>
                     </div>
                   <?php else: ?>
-                    <p class="text-muted mb-3" style="font-size:.85rem;">Enter your registration code to get started.</p>
-                    <input type="hidden" name="payment_method" value="code">
+                    <p class="text-muted mb-3" style="font-size:.85rem;">Choose how to create your account — start free or pay with a registration code.</p>
+
+                    <!-- Payment Method Toggle (guest: Free default) -->
+                    <div class="mb-3">
+                      <div class="position-toggle" style="grid-template-columns:1fr 1fr;">
+                        <div class="position-option">
+                          <input type="radio" id="pay_free" name="payment_method" value="free" checked required>
+                          <label class="position-label" for="pay_free">🎁 Free</label>
+                        </div>
+                        <div class="position-option">
+                          <input type="radio" id="pay_code" name="payment_method" value="code">
+                          <label class="position-label" for="pay_code">🎫 Registration Code</label>
+                        </div>
+                      </div>
+                    </div>
                   <?php endif; ?>
 
                   <!-- Code Input -->
@@ -164,7 +182,7 @@ if ($isLoggedIn && !$prefillSponsor) {
                           <?php $pkgCount = count($packages); ?>
                           <?php if ($pkgCount === 1): ?>
                             <?php $pkg = $packages[0]; ?>
-                            <input type="hidden" name="package_id" id="packageId" value="<?= (int)$pkg['id'] ?>">
+                            <input type="hidden" name="package_id" id="packageId" value="<?= (int)$pkg['id'] ?>" data-pairing="<?= Package::hasPairing((int)$pkg['id']) ? '1' : '0' ?>">
                             <div class="card border-primary">
                               <div class="card-body">
                                 <div class="fw-bold text-primary"><?= e($pkg['name']) ?></div>
@@ -243,6 +261,11 @@ if ($isLoggedIn && !$prefillSponsor) {
                     <div class="alert alert-info py-2 mb-3" style="font-size:.85rem;">
                       🔗 You are registering via a referral link. No payment is required now — you can activate your account later with a registration code or e-wallet.
                     </div>
+                    <?php if ($referralDefers): ?>
+                    <div class="alert alert-warning py-2 mb-3" style="font-size:.85rem;">
+                      ℹ️ Your sponsor does not have a binary network, so no binary connection is made at registration. When you activate with a binary package, the system will auto-select the best available position (or you can pick the connection manually).
+                    </div>
+                    <?php endif; ?>
                   <?php endif; ?>
                   <div class="mb-3">
                     <label class="form-label">Username <span class="text-danger">*</span></label>
@@ -280,6 +303,32 @@ if ($isLoggedIn && !$prefillSponsor) {
                       <?= $lockSponsor ? 'readonly' : 'autocomplete="off"' ?> required>
                     <div class="form-text" id="sponsorHint"></div>
                   </div>
+                  <?php if ($isLoggedIn && !$isReferralMode && ($registrarHasBinary ?? false)): ?>
+                  <div id="hasBinaryRow" class="mb-3">
+                    <label class="form-label">Binary Placement</label>
+                    <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" role="switch" id="hasBinary" name="has_binary" value="1" checked>
+                      <label class="form-check-label" for="hasBinary">Has Binary <span style="font-size:.75rem;color:var(--muted);">— place this member in the binary network now</span></label>
+                    </div>
+                    <div class="form-text" id="hasBinaryHint">Toggle ON to connect the member to the binary network now. Toggle OFF to defer the binary connection until the member activates.</div>
+                  </div>
+                  <?php endif; ?>
+
+                  <div id="binaryModeSection" style="display:none;" class="mb-3">
+                    <label class="form-label">Binary Connection</label>
+                    <div class="position-toggle" style="grid-template-columns:1fr 1fr;">
+                      <div class="position-option">
+                        <input type="radio" id="mode_auto" name="binary_mode" value="auto" checked>
+                        <label class="position-label" for="mode_auto">✨ Auto-select</label>
+                      </div>
+                      <div class="position-option">
+                        <input type="radio" id="mode_manual" name="binary_mode" value="manual">
+                        <label class="position-label" for="mode_manual">🖐 Manual</label>
+                      </div>
+                    </div>
+                    <div class="form-text" id="autoPreviewHint">Auto places the member at the best available position across the whole network. Manual lets you pick the upline yourself.</div>
+                  </div>
+
                   <div id="binarySection">
                     <div class="mb-3">
                       <label class="form-label">Binary Upline Username <span class="text-danger">*</span></label>
@@ -411,6 +460,8 @@ if ($isLoggedIn && !$prefillSponsor) {
   const IS_REFERRAL_MODE = <?= $isReferralMode ? 'true' : 'false' ?>;
   const PREFILL_UPLINE = <?= json_encode($prefillUpline) ?>;
   const PREFILL_POSITION = <?= json_encode($prefillPosition) ?>;
+  const REFERRAL_DEFERS = <?= (($referralDefers ?? false) === true) ? 'true' : 'false' ?>;
+  const REGISTRAR_HAS_BINARY = <?= ($isLoggedIn && ($registrarHasBinary ?? false)) ? 'true' : 'false' ?>;
 
   let codeData = {},
     selectedPkg = {},
@@ -418,7 +469,11 @@ if ($isLoggedIn && !$prefillSponsor) {
     sponsorOk = false,
     uplineOk = false,
     slotData = {},
-    binaryEnabled = true;
+    binaryEnabled = true,
+    binaryMode = 'manual',
+    autoSuggestion = null,
+    manualBinaryActive = false,
+    autoBinaryActive = false;
 
   // Show/hide the binary placement sections based on the selected package.
   function setBinaryEnabled(on) {
@@ -439,6 +494,134 @@ if ($isLoggedIn && !$prefillSponsor) {
       if (right) right.checked = false;
       setHint('uplineHint', 'Not required for this package.', null);
     }
+  }
+
+  // Is the currently selected package / code binary-capable?
+  function currentPairingEnabled() {
+    const method = getPaymentMethod();
+    if (method === 'code') {
+      return !!(codeData && codeData.pairing_enabled);
+    }
+    if (method === 'ewallet') {
+      if (selectedPkg.pairing === true || selectedPkg.pairing === false) return selectedPkg.pairing;
+      const single = document.getElementById('packageId');
+      if (single) return single.dataset.pairing === '1';
+      const pkgSel = document.getElementById('packageSelect');
+      if (pkgSel && pkgSel.value) {
+        const opt = pkgSel.options[pkgSel.selectedIndex];
+        return opt.dataset.pairing === '1';
+      }
+    }
+    return false;
+  }
+
+  function refreshAutoPreview() {
+    const modeAuto = document.getElementById('mode_auto');
+    const hint = document.getElementById('autoPreviewHint');
+    if (!modeAuto || !hint || !modeAuto.checked) return;
+    hint.textContent = 'Finding the best position…';
+    autoSuggestion = null;
+    fetch(API + '/?page=auto_select_upline')
+      .then(r => r.json())
+      .then(d => {
+        if (!d.valid) {
+          autoSuggestion = { valid: false, message: d.message || '' };
+          hint.textContent = autoSuggestion.message || 'No position available — the member will become a binary network root.';
+          return;
+        }
+        autoSuggestion = d;
+        const posLabel = d.position.charAt(0).toUpperCase() + d.position.slice(1);
+        hint.textContent = 'Auto will place this member under @' + d.upline_username + ' (' + posLabel + ').';
+        const upEl = document.getElementById('upline_username');
+        if (upEl) upEl.value = d.upline_username;
+        const rb = document.querySelector('[name=binary_position][value="' + d.position + '"]');
+        if (rb) rb.checked = true;
+        checkPos(d.position);
+      })
+      .catch(() => {
+        autoSuggestion = { valid: false, message: 'Could not load placement suggestion.' };
+        hint.textContent = autoSuggestion.message;
+      });
+  }
+
+  // Recompute every binary UI element from the current method/package/code.
+  function applyBinaryState() {
+    if (IS_REFERRAL_MODE) return;
+
+    const method = getPaymentMethod();
+    const pairing = currentPairingEnabled();
+    const toggle = document.getElementById('hasBinary');
+    const modeSection = document.getElementById('binaryModeSection');
+    const modeAuto = document.getElementById('mode_auto');
+
+    if (modeSection) {
+      modeSection.style.display = 'none';
+      if (modeAuto) binaryMode = modeAuto.checked ? 'auto' : 'manual';
+    }
+
+    if (method === 'free') {
+      // Free: only a binary registrar places, controlled interactively by the toggle.
+      autoBinaryActive = false;
+      if (toggle) {
+        toggle.disabled = false;
+        document.getElementById('hasBinaryHint').textContent = 'Toggle ON to connect the member to the binary network now. Toggle OFF to defer the binary connection until the member activates.';
+        manualBinaryActive = toggle.checked && REGISTRAR_HAS_BINARY;
+      } else {
+        manualBinaryActive = false;
+      }
+      setBinaryEnabled(manualBinaryActive);
+      return;
+    }
+
+    // Direct (code / e-wallet):
+    autoBinaryActive = false;
+    if (!pairing) {
+      // Binary-less package → toggle locked OFF, no placement at registration.
+      manualBinaryActive = false;
+      if (toggle) {
+        toggle.checked = false;
+        toggle.disabled = true;
+        document.getElementById('hasBinaryHint').textContent = 'This package is not part of the binary network.';
+      }
+      setBinaryEnabled(false);
+      return;
+    }
+
+    // Binary package.
+    if (REGISTRAR_HAS_BINARY) {
+      // Binary registrar → always places manually (toggle locked ON).
+      manualBinaryActive = true;
+      if (toggle) {
+        toggle.checked = true;
+        toggle.disabled = true;
+        document.getElementById('hasBinaryHint').textContent = 'Binary placement is required for this package.';
+      }
+      setBinaryEnabled(true);
+      return;
+    }
+
+    // Binary-less registrar / guest → Auto (default) or Manual.
+    manualBinaryActive = binaryMode === 'manual';
+    autoBinaryActive = binaryMode === 'auto';
+    if (toggle) toggle.disabled = true;
+    setBinaryEnabled(manualBinaryActive);
+    if (autoBinaryActive) {
+      if (modeSection) modeSection.style.display = 'block';
+      refreshAutoPreview();
+    }
+  }
+
+  document.querySelectorAll('[name=binary_mode]').forEach(r => {
+    r.addEventListener('change', function() {
+      binaryMode = this.value;
+      applyBinaryState();
+    });
+  });
+  const hasBinaryEl = document.getElementById('hasBinary');
+  if (hasBinaryEl) {
+    hasBinaryEl.addEventListener('change', function() {
+      applyBinaryState();
+    });
   }
 
   function goStep(n) {
@@ -472,7 +655,6 @@ if ($isLoggedIn && !$prefillSponsor) {
 
   // ── Payment Method Toggle ─────────────────────────────────────
   function getPaymentMethod() {
-    if (!IS_LOGGED_IN) return 'code';
     return document.querySelector('[name=payment_method]:checked')?.value || 'code';
   }
 
@@ -502,13 +684,11 @@ if ($isLoggedIn && !$prefillSponsor) {
       if (refMode) refMode.value = '';
       if (!CAN_USE_EWALLET) {
         toBtn.disabled = true;
+        applyBinaryState();
         return;
       }
-      if (PKG_COUNT === 1 && pkgSel) {
+      if (PKG_COUNT === 1) {
         toBtn.disabled = false;
-        const single = pkgSel.options[0];
-        if (single) setBinaryEnabled(single.dataset.pairing === '1');
-        if (pkgSel.value) setBinaryEnabled(pkgSel.options[pkgSel.selectedIndex].dataset.pairing === '1');
       } else {
         toBtn.disabled = !(pkgSel && pkgSel.value);
       }
@@ -520,6 +700,8 @@ if ($isLoggedIn && !$prefillSponsor) {
       if (refMode) refMode.value = '';
       toBtn.disabled = !document.getElementById('validatedCode').value;
     }
+
+    applyBinaryState();
   }
 
   document.querySelectorAll('[name=payment_method]').forEach(r => {
@@ -548,6 +730,7 @@ if ($isLoggedIn && !$prefillSponsor) {
         pairing: opt.dataset.pairing === '1'
       };
       setBinaryEnabled(selectedPkg.pairing);
+      applyBinaryState();
       document.getElementById('pkgCardName').textContent = selectedPkg.name;
       document.getElementById('pkgCardDetails').textContent =
         'Entry: ' + selectedPkg.fee + ' · Bonus: ' + selectedPkg.bonus + ' · Cap: ' + selectedPkg.cap + ' pairs/day';
@@ -559,7 +742,7 @@ if ($isLoggedIn && !$prefillSponsor) {
 
   function resetPackageState() {
     selectedPkg = {};
-    setBinaryEnabled(true);
+    applyBinaryState();
     if (packageSelect) {
       packageSelect.selectedIndex = 0;
       document.getElementById('packageCard')?.classList.add('d-none');
@@ -591,7 +774,7 @@ if ($isLoggedIn && !$prefillSponsor) {
     document.getElementById('validatedCode').value = '';
     setHint('codeHint', '', null);
     codeData = {};
-    setBinaryEnabled(true);
+    applyBinaryState();
     if (getPaymentMethod() === 'code') {
       document.getElementById('toStep2Btn').disabled = true;
     }
@@ -617,7 +800,7 @@ if ($isLoggedIn && !$prefillSponsor) {
       })).json();
       if (data.valid) {
         codeData = data;
-        setBinaryEnabled(data.pairing_enabled !== false);
+        applyBinaryState();
         document.getElementById('pkgName').textContent = data.package_name;
         document.getElementById('pkgDetails').textContent =
           'Entry: ' + data.entry_fee + ' · Pair volume: ' + data.volume + ' · Cap: ' + data.cap_pesos + '/day';
@@ -825,6 +1008,8 @@ if ($isLoggedIn && !$prefillSponsor) {
         setHint('positionHint', 'Selected position is taken. Choose another.', false);
         return;
       }
+    } else if (autoBinaryActive && !autoSuggestion) {
+      if (binaryMode === 'auto') refreshAutoPreview();
     }
 
     // Populate review
@@ -850,14 +1035,19 @@ if ($isLoggedIn && !$prefillSponsor) {
     if (revUser) revUser.textContent = '@' + document.getElementById('username').value;
     const revSponsor = document.getElementById('rev_sponsor');
     if (revSponsor) revSponsor.textContent = '@' + sponsorVal;
+    const showBinary = binaryEnabled || autoBinaryActive;
     const uRow = document.getElementById('revUplineRow');
-    if (uRow) uRow.style.display = binaryEnabled ? '' : 'none';
+    if (uRow) uRow.style.display = showBinary ? '' : 'none';
     const revUpline = document.getElementById('rev_upline');
-    if (revUpline) revUpline.textContent = binaryEnabled ? '@' + document.getElementById('upline_username').value : 'N/A';
+    if (revUpline) revUpline.textContent = autoBinaryActive
+      ? (autoSuggestion ? '@' + autoSuggestion.upline_username + ' (auto)' : 'Auto — network root')
+      : (binaryEnabled ? '@' + document.getElementById('upline_username').value : 'N/A');
     const pRow = document.getElementById('revPositionRow');
-    if (pRow) pRow.style.display = binaryEnabled ? '' : 'none';
+    if (pRow) pRow.style.display = showBinary ? '' : 'none';
     const revPos = document.getElementById('rev_position');
-    if (revPos) revPos.textContent = binaryEnabled ? pos.charAt(0).toUpperCase() + pos.slice(1) : 'N/A';
+    if (revPos) revPos.textContent = autoBinaryActive
+      ? (autoSuggestion ? autoSuggestion.position.charAt(0).toUpperCase() + autoSuggestion.position.slice(1) + ' (auto)' : '—')
+      : (binaryEnabled ? pos.charAt(0).toUpperCase() + pos.slice(1) : 'N/A');
     goStep(3);
   });
 
@@ -877,11 +1067,25 @@ if ($isLoggedIn && !$prefillSponsor) {
     if (PREFILL_SPONSOR) {
       checkSponsor(PREFILL_SPONSOR);
     }
-    if (PREFILL_UPLINE) {
+    if (REFERRAL_DEFERS) {
+      // Sponsor has no binary → no placement at registration. The member
+      // decides their binary connection at activation (Auto by default).
+      binaryEnabled = false;
+      uplineOk = false;
+      const binSec = document.getElementById('binarySection');
+      if (binSec) binSec.style.display = 'none';
+      const upEl = document.getElementById('upline_username');
+      const leftEl = document.getElementById('pos_left');
+      const rightEl = document.getElementById('pos_right');
+      if (upEl) { upEl.required = false; upEl.value = ''; }
+      if (leftEl) leftEl.required = false;
+      if (rightEl) rightEl.required = false;
+    } else if (PREFILL_UPLINE) {
       checkUpline(PREFILL_UPLINE);
+      uplineOk = true;
+    } else {
+      uplineOk = false;
     }
-    // position is pre-selected; mark ok
-    uplineOk = !!PREFILL_UPLINE;
 
     // Disable required on hidden step-1 fields so HTML5 validation doesn't block submission
     const regCode = document.getElementById('reg_code');

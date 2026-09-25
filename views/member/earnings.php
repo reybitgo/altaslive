@@ -12,13 +12,18 @@
   <?php require 'views/partials/topbar.php'; ?>
   <div class="page-content">
     <?= render_flash() ?>
+    <?php
+    $allPlans = User::isPrimaryAdmin((int)(Auth::user()['id'] ?? 0)) || Auth::isSuperadmin();
+    $isBinary = $allPlans || Package::hasPairing((int)(Auth::user()['package_id'] ?? 0));
+    $showIndirect = $allPlans || Package::hasIndirectReferral((int)(Auth::user()['package_id'] ?? 0));
+    ?>
     <div class="row g-3 mb-3">
       <?php
       $statCards = [
         ['Total Earned',      $summary['total_earned'],   'primary', 'primary'],
-        ['Pairing Bonuses',   $summary['total_pairing'],  'success', 'success'],
+        ...($isBinary ? [['Pairing Bonuses', $summary['total_pairing'], 'success', 'success']] : []),
         ['Direct Referral',   $summary['total_direct'],   'orange', 'warning'],
-        ...(Package::hasIndirectReferral((int)Auth::user()['package_id']) ? [['Indirect Referral', $summary['total_indirect'], 'purple', 'primary']] : []),
+        ...($showIndirect ? [['Indirect Referral', $summary['total_indirect'], 'purple', 'primary']] : []),
         ['DFI',               $summary['total_dfi'] ?? 0,  'teal', 'info'],
       ];
       foreach ($statCards as [$label, $val, $accent, $color]):
@@ -96,7 +101,7 @@
           <?php if (is_imp_session()): ?><input type="hidden" name="imp" value="<?= e(session_id()) ?>"><?php endif; ?>
           <ul class="nav nav-pills card-header-pills gap-1">
             <?php
-            $filterTabs = ['' => 'All', 'pairing' => '🤝 Pairing', 'direct_referral' => '👥 Direct', ...(Package::hasIndirectReferral((int)Auth::user()['package_id']) ? ['indirect_referral' => '🔗 Indirect'] : []), 'daily_fixed_income' => '📅 DFI'];
+            $filterTabs = ['' => 'All', ...($isBinary ? ['pairing' => '🤝 Pairing'] : []), 'direct_referral' => '👥 Direct', ...($showIndirect ? ['indirect_referral' => '🔗 Indirect'] : []), 'daily_fixed_income' => '📅 DFI'];
             foreach ($filterTabs as $val => $label):
             ?>
               <li class="nav-item">
@@ -138,7 +143,7 @@
                 $typeName = match ($row['type']) {
                   'pairing' => '🤝 Pairing',
                   'direct_referral' => '👥 Direct Referral',
-                  'indirect_referral' => Package::hasIndirectReferral((int)Auth::user()['package_id']) ? '🔗 Indirect Lvl ' . $row['level'] : $row['type'],
+                  'indirect_referral' => $showIndirect ? '🔗 Indirect Lvl ' . $row['level'] : $row['type'],
                   'daily_fixed_income' => '📅 Daily Fixed Income',
                   default => $row['type']
                 };

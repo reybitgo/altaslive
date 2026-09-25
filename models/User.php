@@ -144,13 +144,60 @@ class User
      * Activate a pending account.
      * Returns the user's data for commission firing.
      */
-    public static function activate(int $userId, int $packageId, ?int $regCodeId, string $paymentMethod): array
-    {
+    public static function activate(
+        int $userId,
+        int $packageId,
+        ?int $regCodeId,
+        string $paymentMethod,
+        ?int $binaryParentId = null,
+        ?string $binaryPosition = null
+    ): array {
         $pdo = db();
 
-        // Activate the user AND flush all binary volume that formed while pending.
-        // This prevents retroactive pairing bonuses — only volume formed AFTER
-        // activation will earn bonuses. Legacy count flush kept for audit.
+        $user = self::find($userId);
+        if (!$user || $user['status'] !== 'pending') {
+            throw new RuntimeException('Activation failed — user not found or not pending.');
+        }
+
+        // A member who already has a reserved binary slot must activate with a
+        // binary (pairing-enabled) package; else the tree would hold a
+        // non-binary member occupying a reserved position.
+        if ($user['binary_parent_id'] !== null && $user['binary_position'] !== null && !Package::hasPairing($packageId)) {
+            throw new RuntimeException('A member with a reserved binary position must activate with a binary package.');
+        }
+
+        // ── Effective binary placement ──
+        // 1. Pending members already placed at registration keep their reserved slot.
+        // 2. Unplaced members activating a pairing package use the supplied
+        //    placement; both values null means "become a binary network root".
+        // 3. Non-pairing packages never place (any supplied values are ignored).
+        $parentId = null;
+        $position = null;
+        if (Package::hasPairing($packageId)) {
+            if ($user['binary_parent_id'] !== null && $user['binary_position'] !== null) {
+                $parentId = (int)$user['binary_parent_id'];
+                $position = (string)$user['binary_position'];
+            } elseif ($binaryParentId !== null && $binaryPosition !== null) {
+                $parentId = (int)$binaryParentId;
+                $position = $binaryPosition;
+            }
+
+            if ($parentId !== null) {
+                if ($parentId === $userId) {
+                    throw new RuntimeException('Cannot place the member under themselves.');
+                }
+                if (!in_array($position, ['left', 'right'], true)) {
+                    throw new RuntimeException('Invalid binary position.');
+                }
+                if (!self::isValidBinaryUpline($parentId)) {
+                    throw new RuntimeException('The selected binary upline is not available.');
+                }
+                if (!self::isSlotFree($parentId, $position, $userId)) {
+                    throw new RuntimeException('That binary position is already taken.');
+                }
+            }
+        }
+
         $pdo->prepare("
             UPDATE users
             SET status = 'active',
@@ -158,10 +205,12 @@ class User
                 reg_code_id = COALESCE(?, reg_code_id),
                 reg_payment_method = ?,
                 joined_at = NOW(),
+                binary_parent_id = COALESCE(?, binary_parent_id),
+                binary_position = COALESCE(?, binary_position),
                 pairs_flushed = LEAST(left_count, right_count),
                 pairs_volume_flushed = LEAST(left_pair_volume, right_pair_volume)
             WHERE id = ? AND status = 'pending'
-        ")->execute([$packageId, $regCodeId, $paymentMethod, $userId]);
+        ")->execute([$packageId, $regCodeId, $paymentMethod, $parentId, $position, $userId]);
 
         $user = self::find($userId);
         if (!$user || $user['status'] !== 'active') {
@@ -181,9 +230,12 @@ class User
         }
 
         // Fire commissions now that user is active.
-        // 1. Pairing bonuses — increment leg counts now (pending registration skipped this)
-        //    and calculate pairs for this single activation only.
-        Commission::processBinaryPlacement($userId, (int)$user['binary_parent_id'], $user['binary_position'], true);
+        // 1. Pairing bonuses — only when the member is actually placed in the
+        //    binary network. Unplaced roots have no legs to flush, which also
+        //    fixes the previous uncaught TypeError from a NULL binary_position.
+        if ($user['binary_parent_id'] !== null && in_array($user['binary_position'], ['left', 'right'], true)) {
+            Commission::processBinaryPlacement($userId, (int)$user['binary_parent_id'], $user['binary_position'], true);
+        }
 
         // 2. Direct referral bonus → sponsor
         Commission::processDirectReferral((int)$user['sponsor_id'], $userId, $packageId);
@@ -526,14 +578,172 @@ class User
 
     // ── Binary Slot Check ─────────────────────────────────────────────────────
 
-    public static function isSlotFree(int $parentId, string $position): bool
+    public static function isSlotFree(int $parentId, string $position, int $excludeUserId = 0): bool
+    {
+        $sql = "SELECT COUNT(*) FROM users
+                WHERE binary_parent_id = ? AND binary_position = ?";
+        $params = [$parentId, $position];
+        if ($excludeUserId > 0) {
+            $sql .= ' AND id <> ?';
+            $params[] = $excludeUserId;
+        }
+        $st = db()->prepare($sql);
+        $st->execute($params);
+        return (int)$st->fetchColumn() === 0;
+    }
+
+    // ── Binary Placement Helpers ──────────────────────────────────────────────
+
+    /**
+     * Primary admin account id — the default binary-root anchor.
+     */
+    public static function primaryAdminId(): int
+    {
+        return (int) db()->query(
+            "SELECT id FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1"
+        )->fetchColumn();
+    }
+
+    /**
+     * True when the given user id is the primary admin account (seeded as
+     * user id 1). Together with Auth::isSuperadmin(), this marks accounts
+     * that browse the member portal with every compensation plan enabled,
+     * regardless of package.
+     */
+    public static function isPrimaryAdmin(int $userId): bool
+    {
+        return (int) $userId === 1;
+    }
+
+    /**
+     * True when a user may host binary placements: they exist, are active, and
+     * either carry a pairing-enabled package or are the primary admin (the
+     * bounded default root that anchors the network even with no package).
+     */
+    public static function isValidBinaryUpline(int $userId): bool
     {
         $st = db()->prepare("
-            SELECT COUNT(*) FROM users
-            WHERE binary_parent_id = ? AND binary_position = ?
+            SELECT u.id, u.status, COALESCE(p.pairing_enabled, 0) AS pairing_enabled
+            FROM users u
+            LEFT JOIN packages p ON p.id = u.package_id
+            WHERE u.id = ?
         ");
-        $st->execute([$parentId, $position]);
-        return (int)$st->fetchColumn() === 0;
+        $st->execute([$userId]);
+        $row = $st->fetch();
+        if (!$row) {
+            return false;
+        }
+        if (($row['status'] ?? '') !== 'active') {
+            return false;
+        }
+        if ((int)$row['id'] === self::primaryAdminId()) {
+            return true;
+        }
+        return (int)($row['pairing_enabled'] ?? 0) === 1;
+    }
+
+    /**
+     * Find the next free binary slot across the whole network.
+     *
+     * Phase 1 — level-order (breadth-first, left-first) search from every
+     * placement-tree root, limited to active pairing members.
+     * Phase 2 — falls back to the primary admin when no member can host.
+     *
+     * Returns null when nothing is available; callers then treat the member
+     * as a binary root (binary_parent_id = NULL).
+     *
+     * @return array{upline_id:int, upline_username:string, position:'left'|'right'}|null
+     */
+    public static function findNextBinarySlotNetworkWide(int $excludeUserId = 0): ?array
+    {
+        $pdo     = db();
+        $adminId = self::primaryAdminId();
+
+        $rows = $pdo->query(
+            "SELECT u.id, u.username, u.role, u.status, u.binary_parent_id,
+                    COALESCE(p.pairing_enabled, 0) AS pairing_enabled
+             FROM users u
+             LEFT JOIN packages p ON p.id = u.package_id
+             WHERE (u.role = 'member' OR u.id = {$adminId})"
+        )->fetchAll();
+
+        if (!$rows) {
+            return null;
+        }
+
+        $nodes    = [];
+        $byParent = [];
+        foreach ($rows as $r) {
+            $id     = (int)$r['id'];
+            $parent = ($r['binary_parent_id'] !== null) ? (int)$r['binary_parent_id'] : null;
+            $nodes[$id] = [
+                'id'       => $id,
+                'username' => (string)$r['username'],
+                'role'     => (string)$r['role'],
+                'status'   => (string)$r['status'],
+                'pairing'  => (int)$r['pairing_enabled'] === 1,
+                'parent'   => $parent,
+            ];
+            if ($parent !== null && $parent !== $id) {
+                $byParent[$parent][] = $id;
+            }
+        }
+        foreach ($byParent as &$kids) {
+            sort($kids);
+        }
+        unset($kids);
+
+        // Roots are nodes whose parent is missing from the fetched set.
+        $roots = [];
+        foreach ($nodes as $id => $n) {
+            if ($n['parent'] === null || !isset($nodes[$n['parent']])) {
+                $roots[] = $id;
+            }
+        }
+        sort($roots);
+
+        // Phase 1 — level-order BFS over member candidates.
+        $queue   = $roots;
+        $visited = [];
+        while (!empty($queue)) {
+            $curId = (int) array_shift($queue);
+            if (isset($visited[$curId]) || !isset($nodes[$curId])) {
+                continue;
+            }
+            $visited[$curId] = true;
+            $node = $nodes[$curId];
+
+            if ($curId !== $excludeUserId
+                && $node['role'] === 'member'
+                && $node['status'] === 'active'
+                && $node['pairing']) {
+                if (self::isSlotFree($curId, 'left')) {
+                    return ['upline_id' => $curId, 'upline_username' => $node['username'], 'position' => 'left'];
+                }
+                if (self::isSlotFree($curId, 'right')) {
+                    return ['upline_id' => $curId, 'upline_username' => $node['username'], 'position' => 'right'];
+                }
+            }
+
+            foreach ($byParent[$curId] ?? [] as $childId) {
+                $queue[] = $childId;
+            }
+        }
+
+        // Phase 2 — admin anchor fallback (only when no member could host).
+        if ($adminId > 0 && $adminId !== $excludeUserId && isset($nodes[$adminId])) {
+            $admin = $nodes[$adminId];
+            if ($admin['status'] === 'active') {
+                if (self::isSlotFree($adminId, 'left')) {
+                    return ['upline_id' => $adminId, 'upline_username' => $admin['username'], 'position' => 'left'];
+                }
+                if (self::isSlotFree($adminId, 'right')) {
+                    return ['upline_id' => $adminId, 'upline_username' => $admin['username'], 'position' => 'right'];
+                }
+            }
+        }
+
+        return null;
     }
 
     // ── Admin Queries ─────────────────────────────────────────────────────────

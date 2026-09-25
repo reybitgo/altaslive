@@ -11,6 +11,11 @@
   <?php require 'views/partials/topbar.php'; ?>
   <div class="page-content">
     <?= render_flash() ?>
+    <?php
+    $allPlans = User::isPrimaryAdmin((int)($user['id'] ?? 0)) || Auth::isSuperadmin();
+    $isBinary = $allPlans || Package::hasPairing((int)($user['package_id'] ?? 0));
+    $showIndirect = $allPlans || Package::hasIndirectReferral((int)($user['package_id'] ?? 0));
+    ?>
 
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
       <div>
@@ -77,7 +82,7 @@
           </div>
 
           <!-- Earning phases (only show if there's earnings) -->
-          <?php if ((float)$summary['total_pairing'] > 0): ?>
+          <?php if ($isBinary && (float)$summary['total_pairing'] > 0): ?>
           <div class="timeline-item">
             <div class="timeline-dot" style="background:#12a05c;"></div>
             <div class="timeline-content">
@@ -95,7 +100,7 @@
             </div>
           </div>
           <?php endif; ?>
-          <?php if (Package::hasIndirectReferral((int)$user['package_id']) && (float)$summary['total_indirect'] > 0): ?>
+          <?php if ($showIndirect && (float)$summary['total_indirect'] > 0): ?>
           <div class="timeline-item">
             <div class="timeline-dot" style="background:#8b5cf6;"></div>
             <div class="timeline-content">
@@ -234,9 +239,9 @@
             <tbody>
               <?php
               $breakdown = [
-                  ['Pairing', (float)$summary['total_pairing']],
+                  ...($isBinary ? [['Pairing', (float)$summary['total_pairing']]] : []),
                   ['Direct Referral', (float)$summary['total_direct']],
-                  ...(Package::hasIndirectReferral((int)$user['package_id']) ? [['Indirect Referral', (float)$summary['total_indirect']]] : []),
+                  ...($showIndirect ? [['Indirect Referral', (float)$summary['total_indirect']]] : []),
                   ['Daily Fixed Income', (float)($summary['total_dfi'] ?? 0)],
               ];
               $hasRows = false;

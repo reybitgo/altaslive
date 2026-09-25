@@ -49,11 +49,13 @@
                   <td>Sponsor</td>
                   <td><?= isset($user['sponsor_username']) && $user['sponsor_username'] ? '@' . e($user['sponsor_username']) : '—' ?></td>
                 </tr>
+                <?php if (User::isPrimaryAdmin((int)($user['id'] ?? 0)) || Auth::isSuperadmin() || Package::hasPairing((int)($user['package_id'] ?? 0))): ?>
                 <tr>
                   <td>Upline</td>
                   <td><?php $bpu = $user['binary_parent_username'] ?? null;
                       echo $bpu ? '@' . e($bpu) . ' (' . e($user['binary_position'] ?? '') . ')' : '—'; ?></td>
                 </tr>
+                <?php endif; ?>
                 <tr>
                   <td>Joined</td>
                   <td><?= fmt_datetime($user['joined_at']) ?></td>

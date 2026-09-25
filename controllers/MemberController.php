@@ -206,7 +206,9 @@ class MemberController
         $view     = $_GET['view'] ?? 'binary'; // 'binary' | 'referral'
         $packages = Package::all(true);
         $binaryPackages = array_values(array_filter($packages, fn($p) => (int)($p['pairing_enabled'] ?? 1) === 1));
-        $pairingEnabled = Package::hasPairing((int)$user['package_id']);
+        $allPlans       = User::isPrimaryAdmin((int)$user['id']) || Auth::isSuperadmin();
+        $pairingEnabled = $allPlans || Package::hasPairing((int)$user['package_id']);
+        $showIndirect   = $allPlans || Package::hasIndirectReferral((int)$user['package_id']);
         $binaryRootId   = self::resolveBinaryRoot();
         $referralRootId = self::resolveReferralRoot(isset($_GET['root']) ? (int)$_GET['root'] : null);
 
@@ -218,7 +220,7 @@ class MemberController
         $indirect = [];
         $direct   = [];
         if ($view === 'referral') {
-            if (Package::hasIndirectReferral((int)$user['package_id'])) {
+            if ($showIndirect) {
                 $indirect = User::indirectReferralTree($referralRootId);
             } else {
                 $page    = max(1, (int)($_GET['pg'] ?? 1));
@@ -232,6 +234,14 @@ class MemberController
     public function apiBinaryTree(): void
     {
         Auth::guard('member');
+        $user = Auth::user();
+
+        // Mirror genealogy(): binary tree data is only for binary accounts (or admins)
+        if (!Package::hasPairing((int)($user['package_id'] ?? 0)) && !Auth::isAdmin()) {
+            json_response(['ok' => false, 'error' => 'Binary tree is not available for your account.']);
+            return;
+        }
+
         $rootId = self::resolveBinaryRoot(isset($_GET['root']) ? (int)$_GET['root'] : null);
         $depth  = min(4, max(1, (int)($_GET['depth'] ?? 3)));
         json_response(self::buildTreeNode($rootId, $depth));
@@ -513,8 +523,17 @@ class MemberController
             redirect('/?page=dashboard');
         }
 
+        $binaryPlaced = $user['binary_parent_id'] !== null && $user['binary_position'] !== null;
+
         $packages = Package::all(true);
+        // A member with a reserved binary slot must activate with a binary
+        // (pairing-enabled) package — non-binary packages are barred.
+        if ($binaryPlaced) {
+            $packages = array_values(array_filter($packages, fn($p) => (int)$p['pairing_enabled'] === 1));
+        }
+
         $canUseEwallet = false;
+        $minFee = 0.0;
         if (!empty($packages)) {
             $minFee = min(array_map(fn($p) => (float)$p['entry_fee'], $packages));
             $canUseEwallet = Ewallet::balance($user['id']) >= $minFee;
@@ -539,6 +558,10 @@ class MemberController
             redirect('/?page=dashboard');
         }
 
+        // Reserved binary slot must be honored: activation is limited to binary
+        // (pairing-enabled) packages for members placed at registration.
+        $placedInBinary = $user['binary_parent_id'] !== null && $user['binary_position'] !== null;
+
         $paymentMethod = $_POST['payment_method'] ?? 'code';
         $code          = strtoupper(trim($_POST['reg_code'] ?? ''));
         $packageId     = (int)($_POST['package_id'] ?? 0);
@@ -555,6 +578,10 @@ class MemberController
                 flash('error', 'Invalid or already-used registration code.');
                 redirect('/?page=activate');
             }
+            if ($placedInBinary && !Package::hasPairing((int)$codeRow['package_id'])) {
+                flash('error', 'This code is for a non-binary package. Your binary position is reserved, so activate with a binary package code (e.g. Starter).');
+                redirect('/?page=activate');
+            }
             $packageId = (int)$codeRow['package_id'];
             $regCodeId = (int)$codeRow['id'];
         } else {
@@ -566,6 +593,10 @@ class MemberController
             $pkg = Package::find($packageId);
             if (!$pkg) {
                 flash('error', 'Invalid package selected.');
+                redirect('/?page=activate');
+            }
+            if ($placedInBinary && !Package::hasPairing($packageId)) {
+                flash('error', 'Non-binary packages are not allowed. Your binary position is reserved — choose a binary package (e.g. Starter).');
                 redirect('/?page=activate');
             }
             $entryFee = (float)$pkg['entry_fee'];
@@ -602,8 +633,50 @@ class MemberController
             }
         }
 
+        // ── Binary placement resolution ──
+        // Activation may reuse a slot already reserved at registration, place
+        // the member now (Auto), use a member-picked upline (Manual), or leave
+        // the member as an unplaced binary network root when no slot exists.
+        $binaryParentId = null;
+        $binaryPosition = null;
+        $pairingActivation = Package::hasPairing($packageId);
+        if ($pairingActivation && $user['binary_parent_id'] === null) {
+            $pairingMode = $_POST['binary_mode'] ?? 'auto';
+            if ($pairingMode === 'manual') {
+                $upU = trim($_POST['upline_username'] ?? '');
+                $pos = trim($_POST['binary_position'] ?? '');
+                $upline = User::findByUsername($upU);
+                if (!$upline || !User::isValidBinaryUpline((int)$upline['id'])) {
+                    flash('error', 'Invalid binary upline selected.');
+                    redirect('/?page=activate');
+                }
+                if ((int)$upline['id'] === $userId) {
+                    flash('error', 'You cannot place yourself under yourself.');
+                    redirect('/?page=activate');
+                }
+                if (!in_array($pos, ['left', 'right'], true)) {
+                    flash('error', 'Invalid binary position.');
+                    redirect('/?page=activate');
+                }
+                if (!User::isSlotFree((int)$upline['id'], $pos)) {
+                    flash('error', 'That binary position is already taken.');
+                    redirect('/?page=activate');
+                }
+                $binaryParentId = (int)$upline['id'];
+                $binaryPosition = $pos;
+            } else {
+                // Auto / default — no available slot means the member becomes a
+                // binary network root (binary_parent_id stays NULL).
+                $auto = User::findNextBinarySlotNetworkWide($userId);
+                if ($auto) {
+                    $binaryParentId = (int)$auto['upline_id'];
+                    $binaryPosition = $auto['position'];
+                }
+            }
+        }
+
         try {
-            User::activate($userId, $packageId, $regCodeId, $paymentMethod);
+            User::activate($userId, $packageId, $regCodeId, $paymentMethod, $binaryParentId, $binaryPosition);
 
             // Mark code as used
             if ($regCodeId) {
