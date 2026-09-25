@@ -369,8 +369,11 @@ class User
         if ($newPackageId === (int)$user['package_id']) {
             throw new RuntimeException('You already have this package.');
         }
-        if ((float)$newPkg['entry_fee'] < (float)$curPkg['entry_fee']) {
-            throw new RuntimeException('Downgrading is not allowed.');
+        if ((string)$newPkg['status'] !== 'active') {
+            throw new RuntimeException('The selected package is no longer available.');
+        }
+        if ((float)$newPkg['entry_fee'] <= (float)$curPkg['entry_fee']) {
+            throw new RuntimeException('Choose a package with a higher entry fee.');
         }
         if (!Package::upgradeCompatible((int)$user['package_id'], $newPackageId)) {
             throw new RuntimeException('Cannot upgrade to a package that disables a plan you already have.');
@@ -380,13 +383,21 @@ class User
 
         $curPairing = Package::hasPairing((int)$user['package_id']);
         $newPairing = Package::hasPairing($newPackageId);
+        $joiningBinary = !$curPairing && $newPairing;
+        $hasExistingPlacement = $joiningBinary
+            && $user['binary_parent_id'] !== null
+            && in_array((string)$user['binary_position'], ['left', 'right'], true);
+        $placementParentId = $hasExistingPlacement ? (int)$user['binary_parent_id'] : $binaryParentId;
+        $placementPosition = $hasExistingPlacement ? (string)$user['binary_position'] : $binaryPosition;
 
         $pdo->beginTransaction();
         try {
             // ── Payment: diff only ──
             if ($paymentMethod === 'code' && $upgradeCodeId) {
                 $codeRow = $pdo->prepare(
-                    "SELECT * FROM reg_codes WHERE id = ? AND status = 'unused' AND code_type = 'upgrade'"
+                    "SELECT * FROM reg_codes
+                     WHERE id = ? AND status = 'unused' AND code_type = 'upgrade'
+                     FOR UPDATE"
                 );
                 $codeRow->execute([$upgradeCodeId]);
                 $codeRow = $codeRow->fetch();
@@ -396,8 +407,15 @@ class User
                 if ((int)$codeRow['package_id'] !== $newPackageId) {
                     throw new RuntimeException('This upgrade code does not match the selected package.');
                 }
-                $pdo->prepare("UPDATE reg_codes SET status = 'used', used_by = ?, used_at = NOW() WHERE id = ?")
-                    ->execute([$userId, $upgradeCodeId]);
+                $codeUpdate = $pdo->prepare(
+                    "UPDATE reg_codes
+                     SET status = 'used', used_by = ?, used_at = NOW()
+                     WHERE id = ? AND status = 'unused'"
+                );
+                $codeUpdate->execute([$userId, $upgradeCodeId]);
+                if ($codeUpdate->rowCount() !== 1) {
+                    throw new RuntimeException('This upgrade code has already been used.');
+                }
             } elseif ($paymentMethod === 'ewallet') {
                 if ($diff > 0) {
                     $debitOk = Ewallet::debitInternal(
@@ -428,30 +446,26 @@ class User
             }
 
             // ── Binary placement transition: non-binary → pairing ──
-            if (!$curPairing && $newPairing) {
-                if (!$binaryParentId || !in_array($binaryPosition, ['left', 'right'], true)) {
+            if ($joiningBinary) {
+                if (!$placementParentId || !in_array($placementPosition, ['left', 'right'], true)) {
                     throw new RuntimeException('A binary position is required for this package.');
                 }
-                if ((int)$binaryParentId === $userId) {
+                if ((int)$placementParentId === $userId) {
                     throw new RuntimeException('Cannot place a member under themselves.');
                 }
-                $upl = self::find((int)$binaryParentId);
-                if (!$upl || !Package::hasPairing((int)$upl['package_id'])) {
+                if (!self::isValidBinaryUpline((int)$placementParentId)) {
                     throw new RuntimeException('Selected binary upline is not available.');
                 }
-                if ($upl['status'] !== 'active') {
-                    throw new RuntimeException('The binary upline must be an active member.');
-                }
-                if (!User::isSlotFree((int)$binaryParentId, $binaryPosition)) {
+                if (!self::isSlotFree((int)$placementParentId, $placementPosition, $userId)) {
                     throw new RuntimeException('That binary position is already taken.');
                 }
             }
 
             // ── Apply package + binary placement ──
-            if (!$curPairing && $newPairing) {
+            if ($joiningBinary && !$hasExistingPlacement) {
                 $pdo->prepare(
                     "UPDATE users SET package_id = ?, binary_parent_id = ?, binary_position = ? WHERE id = ?"
-                )->execute([$newPackageId, $binaryParentId, $binaryPosition, $userId]);
+                )->execute([$newPackageId, $placementParentId, $placementPosition, $userId]);
             } else {
                 $pdo->prepare("UPDATE users SET package_id = ? WHERE id = ?")
                     ->execute([$newPackageId, $userId]);
@@ -464,8 +478,12 @@ class User
         }
 
         // ── Fire binary placement when joining the binary network (outside txn) ──
-        if (!$curPairing && $newPairing) {
-            Commission::processBinaryPlacement($userId, (int)$binaryParentId, $binaryPosition, true);
+        if ($joiningBinary && !$hasExistingPlacement) {
+            try {
+                Commission::processBinaryPlacement($userId, (int)$placementParentId, $placementPosition, true);
+            } catch (\Throwable $e) {
+                error_log("Binary placement commission failed for upgraded user {$userId}: " . $e->getMessage());
+            }
         }
 
         return self::find($userId);

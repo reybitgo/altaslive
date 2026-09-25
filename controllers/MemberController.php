@@ -696,87 +696,172 @@ class MemberController
 
     public function showUpgrade(): void
     {
-        Auth::guard('member');
-        $user    = Auth::user();
+        $user    = $this->guardUpgradeAccount();
         $current = Package::find((int)$user['package_id']);
-        $curFee  = $current ? (float)$current['entry_fee'] : 0.0;
+        if (!$current) {
+            flash('error', 'Your current package is no longer available. Please contact support.');
+            redirect('/?page=dashboard');
+        }
 
-        $targets = [];
+        $curFee       = (float)$current['entry_fee'];
+        $currentPlans = Package::plans((int)$current['id']);
+        $curPairing   = (bool)$currentPlans['binary'];
+        $binaryPlacementPreserved = $user['binary_parent_id'] !== null
+            && in_array((string)$user['binary_position'], ['left', 'right'], true);
+        $targets      = [];
+
         foreach (Package::all(true) as $pkg) {
-            if ((int)$pkg['id'] !== (int)$user['package_id']
-                && (float)$pkg['entry_fee'] > $curFee
-                && Package::upgradeCompatible((int)$user['package_id'], (int)$pkg['id'])
+            $packageId = (int)$pkg['id'];
+            if ($packageId === (int)$user['package_id']
+                || (float)$pkg['entry_fee'] <= $curFee
+                || !Package::upgradeCompatible((int)$user['package_id'], $packageId)
             ) {
-                $pkg['diff'] = (float)$pkg['entry_fee'] - $curFee;
-                $targets[]   = $pkg;
+                continue;
+            }
+            $pkg['diff'] = (float)$pkg['entry_fee'] - $curFee;
+            $pkg['plans'] = Package::plans($packageId);
+            $targets[] = $pkg;
+        }
+
+        $oldState = $_SESSION['upgrade_form_state'] ?? [];
+        unset($_SESSION['upgrade_form_state']);
+
+        $targetIds = array_map(fn($pkg) => (int)$pkg['id'], $targets);
+        $selectedPackageId = (int)($oldState['package_id'] ?? 0);
+        if (!in_array($selectedPackageId, $targetIds, true)) {
+            $selectedPackageId = (int)($targets[0]['id'] ?? 0);
+        }
+
+        $selectedTarget = null;
+        foreach ($targets as $pkg) {
+            if ((int)$pkg['id'] === $selectedPackageId) {
+                $selectedTarget = $pkg;
+                break;
             }
         }
 
-        $balance     = Ewallet::balance((int)$user['id']);
-        $curPairing  = Package::hasPairing((int)$user['package_id']);
+        $balance = Ewallet::balance((int)$user['id']);
+        $selectedPaymentMethod = in_array($oldState['payment_method'] ?? '', ['code', 'ewallet'], true)
+            ? (string)$oldState['payment_method']
+            : 'code';
+        if ($balance + 0.005 >= (float)($selectedTarget['diff'] ?? 0)) {
+            $selectedPaymentMethod = $selectedPaymentMethod === 'code' && empty($oldState['payment_method'])
+                ? 'ewallet'
+                : $selectedPaymentMethod;
+        } elseif ($selectedPaymentMethod === 'ewallet') {
+            $selectedPaymentMethod = 'code';
+        }
+
+        $selectedUpline = null;
+        $selectedUplinePosition = '';
+        $oldUplineId = (int)($oldState['binary_upline_id'] ?? 0);
+        $selectedTargetPairing = (bool)($selectedTarget['plans']['binary'] ?? false);
+        if (!$curPairing && $selectedTargetPairing && !$binaryPlacementPreserved && $oldUplineId > 0) {
+            $candidate = User::find($oldUplineId);
+            if ($candidate
+                && (int)$candidate['id'] !== (int)$user['id']
+                && User::isValidBinaryUpline($oldUplineId)
+            ) {
+                $leftFree = User::isSlotFree($oldUplineId, 'left');
+                $rightFree = User::isSlotFree($oldUplineId, 'right');
+                if ($leftFree || $rightFree) {
+                    $candidatePackage = Package::find((int)$candidate['package_id']);
+                    $selectedUpline = [
+                        'id' => $oldUplineId,
+                        'username' => (string)$candidate['username'],
+                        'full_name' => (string)($candidate['full_name'] ?: $candidate['username']),
+                        'package' => (string)($candidatePackage['name'] ?? 'Binary member'),
+                        'left_free' => $leftFree,
+                        'right_free' => $rightFree,
+                    ];
+                    $savedPosition = (string)($oldState['binary_position'] ?? '');
+                    if (($savedPosition === 'left' && $leftFree) || ($savedPosition === 'right' && $rightFree)) {
+                        $selectedUplinePosition = $savedPosition;
+                    }
+                }
+            }
+        }
+
         require 'views/member/upgrade.php';
     }
 
     public function doUpgrade(): void
     {
-        Auth::guard('member');
+        $user   = $this->guardUpgradeAccount();
         csrf_verify();
 
-        $user   = Auth::user();
-        $userId = (int)$user['id'];
-
-        $paymentMethod = $_POST['payment_method'] ?? 'code';
-        $code          = strtoupper(trim($_POST['upgrade_code'] ?? ''));
+        $userId        = (int)$user['id'];
+        $paymentMethod = (string)($_POST['payment_method'] ?? '');
+        $code          = strtoupper(trim((string)($_POST['upgrade_code'] ?? '')));
         $newPackageId  = (int)($_POST['package_id'] ?? 0);
 
-        $upgradeCodeId = null;
-
-        if ($paymentMethod === 'code') {
-            if (empty($code)) {
-                flash('error', 'Upgrade code is required.');
-                redirect('/?page=upgrade');
-            }
-            $codeRow = Code::validate($code);
-            if (!$codeRow || ($codeRow['code_type'] ?? 'registration') !== 'upgrade') {
-                flash('error', 'Invalid or already-used upgrade code.');
-                redirect('/?page=upgrade');
-            }
-            $newPackageId  = (int)$codeRow['package_id'];
-            $upgradeCodeId = (int)$codeRow['id'];
-        } else {
-            if ($newPackageId <= 0) {
-                flash('error', 'Please select a package.');
-                redirect('/?page=upgrade');
-            }
+        if (!in_array($paymentMethod, ['code', 'ewallet'], true)) {
+            $this->redirectUpgradeWithError('Please select a valid payment method.');
+        }
+        if ($newPackageId <= 0) {
+            $this->redirectUpgradeWithError('Please select an upgrade package.');
+        }
+        if ($paymentMethod === 'code' && $code === '') {
+            $this->redirectUpgradeWithError('Upgrade code is required.');
         }
 
-        $curPkg   = Package::find((int)$user['package_id']);
+        $curPkg = Package::find((int)$user['package_id']);
         $targetPkg = Package::find($newPackageId);
         if (!$curPkg || !$targetPkg) {
-            flash('error', 'Invalid package selection.');
-            redirect('/?page=upgrade');
+            $this->redirectUpgradeWithError('Invalid package selection.');
+        }
+        if ((string)$targetPkg['status'] !== 'active') {
+            $this->redirectUpgradeWithError('The selected package is no longer available.');
         }
 
+        $diff = (float)$targetPkg['entry_fee'] - (float)$curPkg['entry_fee'];
+        if ($diff <= 0) {
+            $this->redirectUpgradeWithError('Choose a package with a higher entry fee.');
+        }
         if (!Package::upgradeCompatible((int)$user['package_id'], $newPackageId)) {
-            flash('error', 'Cannot upgrade to a package that disables a plan you already have.');
-            redirect('/?page=upgrade');
+            $this->redirectUpgradeWithError('This package does not preserve all of your current benefits.');
+        }
+
+        $upgradeCodeId = null;
+        if ($paymentMethod === 'code') {
+            $codeRow = Code::validate($code);
+            if (!$codeRow || (string)($codeRow['code_type'] ?? 'registration') !== 'upgrade') {
+                $this->redirectUpgradeWithError('Invalid, expired, or already-used upgrade code.');
+            }
+            if ((int)$codeRow['package_id'] !== $newPackageId) {
+                $codePackage = Package::find((int)$codeRow['package_id']);
+                $this->redirectUpgradeWithError(
+                    'This code is for ' . ($codePackage['name'] ?? 'another package') . ', not the selected package.'
+                );
+            }
+            $upgradeCodeId = (int)$codeRow['id'];
+        } elseif (Ewallet::balance($userId) + 0.005 < $diff) {
+            $this->redirectUpgradeWithError('Insufficient e-wallet balance. Required: ' . fmt_money($diff));
         }
 
         $binaryParentId = null;
         $binaryPosition = null;
-        $curPairing     = Package::hasPairing((int)$user['package_id']);
-        $newPairing     = Package::hasPairing($newPackageId);
-
-        if (!$curPairing && $newPairing) {
+        $curPairing = Package::hasPairing((int)$user['package_id']);
+        $newPairing = Package::hasPairing($newPackageId);
+        $hasExistingPlacement = !$curPairing
+            && $newPairing
+            && $user['binary_parent_id'] !== null
+            && in_array((string)$user['binary_position'], ['left', 'right'], true);
+        if (!$curPairing && $newPairing && !$hasExistingPlacement) {
             $binaryParentId = (int)($_POST['binary_upline_id'] ?? 0);
-            $binaryPosition = $_POST['binary_position'] ?? '';
-        }
-
-        if ($paymentMethod === 'ewallet') {
-            $diff = max(0, (float)$targetPkg['entry_fee'] - (float)$curPkg['entry_fee']);
-            if ($diff > 0 && Ewallet::balance($userId) < $diff) {
-                flash('error', 'Insufficient e-wallet balance. Required: ' . fmt_money($diff));
-                redirect('/?page=upgrade');
+            $binaryPosition = (string)($_POST['binary_position'] ?? '');
+            if ($binaryParentId <= 0 || !in_array($binaryPosition, ['left', 'right'], true)) {
+                $this->redirectUpgradeWithError('Select a binary upline and an available position.');
+            }
+            $upline = User::find($binaryParentId);
+            if (!$upline
+                || (int)$upline['id'] === $userId
+                || !User::isValidBinaryUpline($binaryParentId)
+            ) {
+                $this->redirectUpgradeWithError('The selected binary upline is not available.');
+            }
+            if (!User::isSlotFree($binaryParentId, $binaryPosition)) {
+                $this->redirectUpgradeWithError('That binary position has already been occupied. Choose another position.');
             }
         }
 
@@ -785,36 +870,102 @@ class MemberController
                 $userId,
                 $newPackageId,
                 $paymentMethod,
-                $binaryParentId ?: null,
-                in_array($binaryPosition, ['left', 'right'], true) ? $binaryPosition : null,
+                $binaryParentId,
+                $binaryPosition,
                 $upgradeCodeId
             );
-            flash('success', '🎉 Package upgraded successfully!');
+            unset($_SESSION['upgrade_form_state']);
+            flash('success', 'Package upgraded successfully.');
         } catch (\Exception $e) {
-            flash('error', 'Upgrade failed: ' . $e->getMessage());
+            $this->redirectUpgradeWithError('Upgrade failed: ' . $e->getMessage());
         }
 
         redirect('/?page=upgrade');
     }
 
+    public function ajaxValidateUpgradeCode(): void
+    {
+        if (!Auth::check()) {
+            json_response(['valid' => false, 'message' => 'Your session expired. Please log in again.'], 401);
+        }
+        if (!Auth::isMember()) {
+            json_response(['valid' => false, 'message' => 'Access denied.'], 403);
+        }
+        $user = Auth::user();
+        if ((string)($user['status'] ?? '') !== 'active' || (int)($user['package_id'] ?? 0) <= 0) {
+            json_response(['valid' => false, 'message' => 'Your account cannot upgrade packages right now.'], 403);
+        }
+        $token = (string)($_POST['csrf_token'] ?? '');
+        if ($token === '' || !hash_equals(csrf_token(), $token)) {
+            json_response(['valid' => false, 'message' => 'Your session expired. Please refresh the page.'], 403);
+        }
+
+        $code = strtoupper(trim((string)($_POST['code'] ?? '')));
+        $selectedPackageId = (int)($_POST['package_id'] ?? 0);
+        if ($code === '' || $selectedPackageId <= 0) {
+            json_response(['valid' => false, 'message' => 'Select a package and enter an upgrade code.'], 422);
+        }
+
+        $codeRow = Code::validate($code);
+        if (!$codeRow || (string)($codeRow['code_type'] ?? 'registration') !== 'upgrade') {
+            json_response(['valid' => false, 'message' => 'Invalid, expired, or already-used upgrade code.'], 422);
+        }
+
+        $codePackageId = (int)$codeRow['package_id'];
+        if ($codePackageId !== $selectedPackageId) {
+            $codePackage = Package::find($codePackageId);
+            json_response([
+                'valid' => false,
+                'message' => 'This code is for ' . ($codePackage['name'] ?? 'another package') . ', not the selected package.',
+            ], 422);
+        }
+
+        $currentPackage = Package::find((int)$user['package_id']);
+        $targetPackage = Package::find($selectedPackageId);
+        if (!$currentPackage || !$targetPackage || (string)$targetPackage['status'] !== 'active') {
+            json_response(['valid' => false, 'message' => 'The selected package is not available.'], 422);
+        }
+        $difference = (float)$targetPackage['entry_fee'] - (float)$currentPackage['entry_fee'];
+        if ($difference <= 0 || !Package::upgradeCompatible((int)$user['package_id'], $selectedPackageId)) {
+            json_response(['valid' => false, 'message' => 'The selected package is not a valid upgrade.'], 422);
+        }
+
+        json_response([
+            'valid' => true,
+            'package_id' => $selectedPackageId,
+            'package_name' => (string)$targetPackage['name'],
+            'upgrade_fee' => fmt_money($difference),
+        ]);
+    }
+
     /** AJAX: search pair-enabled active members with an available binary slot */
     public function ajaxBinaryUplines(): void
     {
-        Auth::guard('member');
-        $q  = trim($_GET['q'] ?? '');
+        if (!Auth::check() || !Auth::isMember()) {
+            json_response(['candidates' => [], 'message' => 'Your session expired. Please log in again.'], 401);
+        }
+        if ((string)(Auth::user()['status'] ?? '') !== 'active') {
+            json_response(['candidates' => [], 'message' => 'Your account cannot use this feature right now.'], 403);
+        }
+        $q = trim($_GET['q'] ?? '');
+        if (strlen($q) < 2) {
+            json_response(['candidates' => []]);
+        }
+        $adminId = User::primaryAdminId();
         $st = db()->prepare("
-            SELECT u.id, u.username, u.full_name, p.name AS package_name
+            SELECT u.id, u.username, u.full_name,
+                   COALESCE(p.name, 'Binary network root') AS package_name
             FROM users u
-            JOIN packages p ON p.id = u.package_id
-            WHERE u.role = 'member'
-              AND u.status = 'active'
-              AND p.pairing_enabled = 1
+            LEFT JOIN packages p ON p.id = u.package_id
+            WHERE u.status = 'active'
+              AND u.id <> ?
+              AND (COALESCE(p.pairing_enabled, 0) = 1 OR u.id = ?)
               AND (u.username LIKE ? OR u.full_name LIKE ?)
-            ORDER BY u.username ASC
+            ORDER BY (u.id = ?) DESC, u.username ASC
             LIMIT 20
         ");
         $like = '%' . $q . '%';
-        $st->execute([$like, $like]);
+        $st->execute([Auth::id(), $adminId, $like, $like, $adminId]);
 
         $candidates = [];
         foreach ($st->fetchAll() as $u) {
@@ -922,5 +1073,45 @@ class MemberController
             'percent'     => $percent,
             'assigned_at' => $cd['assigned_at'],
         ]);
+    }
+
+    private function guardUpgradeAccount(): array
+    {
+        Auth::guard('member');
+        if (!Auth::isMember()) {
+            flash('error', 'Access denied.');
+            redirect(Auth::isAdmin() ? '/?page=admin' : '/?page=dashboard');
+        }
+
+        $user = Auth::user();
+        $status = (string)($user['status'] ?? '');
+        if ($status === 'pending') {
+            flash('error', 'Activate your account before upgrading packages.');
+            redirect('/?page=activate');
+        }
+        if ($status !== 'active') {
+            flash('error', 'Your account must be active to upgrade packages.');
+            redirect('/?page=dashboard');
+        }
+        if ((int)($user['package_id'] ?? 0) <= 0) {
+            flash('error', 'Select a package before requesting an upgrade.');
+            redirect('/?page=activate');
+        }
+
+        return $user;
+    }
+
+    private function redirectUpgradeWithError(string $message): never
+    {
+        $paymentMethod = (string)($_POST['payment_method'] ?? 'code');
+        $binaryPosition = (string)($_POST['binary_position'] ?? '');
+        $_SESSION['upgrade_form_state'] = [
+            'package_id' => (int)($_POST['package_id'] ?? 0),
+            'payment_method' => in_array($paymentMethod, ['code', 'ewallet'], true) ? $paymentMethod : 'code',
+            'binary_upline_id' => (int)($_POST['binary_upline_id'] ?? 0),
+            'binary_position' => in_array($binaryPosition, ['left', 'right'], true) ? $binaryPosition : '',
+        ];
+        flash('error', $message);
+        redirect('/?page=upgrade');
     }
 }

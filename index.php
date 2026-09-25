@@ -310,6 +310,7 @@ $routes = [
     // Package upgrade
     'upgrade'            => ['MemberController', 'showUpgrade',       'member'],
     'do_upgrade'         => ['MemberController', 'doUpgrade',         'member'],
+    'api_validate_upgrade_code' => ['MemberController', 'ajaxValidateUpgradeCode', 'member'],
     'api_binary_uplines' => ['MemberController', 'ajaxBinaryUplines', 'member'],
 
     // ── Admin ─────────────────────────────────────────
