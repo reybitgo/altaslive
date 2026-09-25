@@ -80,7 +80,7 @@ if (!$isLoggedIn && !$prefillSponsor) {
                     <div style="font-size:.72rem;color:var(--muted);">Registering as <strong>@<?= e($currentUser['username']) ?></strong></div>
                   </div>
                   <a href="<?= Auth::isAdmin() ? APP_URL . '/?page=admin' : APP_URL . '/?page=dashboard' ?>"
-                    class="btn btn-sm btn-outline-secondary">✕ Cancel</a>
+                    class="btn btn-sm btn-outline-secondary">Cancel</a>
                 </div>
               <?php else: ?>
                 <!-- Guest header -->
@@ -94,10 +94,10 @@ if (!$isLoggedIn && !$prefillSponsor) {
               <!-- Step bar -->
               <div class="steps-bar" id="stepsBar">
                 <?php if (!$isReferralMode): ?>
-                <div class="reg-step active" id="step-ind-1">
-                  <div class="step-dot">1</div>
-                  <div class="step-text">Select Package</div>
-                </div>
+                  <div class="reg-step active" id="step-ind-1">
+                    <div class="step-dot">1</div>
+                    <div class="step-text">Select Package</div>
+                  </div>
                 <?php endif; ?>
                 <div class="reg-step <?= $isReferralMode ? 'active' : '' ?>" id="step-ind-2">
                   <div class="step-dot"><?= $isReferralMode ? '1' : '2' ?></div>
@@ -130,10 +130,10 @@ if (!$isLoggedIn && !$prefillSponsor) {
                       <label class="form-label">Payment Method <span class="text-danger">*</span></label>
                       <div class="position-toggle" style="grid-template-columns:<?= $freeEnabled ? '1fr 1fr 1fr' : '1fr 1fr' ?>;">
                         <?php if ($freeEnabled): ?>
-                        <div class="position-option">
-                          <input type="radio" id="pay_free" name="payment_method" value="free" checked required>
-                          <label class="position-label" for="pay_free">🎁 Free</label>
-                        </div>
+                          <div class="position-option">
+                            <input type="radio" id="pay_free" name="payment_method" value="free" checked required>
+                            <label class="position-label" for="pay_free">🎁 Free</label>
+                          </div>
                         <?php endif; ?>
                         <div class="position-option">
                           <input type="radio" id="pay_code" name="payment_method" value="code" <?= $freeEnabled ? '' : 'checked' ?>>
@@ -147,25 +147,25 @@ if (!$isLoggedIn && !$prefillSponsor) {
                     </div>
                   <?php else: ?>
                     <?php if ($freeEnabled): ?>
-                    <p class="text-muted mb-3" style="font-size:.85rem;">
-                      Choose how to create your account — start free or pay with a registration code.
-                    </p>
+                      <p class="text-muted mb-3" style="font-size:.85rem;">
+                        Choose how to create your account — start free or pay with a registration code.
+                      </p>
 
-                    <!-- Payment Method Toggle (guest) -->
-                    <div class="mb-3">
-                      <div class="position-toggle" style="grid-template-columns:1fr 1fr;">
-                        <div class="position-option">
-                          <input type="radio" id="pay_free" name="payment_method" value="free" checked required>
-                          <label class="position-label" for="pay_free">🎁 Free</label>
-                        </div>
-                        <div class="position-option">
-                          <input type="radio" id="pay_code" name="payment_method" value="code">
-                          <label class="position-label" for="pay_code">🎫 Registration Code</label>
+                      <!-- Payment Method Toggle (guest) -->
+                      <div class="mb-3">
+                        <div class="position-toggle" style="grid-template-columns:1fr 1fr;">
+                          <div class="position-option">
+                            <input type="radio" id="pay_free" name="payment_method" value="free" checked required>
+                            <label class="position-label" for="pay_free">🎁 Free</label>
+                          </div>
+                          <div class="position-option">
+                            <input type="radio" id="pay_code" name="payment_method" value="code">
+                            <label class="position-label" for="pay_code">🎫 Registration Code</label>
+                          </div>
                         </div>
                       </div>
-                    </div>
                     <?php else: ?>
-                    <input type="hidden" name="payment_method" value="code">
+                      <input type="hidden" name="payment_method" value="code">
                     <?php endif; ?>
                   <?php endif; ?>
 
@@ -272,9 +272,9 @@ if (!$isLoggedIn && !$prefillSponsor) {
                       🔗 You are registering via a referral link. No payment is required now — you can activate your account later with a registration code or e-wallet.
                     </div>
                     <?php if ($referralDefers): ?>
-                    <div class="alert alert-warning py-2 mb-3" style="font-size:.85rem;">
-                      ℹ️ Your sponsor does not have a binary network, so no binary connection is made at registration. When you activate with a binary package, the system will auto-select the best available position (or you can pick the connection manually).
-                    </div>
+                      <div class="alert alert-warning py-2 mb-3" style="font-size:.85rem;">
+                        ℹ️ Your sponsor does not have a binary network, so no binary connection is made at registration. When you activate with a binary package, the system will auto-select the best available position (or you can pick the connection manually).
+                      </div>
                     <?php endif; ?>
                   <?php endif; ?>
                   <div class="mb-3">
@@ -314,14 +314,14 @@ if (!$isLoggedIn && !$prefillSponsor) {
                     <div class="form-text" id="sponsorHint"></div>
                   </div>
                   <?php if ($isLoggedIn && !$isReferralMode && ($registrarHasBinary ?? false) && $freeEnabled): ?>
-                  <div id="hasBinaryRow" class="mb-3">
-                    <label class="form-label">Binary Placement</label>
-                    <div class="form-check form-switch">
-                      <input class="form-check-input" type="checkbox" role="switch" id="hasBinary" name="has_binary" value="1" checked>
-                      <label class="form-check-label" for="hasBinary">Has Binary <span style="font-size:.75rem;color:var(--muted);">— place this member in the binary network now</span></label>
+                    <div id="hasBinaryRow" class="mb-3">
+                      <label class="form-label">Binary Placement</label>
+                      <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="hasBinary" name="has_binary" value="1" checked>
+                        <label class="form-check-label" for="hasBinary">Has Binary <span style="font-size:.75rem;color:var(--muted);">— place this member in the binary network now</span></label>
+                      </div>
+                      <div class="form-text" id="hasBinaryHint">Toggle ON to connect the member to the binary network now. Toggle OFF to defer the binary connection until the member activates.</div>
                     </div>
-                    <div class="form-text" id="hasBinaryHint">Toggle ON to connect the member to the binary network now. Toggle OFF to defer the binary connection until the member activates.</div>
-                  </div>
                   <?php endif; ?>
 
                   <div id="binaryModeSection" style="display:none;" class="mb-3">
@@ -400,10 +400,10 @@ if (!$isLoggedIn && !$prefillSponsor) {
                           <td id="rev_package">—</td>
                         </tr>
                         <?php if ($isReferralMode): ?>
-                        <tr>
-                          <td>Activation</td>
-                          <td><span class="badge bg-warning text-dark">Pending</span></td>
-                        </tr>
+                          <tr>
+                            <td>Activation</td>
+                            <td><span class="badge bg-warning text-dark">Pending</span></td>
+                          </tr>
                         <?php endif; ?>
                         <tr>
                           <td>Username</td>
@@ -458,7 +458,7 @@ if (!$isLoggedIn && !$prefillSponsor) {
 <?php endif; ?>
 
 <?php if (!$isLoggedIn): ?>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <?php endif; ?>
 <script>
   const API = '<?= APP_URL ?>';
@@ -506,7 +506,10 @@ if (!$isLoggedIn && !$prefillSponsor) {
       setHint('uplineHint', 'Not required for this package.', null);
     } else if (left && right && !left.checked && !right.checked) {
       const target = !left.disabled ? left : right;
-      if (!left.disabled || !right.disabled) { target.checked = true; checkPos(target.value); }
+      if (!left.disabled || !right.disabled) {
+        target.checked = true;
+        checkPos(target.value);
+      }
     }
   }
 
@@ -539,7 +542,10 @@ if (!$isLoggedIn && !$prefillSponsor) {
       .then(r => r.json())
       .then(d => {
         if (!d.valid) {
-          autoSuggestion = { valid: false, message: d.message || '' };
+          autoSuggestion = {
+            valid: false,
+            message: d.message || ''
+          };
           hint.textContent = autoSuggestion.message || 'No position available — the member will become a binary network root.';
           return;
         }
@@ -553,7 +559,10 @@ if (!$isLoggedIn && !$prefillSponsor) {
         checkPos(d.position);
       })
       .catch(() => {
-        autoSuggestion = { valid: false, message: 'Could not load placement suggestion.' };
+        autoSuggestion = {
+          valid: false,
+          message: 'Could not load placement suggestion.'
+        };
         hint.textContent = autoSuggestion.message;
       });
   }
@@ -651,7 +660,10 @@ if (!$isLoggedIn && !$prefillSponsor) {
     });
     const flash = document.getElementById('flashArea');
     if (flash) flash.innerHTML = '';
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
   }
 
   function setHint(id, msg, ok) {
@@ -1053,15 +1065,15 @@ if (!$isLoggedIn && !$prefillSponsor) {
     const uRow = document.getElementById('revUplineRow');
     if (uRow) uRow.style.display = showBinary ? '' : 'none';
     const revUpline = document.getElementById('rev_upline');
-    if (revUpline) revUpline.textContent = autoBinaryActive
-      ? (autoSuggestion ? '@' + autoSuggestion.upline_username + ' (auto)' : 'Auto — network root')
-      : (binaryEnabled ? '@' + document.getElementById('upline_username').value : 'N/A');
+    if (revUpline) revUpline.textContent = autoBinaryActive ?
+      (autoSuggestion ? '@' + autoSuggestion.upline_username + ' (auto)' : 'Auto — network root') :
+      (binaryEnabled ? '@' + document.getElementById('upline_username').value : 'N/A');
     const pRow = document.getElementById('revPositionRow');
     if (pRow) pRow.style.display = showBinary ? '' : 'none';
     const revPos = document.getElementById('rev_position');
-    if (revPos) revPos.textContent = autoBinaryActive
-      ? (autoSuggestion ? autoSuggestion.position.charAt(0).toUpperCase() + autoSuggestion.position.slice(1) + ' (auto)' : '—')
-      : (binaryEnabled ? pos.charAt(0).toUpperCase() + pos.slice(1) : 'N/A');
+    if (revPos) revPos.textContent = autoBinaryActive ?
+      (autoSuggestion ? autoSuggestion.position.charAt(0).toUpperCase() + autoSuggestion.position.slice(1) + ' (auto)' : '—') :
+      (binaryEnabled ? pos.charAt(0).toUpperCase() + pos.slice(1) : 'N/A');
     goStep(3);
   });
 
@@ -1091,7 +1103,10 @@ if (!$isLoggedIn && !$prefillSponsor) {
       const upEl = document.getElementById('upline_username');
       const leftEl = document.getElementById('pos_left');
       const rightEl = document.getElementById('pos_right');
-      if (upEl) { upEl.required = false; upEl.value = ''; }
+      if (upEl) {
+        upEl.required = false;
+        upEl.value = '';
+      }
       if (leftEl) leftEl.required = false;
       if (rightEl) rightEl.required = false;
     } else if (PREFILL_UPLINE) {
@@ -1110,14 +1125,33 @@ if (!$isLoggedIn && !$prefillSponsor) {
   updateStep1State();
 </script>
 <style>
-  .position-label{-webkit-hyphens:none;hyphens:none;overflow-wrap:normal;min-height:42px;}
-  @media(max-width:576px){
-    .position-toggle{gap:.4rem;}
-    .position-label{padding:.6rem .4rem;font-size:.72rem;min-height:38px;}
+  .position-label {
+    -webkit-hyphens: none;
+    hyphens: none;
+    overflow-wrap: normal;
+    min-height: 42px;
   }
-  @media(max-width:480px){
-    .position-toggle[style*="grid-template-columns:1fr 1fr 1fr"]{grid-template-columns:1fr !important;}
-    .position-toggle[style*="grid-template-columns:1fr 1fr 1fr"] .position-label{white-space:normal;}
+
+  @media(max-width:576px) {
+    .position-toggle {
+      gap: .4rem;
+    }
+
+    .position-label {
+      padding: .6rem .4rem;
+      font-size: .72rem;
+      min-height: 38px;
+    }
+  }
+
+  @media(max-width:480px) {
+    .position-toggle[style*="grid-template-columns:1fr 1fr 1fr"] {
+      grid-template-columns: 1fr !important;
+    }
+
+    .position-toggle[style*="grid-template-columns:1fr 1fr 1fr"] .position-label {
+      white-space: normal;
+    }
   }
 </style>
 <?php if (!$isLoggedIn): ?>

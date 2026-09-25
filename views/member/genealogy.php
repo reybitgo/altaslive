@@ -273,17 +273,17 @@
     </div>
 
     <script>
-    function copyRefLink() {
-      const el = document.getElementById('refLink');
-      el.select();
-      el.setSelectionRange(0, 99999);
-      navigator.clipboard.writeText(el.value).then(() => {
-        const btn = el.nextElementSibling;
-        const old = btn.textContent;
-        btn.textContent = '✓';
-        setTimeout(() => btn.textContent = old, 1500);
-      });
-    }
+      function copyRefLink() {
+        const el = document.getElementById('refLink');
+        el.select();
+        el.setSelectionRange(0, 99999);
+        navigator.clipboard.writeText(el.value).then(() => {
+          const btn = el.nextElementSibling;
+          const old = btn.textContent;
+          btn.textContent = '✓';
+          setTimeout(() => btn.textContent = old, 1500);
+        });
+      }
     </script>
 
     <?php if ($view !== 'referral'): ?>
@@ -427,8 +427,8 @@
                       <span class="badge <?= $b ?>"><?= ucfirst($m['status']) ?></span>
                     </td>
                   </tr>
-                <?php endforeach;
-                endif; ?>
+              <?php endforeach;
+              endif; ?>
             </tbody>
           </table>
         </div>
@@ -603,8 +603,14 @@
         .attr('transform', d => `translate(${responsiveNodeWidth / 2}, ${-responsiveNodeHeight / 2})`)
         .style('cursor', 'pointer')
         .style('opacity', 0.7)
-        .on('mouseover', function(event) { event.stopPropagation(); d3.select(this).style('opacity', 1); })
-        .on('mouseout', function(event) { event.stopPropagation(); d3.select(this).style('opacity', 0.7); })
+        .on('mouseover', function(event) {
+          event.stopPropagation();
+          d3.select(this).style('opacity', 1);
+        })
+        .on('mouseout', function(event) {
+          event.stopPropagation();
+          d3.select(this).style('opacity', 0.7);
+        })
         .on('click', function(event, d) {
           event.stopPropagation();
           openRegisterModal(d.data);
@@ -881,7 +887,7 @@
         html += `<div style="color:rgba(255,255,255,0.7);font-size:0.75rem;line-height:1.4;">`;
         html += `${data.package || 'Member'} · ${data.joined || '—'}<br>`;
         html += `Left: ${data.left_count || 0} · Right: ${data.right_count || 0}<br>`;
-        const statusColor = data.status==='active'?'#4ade80':data.status==='pending'?'#fbbf24':'#f87171';
+        const statusColor = data.status === 'active' ? '#4ade80' : data.status === 'pending' ? '#fbbf24' : '#f87171';
         html += `Status: <span style="color:${statusColor};font-weight:600;">${data.status || 'active'}</span>`;
         if (data.cd_active) {
           html += ` &middot; <span style="color:#fbbf24;font-weight:600;">CD Active</span>`;
@@ -986,518 +992,788 @@
 </script>
 
 <?php if ($view !== 'referral'): ?>
-<script>
-  let regCodeData={},regSelectedPkg={},regUsernameOk=false,regSlotData={},regSponsorOk=false;
-  let regCurrentStep=1;
-  let regBinaryEnabled=true;
-  const PACKAGES=<?= json_encode(array_map(fn($p)=>['id'=>$p['id'],'name'=>$p['name'],'entry_fee'=>fmt_money((float)$p['entry_fee']),'pairing_bonus'=>fmt_money((float)$p['pairing_bonus']),'daily_pair_cap'=>(int)$p['daily_pair_cap'],'pairing_enabled'=>(int)($p['pairing_enabled'] ?? 1) === 1], $binaryPackages ?? [])) ?>;
-  const CSRF_TOKEN='<?= csrf_token() ?>';
-  const APP_URL_JS='<?= APP_URL ?>';
-  const IMP_QUERY='<?= is_imp_session() ? '&imp=' . e(session_id()) : '' ?>';
-  const CURRENT_USER='<?= e($user["username"]) ?>';
-  const REGISTRAR_HAS_BINARY=<?= $pairingEnabled ? 'true' : 'false' ?>;
-  const RM_FREE_ENABLED=<?= setting('free_registration_enabled', '1') === '1' ? 'true' : 'false' ?>;
-  let rmBinaryMode='manual',rmAutoSuggestion=null,rmAutoActive=false,rmUplineFree={left:false,right:false};
+  <script>
+    let regCodeData = {},
+      regSelectedPkg = {},
+      regUsernameOk = false,
+      regSlotData = {},
+      regSponsorOk = false;
+    let regCurrentStep = 1;
+    let regBinaryEnabled = true;
+    const PACKAGES = <?= json_encode(array_map(fn($p) => ['id' => $p['id'], 'name' => $p['name'], 'entry_fee' => fmt_money((float)$p['entry_fee']), 'pairing_bonus' => fmt_money((float)$p['pairing_bonus']), 'daily_pair_cap' => (int)$p['daily_pair_cap'], 'pairing_enabled' => (int)($p['pairing_enabled'] ?? 1) === 1], $binaryPackages ?? [])) ?>;
+    const CSRF_TOKEN = '<?= csrf_token() ?>';
+    const APP_URL_JS = '<?= APP_URL ?>';
+    const IMP_QUERY = '<?= is_imp_session() ? '&imp=' . e(session_id()) : '' ?>';
+    const CURRENT_USER = '<?= e($user["username"]) ?>';
+    const REGISTRAR_HAS_BINARY = <?= $pairingEnabled ? 'true' : 'false' ?>;
+    const RM_FREE_ENABLED = <?= setting('free_registration_enabled', '1') === '1' ? 'true' : 'false' ?>;
+    let rmBinaryMode = 'manual',
+      rmAutoSuggestion = null,
+      rmAutoActive = false,
+      rmUplineFree = {
+        left: false,
+        right: false
+      };
 
-  function rmTogglePw(id,btn){const el=document.getElementById(id);el.type=el.type==='password'?'text':'password';btn.textContent=el.type==='password'?'👁':'🙈';}
-
-  function rmSetBinaryEnabled(on){
-    regBinaryEnabled=!!on;
-    const left=document.getElementById('rm_pos_left'),right=document.getElementById('rm_pos_right');
-    if(left)left.required=regBinaryEnabled;
-    if(right)right.required=regBinaryEnabled;
-    if(!regBinaryEnabled&&left&&right){left.checked=false;right.checked=false;document.getElementById('rm_binary_position').value='';document.getElementById('rm_position_display').textContent='N/A';}
-    else if(regBinaryEnabled&&!document.getElementById('rm_binary_position').value){rmApplyDefaultPosition();}
-  }
-
-  function rmApplyDefaultPosition(){
-    const left=document.getElementById('rm_pos_left'),right=document.getElementById('rm_pos_right');
-    const pos=document.getElementById('rm_binary_position'),disp=document.getElementById('rm_position_display');
-    if(!left||!right||!pos||!disp)return;
-    const lL=document.getElementById('rm_pos_label_left'),rL=document.getElementById('rm_pos_label_right');
-    left.disabled=false;right.disabled=false;
-    if(lL)lL.classList.remove('opacity-50');
-    if(rL)rL.classList.remove('opacity-50');
-    if(!rmUplineFree.left){
-      pos.value='left';left.checked=true;disp.textContent='Left';
-      if(rmUplineFree.right){right.disabled=true;if(rL)rL.classList.add('opacity-50');}
-    }else if(!rmUplineFree.right){
-      pos.value='right';right.checked=true;disp.textContent='Right';
-      left.disabled=true;if(lL)lL.classList.add('opacity-50');
-    }else{
-      pos.value='';left.checked=false;right.checked=false;disp.textContent='N/A';
+    function rmTogglePw(id, btn) {
+      const el = document.getElementById(id);
+      el.type = el.type === 'password' ? 'text' : 'password';
+      btn.textContent = el.type === 'password' ? '👁' : '🙈';
     }
-  }
 
-  function rmCurrentPairing(){
-    const method=document.querySelector('[name="payment_method"]:checked')?.value||'code';
-    if(method==='code') return !!(regCodeData&&regCodeData.pairing_enabled);
-    if(regSelectedPkg.pairing_enabled===true||regSelectedPkg.pairing_enabled===false) return regSelectedPkg.pairing_enabled;
-    const single=document.getElementById('rm_packageId');
-    if(single) return single.dataset.pairing!=='0';
-    const sel=document.getElementById('rm_packageSelect');
-    if(sel&&sel.value) return sel.options[sel.selectedIndex].dataset.pairing==='1';
-    return true;
-  }
-
-  function rmRefreshAutoPreview(){
-    const hint=document.getElementById('rm_autoPreviewHint');
-    if(!hint)return;
-    hint.textContent='Finding the best position…';
-    rmAutoSuggestion=null;
-    fetch(APP_URL_JS+'/?page=auto_select_upline'+IMP_QUERY)
-      .then(r=>r.json())
-      .then(d=>{
-        if(!d.valid){rmAutoSuggestion={valid:false};hint.textContent=d.message||'No position available — the member will become a binary network root.';return;}
-        rmAutoSuggestion=d;
-        hint.textContent='Auto will place this member under @'+d.upline_username+' ('+d.position.charAt(0).toUpperCase()+d.position.slice(1)+').';
-      })
-      .catch(()=>{rmAutoSuggestion={valid:false};hint.textContent='Could not load placement suggestion.';});
-  }
-
-  function rmApplyBinary(){
-    const sec=document.getElementById('rm_binarySection');
-    if(!sec)return;
-    const method=document.querySelector('[name="payment_method"]:checked')?.value||'code';
-    const pairing=rmCurrentPairing();
-    const toggle=document.getElementById('rm_hasBinary');
-    const modeSec=document.getElementById('rm_binaryModeSection');
-    const manualSec=document.getElementById('rm_manualSection');
-    const isAuto=document.querySelector('[name="binary_mode"]:checked')?.value==='auto';
-    let showAny=false,showManual=false;
-    rmAutoActive=false;
-    if(modeSec)modeSec.style.display='none';
-
-    if(method==='free'){
-      if(toggle){
-        toggle.disabled=false;
-        document.getElementById('rm_hasBinaryHint').textContent='Toggle ON to connect the member to the binary network now. Toggle OFF to defer the binary connection until the member activates.';
-        showAny=showManual=toggle.checked&&REGISTRAR_HAS_BINARY;
-      }
-    }else if(pairing){
-      if(REGISTRAR_HAS_BINARY){
-        if(toggle){toggle.checked=true;toggle.disabled=true;document.getElementById('rm_hasBinaryHint').textContent='Binary placement is required for this package.';}
-        showAny=showManual=true;
-      }else{
-        if(toggle){toggle.checked=true;toggle.disabled=true;}
-        showAny=true;
-        showManual=!isAuto;
-        rmAutoActive=isAuto;
-        rmBinaryMode=isAuto?'auto':'manual';
-        if(modeSec)modeSec.style.display='block';
-        if(isAuto)rmRefreshAutoPreview();
+    function rmSetBinaryEnabled(on) {
+      regBinaryEnabled = !!on;
+      const left = document.getElementById('rm_pos_left'),
+        right = document.getElementById('rm_pos_right');
+      if (left) left.required = regBinaryEnabled;
+      if (right) right.required = regBinaryEnabled;
+      if (!regBinaryEnabled && left && right) {
+        left.checked = false;
+        right.checked = false;
+        document.getElementById('rm_binary_position').value = '';
+        document.getElementById('rm_position_display').textContent = 'N/A';
+      } else if (regBinaryEnabled && !document.getElementById('rm_binary_position').value) {
+        rmApplyDefaultPosition();
       }
     }
 
-    sec.style.display=showAny?'block':'none';
-    if(manualSec)manualSec.style.display=showManual?'block':'none';
-    rmSetBinaryEnabled(showManual);
-  }
-
-  function openRegisterModal(data){
-    const modal=document.getElementById('regModal');
-    const form=document.getElementById('regModalForm');
-    form.reset();
-    regCodeData={};regSelectedPkg={};regUsernameOk=false;regSlotData={};regCurrentStep=1;
-    if (RM_FREE_ENABLED) {
-      document.getElementById('rm_referralMode').value='1';
-    } else {
-      document.getElementById('rm_referralMode').value='';
+    function rmApplyDefaultPosition() {
+      const left = document.getElementById('rm_pos_left'),
+        right = document.getElementById('rm_pos_right');
+      const pos = document.getElementById('rm_binary_position'),
+        disp = document.getElementById('rm_position_display');
+      if (!left || !right || !pos || !disp) return;
+      const lL = document.getElementById('rm_pos_label_left'),
+        rL = document.getElementById('rm_pos_label_right');
+      left.disabled = false;
+      right.disabled = false;
+      if (lL) lL.classList.remove('opacity-50');
+      if (rL) rL.classList.remove('opacity-50');
+      if (!rmUplineFree.left) {
+        pos.value = 'left';
+        left.checked = true;
+        disp.textContent = 'Left';
+        if (rmUplineFree.right) {
+          right.disabled = true;
+          if (rL) rL.classList.add('opacity-50');
+        }
+      } else if (!rmUplineFree.right) {
+        pos.value = 'right';
+        right.checked = true;
+        disp.textContent = 'Right';
+        left.disabled = true;
+        if (lL) lL.classList.add('opacity-50');
+      } else {
+        pos.value = '';
+        left.checked = false;
+        right.checked = false;
+        disp.textContent = 'N/A';
+      }
     }
-    document.getElementById('rm_upline_username').value=data.username||'';
-    document.getElementById('rm_upline_display').textContent='@'+(data.username||'—');
-    document.getElementById('rm_sponsor_username').value=CURRENT_USER;
-    document.getElementById('rm_sponsor_display').textContent='@'+CURRENT_USER;
-    document.getElementById('rm_sponsorInput').value=CURRENT_USER;
-    regSponsorOk=true;
-    regSetHint('rm_sponsorHint','Sponsor is valid.',true);
-    if (RM_FREE_ENABLED) {
-      document.getElementById('rm_codeSection').style.display='none';
-      document.getElementById('rm_packageSection').style.display='none';
-      document.getElementById('rm_packageInfo').classList.add('d-none');
-      document.getElementById('rm_validatedCode').value='';
-      document.getElementById('rm_reg_code').removeAttribute('required');
-      document.getElementById('rm_toStep2Btn').disabled=false;
-    } else {
-      // Free registration is disabled → open in the paid (code) flow.
-      document.getElementById('rm_codeSection').style.display='block';
-      document.getElementById('rm_packageSection').style.display='none';
-      document.getElementById('rm_packageInfo').classList.add('d-none');
-      document.getElementById('rm_validatedCode').value='';
-      document.getElementById('rm_reg_code').setAttribute('required','');
-      document.getElementById('rm_toStep2Btn').disabled=true;
+
+    function rmCurrentPairing() {
+      const method = document.querySelector('[name="payment_method"]:checked')?.value || 'code';
+      if (method === 'code') return !!(regCodeData && regCodeData.pairing_enabled);
+      if (regSelectedPkg.pairing_enabled === true || regSelectedPkg.pairing_enabled === false) return regSelectedPkg.pairing_enabled;
+      const single = document.getElementById('rm_packageId');
+      if (single) return single.dataset.pairing !== '0';
+      const sel = document.getElementById('rm_packageSelect');
+      if (sel && sel.value) return sel.options[sel.selectedIndex].dataset.pairing === '1';
+      return true;
     }
-    const pkgCard=document.getElementById('rm_packageCard');
-    if(pkgCard)pkgCard.classList.add('d-none');
-    document.querySelectorAll('#rm_step2 input[name="password"],#rm_step2 input[name="password_confirm"]').forEach(p=>{p.value='';p.type='password';});
-    document.getElementById('rm_binary_position').value='';
-    document.getElementById('rm_position_display').textContent='—';
-    document.querySelectorAll('input[name="binary_position_radio"]').forEach(r=>{r.checked=false;r.disabled=false;});
-    document.getElementById('rm_pos_label_left').classList.remove('opacity-50');
-    document.getElementById('rm_pos_label_right').classList.remove('opacity-50');
 
-    rmUplineFree={left:data.left!=null,right:data.right!=null};
-    rmApplyDefaultPosition();
-    regGoStep(1);
-    rmApplyBinary();
-    new bootstrap.Modal(modal).show();
-  }
-
-  function regGoStep(n){
-    regCurrentStep=n;
-    for(let i=1;i<=3;i++){
-      const el=document.getElementById('rm_step'+i);
-      if(el)el.style.display=i===n?'block':'none';
-      const ind=document.getElementById('rm_ind_'+i);
-      if(ind)ind.className='reg-step '+(i<n?'done':i===n?'active':'');
+    function rmRefreshAutoPreview() {
+      const hint = document.getElementById('rm_autoPreviewHint');
+      if (!hint) return;
+      hint.textContent = 'Finding the best position…';
+      rmAutoSuggestion = null;
+      fetch(APP_URL_JS + '/?page=auto_select_upline' + IMP_QUERY)
+        .then(r => r.json())
+        .then(d => {
+          if (!d.valid) {
+            rmAutoSuggestion = {
+              valid: false
+            };
+            hint.textContent = d.message || 'No position available — the member will become a binary network root.';
+            return;
+          }
+          rmAutoSuggestion = d;
+          hint.textContent = 'Auto will place this member under @' + d.upline_username + ' (' + d.position.charAt(0).toUpperCase() + d.position.slice(1) + ').';
+        })
+        .catch(() => {
+          rmAutoSuggestion = {
+            valid: false
+          };
+          hint.textContent = 'Could not load placement suggestion.';
+        });
     }
-  }
 
-  function regSetHint(id,msg,ok){
-    const el=document.getElementById(id);
-    if(!el)return;
-    el.textContent=msg;
-    el.className='form-text'+(ok===true?' text-success':ok===false?' text-danger':'');
-  }
+    function rmApplyBinary() {
+      const sec = document.getElementById('rm_binarySection');
+      if (!sec) return;
+      const method = document.querySelector('[name="payment_method"]:checked')?.value || 'code';
+      const pairing = rmCurrentPairing();
+      const toggle = document.getElementById('rm_hasBinary');
+      const modeSec = document.getElementById('rm_binaryModeSection');
+      const manualSec = document.getElementById('rm_manualSection');
+      const isAuto = document.querySelector('[name="binary_mode"]:checked')?.value === 'auto';
+      let showAny = false,
+        showManual = false;
+      rmAutoActive = false;
+      if (modeSec) modeSec.style.display = 'none';
 
-  function regResetCodeState(){
-    document.getElementById('rm_packageInfo').classList.add('d-none');
-    document.getElementById('rm_validatedCode').value='';
-    regSetHint('rm_codeHint','',null);
-    regCodeData={};
-    document.getElementById('rm_toStep2Btn').disabled=true;
-  }
+      if (method === 'free') {
+        if (toggle) {
+          toggle.disabled = false;
+          document.getElementById('rm_hasBinaryHint').textContent = 'Toggle ON to connect the member to the binary network now. Toggle OFF to defer the binary connection until the member activates.';
+          showAny = showManual = toggle.checked && REGISTRAR_HAS_BINARY;
+        }
+      } else if (pairing) {
+        if (REGISTRAR_HAS_BINARY) {
+          if (toggle) {
+            toggle.checked = true;
+            toggle.disabled = true;
+            document.getElementById('rm_hasBinaryHint').textContent = 'Binary placement is required for this package.';
+          }
+          showAny = showManual = true;
+        } else {
+          if (toggle) {
+            toggle.checked = true;
+            toggle.disabled = true;
+          }
+          showAny = true;
+          showManual = !isAuto;
+          rmAutoActive = isAuto;
+          rmBinaryMode = isAuto ? 'auto' : 'manual';
+          if (modeSec) modeSec.style.display = 'block';
+          if (isAuto) rmRefreshAutoPreview();
+        }
+      }
 
-  document.addEventListener('DOMContentLoaded',function(){
-    document.querySelectorAll('input[name="binary_position_radio"]').forEach(r=>{
-      r.addEventListener('change',function(){
-        document.getElementById('rm_binary_position').value=this.value;
-        document.getElementById('rm_position_display').textContent=this.value.charAt(0).toUpperCase()+this.value.slice(1);
+      sec.style.display = showAny ? 'block' : 'none';
+      if (manualSec) manualSec.style.display = showManual ? 'block' : 'none';
+      rmSetBinaryEnabled(showManual);
+    }
+
+    function openRegisterModal(data) {
+      const modal = document.getElementById('regModal');
+      const form = document.getElementById('regModalForm');
+      form.reset();
+      regCodeData = {};
+      regSelectedPkg = {};
+      regUsernameOk = false;
+      regSlotData = {};
+      regCurrentStep = 1;
+      if (RM_FREE_ENABLED) {
+        document.getElementById('rm_referralMode').value = '1';
+      } else {
+        document.getElementById('rm_referralMode').value = '';
+      }
+      document.getElementById('rm_upline_username').value = data.username || '';
+      document.getElementById('rm_upline_display').textContent = '@' + (data.username || '—');
+      document.getElementById('rm_sponsor_username').value = CURRENT_USER;
+      document.getElementById('rm_sponsor_display').textContent = '@' + CURRENT_USER;
+      document.getElementById('rm_sponsorInput').value = CURRENT_USER;
+      regSponsorOk = true;
+      regSetHint('rm_sponsorHint', 'Sponsor is valid.', true);
+      if (RM_FREE_ENABLED) {
+        document.getElementById('rm_codeSection').style.display = 'none';
+        document.getElementById('rm_packageSection').style.display = 'none';
+        document.getElementById('rm_packageInfo').classList.add('d-none');
+        document.getElementById('rm_validatedCode').value = '';
+        document.getElementById('rm_reg_code').removeAttribute('required');
+        document.getElementById('rm_toStep2Btn').disabled = false;
+      } else {
+        // Free registration is disabled → open in the paid (code) flow.
+        document.getElementById('rm_codeSection').style.display = 'block';
+        document.getElementById('rm_packageSection').style.display = 'none';
+        document.getElementById('rm_packageInfo').classList.add('d-none');
+        document.getElementById('rm_validatedCode').value = '';
+        document.getElementById('rm_reg_code').setAttribute('required', '');
+        document.getElementById('rm_toStep2Btn').disabled = true;
+      }
+      const pkgCard = document.getElementById('rm_packageCard');
+      if (pkgCard) pkgCard.classList.add('d-none');
+      document.querySelectorAll('#rm_step2 input[name="password"],#rm_step2 input[name="password_confirm"]').forEach(p => {
+        p.value = '';
+        p.type = 'password';
       });
-    });
-
-    document.querySelectorAll('[name="binary_mode"]').forEach(r=>{
-      r.addEventListener('change',function(){
-        rmBinaryMode=this.value;
-        rmApplyBinary();
+      document.getElementById('rm_binary_position').value = '';
+      document.getElementById('rm_position_display').textContent = '—';
+      document.querySelectorAll('input[name="binary_position_radio"]').forEach(r => {
+        r.checked = false;
+        r.disabled = false;
       });
-    });
-    const rmToggleEl=document.getElementById('rm_hasBinary');
-    if(rmToggleEl){
-      rmToggleEl.addEventListener('change',rmApplyBinary);
-    }
+      document.getElementById('rm_pos_label_left').classList.remove('opacity-50');
+      document.getElementById('rm_pos_label_right').classList.remove('opacity-50');
 
-document.querySelectorAll('[name="payment_method"]').forEach(r=>{
-      r.addEventListener('change',function(){
-        regResetCodeState();
-        const v=this.value,isFree=v==='free';
-        document.getElementById('rm_codeSection').style.display='none';
-        document.getElementById('rm_packageSection').style.display='none';
-        document.getElementById('rm_referralMode').value=isFree?'1':'';
-        const codeInput=document.getElementById('rm_reg_code');
-        if(isFree){document.getElementById('rm_toStep2Btn').disabled=false;codeInput.removeAttribute('required');}
-        else if(v==='ewallet'){document.getElementById('rm_packageSection').style.display='block';document.getElementById('rm_toStep2Btn').disabled=PACKAGES.length!==1;codeInput.removeAttribute('required');}
-        else{document.getElementById('rm_codeSection').style.display='block';document.getElementById('rm_toStep2Btn').disabled=true;codeInput.setAttribute('required','');}
-        rmApplyBinary();
-      });
-    });
-
-    document.getElementById('rm_validateCodeBtn').addEventListener('click',async function(){
-      const code=document.getElementById('rm_reg_code').value.trim();
-      const isCd=code.startsWith('CD-');
-      const minLen=isCd?17:14;
-      if(code.length<minLen){regSetHint('rm_codeHint',isCd?'Enter a complete CD code (CD-XXXX-XXXX-XXXX)':'Enter a complete code (XXXX-XXXX-XXXX)',false);return;}
-      this.disabled=true;this.textContent='…';
-      try{
-        const fd=new FormData();fd.append('code',code);fd.append('csrf_token',CSRF_TOKEN);
-        const d=await(await fetch(APP_URL_JS+'/?page=validate_code'+IMP_QUERY,{method:'POST',body:fd})).json();
-        if(d.valid){regCodeData=d;rmApplyBinary();document.getElementById('rm_pkgName').textContent=d.package_name;document.getElementById('rm_pkgDetails').textContent='Entry: '+d.entry_fee+' · Pair volume: '+d.volume+' · Cap: '+d.cap_pesos+'/day';document.getElementById('rm_packageInfo').classList.remove('d-none');document.getElementById('rm_validatedCode').value=code;document.getElementById('rm_toStep2Btn').disabled=false;regSetHint('rm_codeHint','✓ Code is valid!',true);}
-        else{regSetHint('rm_codeHint',d.message||'Invalid code.',false);}
-      }catch(e){regSetHint('rm_codeHint','Network error.',false);}
-      this.disabled=false;this.textContent='Validate';
-    });
-
-    document.getElementById('rm_reg_code').addEventListener('input',function(){
-      let raw=this.value.replace(/[^A-Z0-9]/gi,'').toUpperCase(),formatted='';
-      if(raw.startsWith('CD')){const body=raw.slice(2).slice(0,12);const parts=[body.slice(0,4),body.slice(4,8),body.slice(8,12)].filter(Boolean);formatted='CD'+(parts.length?'-'+parts.join('-'):'');}
-      else{const clean=raw.slice(0,12);const parts=[clean.slice(0,4),clean.slice(4,8),clean.slice(8,12)].filter(Boolean);formatted=parts.join('-');}
-      this.value=formatted;regResetCodeState();
-    });
-
-    const rmPackageSelect=document.getElementById('rm_packageSelect');
-    if(rmPackageSelect){rmPackageSelect.addEventListener('change',function(){
-      if(!this.value){document.getElementById('rm_packageCard')?.classList.add('d-none');document.getElementById('rm_toStep2Btn').disabled=true;rmApplyBinary();return;}
-      const opt=this.options[this.selectedIndex];regSelectedPkg={id:this.value,name:opt.dataset.name,fee:opt.dataset.fee,bonus:opt.dataset.bonus,cap:opt.dataset.cap,pairing_enabled:opt.dataset.pairing==='1'};
+      rmUplineFree = {
+        left: data.left != null,
+        right: data.right != null
+      };
+      rmApplyDefaultPosition();
+      regGoStep(1);
       rmApplyBinary();
-      const card=document.getElementById('rm_packageCard');if(card){document.getElementById('rm_pkgCardName').textContent=regSelectedPkg.name;document.getElementById('rm_pkgCardDetails').textContent='Entry: '+regSelectedPkg.fee+' · Bonus: '+regSelectedPkg.bonus+' · Cap: '+regSelectedPkg.cap+' pairs/day';card.classList.remove('d-none');}
-      regSetHint('rm_packageHint','✓ Package selected.',true);document.getElementById('rm_toStep2Btn').disabled=false;
-    });}
+      new bootstrap.Modal(modal).show();
+    }
 
-    document.getElementById('rm_toStep2Btn').addEventListener('click',()=>{
-      const isFree=document.querySelector('[name="payment_method"]:checked').value==='free';
-      document.getElementById('rm_referralAlert').style.display=isFree?'block':'none';
-      regGoStep(2);
-    });
-
-    let rmUTimer;
-    document.getElementById('rm_username').addEventListener('input',function(){
-      regUsernameOk=false;clearTimeout(rmUTimer);const v=this.value.trim();
-      if(v.length<3){regSetHint('rm_usernameHint','',null);return;}
-      regSetHint('rm_usernameHint','Checking…',null);
-      rmUTimer=setTimeout(async()=>{const d=await(await fetch(APP_URL_JS+'/?page=check_username&username='+encodeURIComponent(v)+IMP_QUERY)).json();regUsernameOk=d.available;regSetHint('rm_usernameHint',d.message,d.available);},600);
-    });
-
-    let rmSTimer;
-    document.getElementById('rm_sponsorInput').addEventListener('input',function(){
-      regSponsorOk=false;clearTimeout(rmSTimer);const v=this.value.trim();
-      if(!v){regSetHint('rm_sponsorHint','',null);return;}
-      regSetHint('rm_sponsorHint','Checking…',null);
-      rmSTimer=setTimeout(async()=>{const d=await(await fetch(APP_URL_JS+'/?page=check_username&username='+encodeURIComponent(v)+IMP_QUERY)).json();regSponsorOk=!d.available;regSetHint('rm_sponsorHint',regSponsorOk?'Sponsor is valid.':'Sponsor not found.',regSponsorOk);},600);
-    });
-
-    document.getElementById('rm_password_confirm').addEventListener('input',function(){
-      const ok=document.getElementById('rm_password').value===this.value;
-      regSetHint('rm_pwMatchHint',this.value?(ok?'✓ Passwords match.':'✗ Passwords do not match.'):'',this.value?ok:null);
-    });
-
-    document.getElementById('rm_toStep3Btn').addEventListener('click',function(){
-      const pw=document.getElementById('rm_password').value,pwc=document.getElementById('rm_password_confirm').value,username=document.getElementById('rm_username').value.trim();
-      if(!username){regSetHint('rm_usernameHint','Username is required.',false);return;}
-      if(!regUsernameOk){regSetHint('rm_usernameHint','Please choose a valid, available username.',false);return;}
-      const sponsorVal=document.getElementById('rm_sponsorInput').value.trim()||CURRENT_USER;
-      if(!regSponsorOk&&sponsorVal!==CURRENT_USER){regSetHint('rm_sponsorHint','Please enter a valid sponsor.',false);return;}
-      if(pw.length<8){alert('Password must be at least 8 characters.');return;}
-      if(pw!==pwc){regSetHint('rm_pwMatchHint','Passwords do not match.',false);return;}
-      const pos=document.getElementById('rm_binary_position').value;
-      if(regBinaryEnabled&&!pos){alert('Please select a binary position (Left or Right).');return;}
-      const method=document.querySelector('[name="payment_method"]:checked').value,isFree=method==='free';
-      document.getElementById('rm_revFreeRow').style.display=isFree?'':'none';
-      document.getElementById('rm_revPayRow').style.display=isFree?'none':'';
-      document.getElementById('rm_revCodeRow').style.display=(!isFree&&method==='code')?'':'none';
-      document.getElementById('rm_revPkgRow').style.display=isFree?'none':'';
-      if(!isFree){
-        document.getElementById('rm_rev_payment').textContent=method==='code'?'🎫 Registration Code':'💳 E-Wallet';
-        document.getElementById('rm_rev_code').textContent=document.getElementById('rm_validatedCode').value||'—';
-        document.getElementById('rm_rev_package').textContent=method==='code'?(regCodeData.package_name||'—'):(regSelectedPkg.name||(PACKAGES.length===1?PACKAGES[0].name:'—'));
+    function regGoStep(n) {
+      regCurrentStep = n;
+      for (let i = 1; i <= 3; i++) {
+        const el = document.getElementById('rm_step' + i);
+        if (el) el.style.display = i === n ? 'block' : 'none';
+        const ind = document.getElementById('rm_ind_' + i);
+        if (ind) ind.className = 'reg-step ' + (i < n ? 'done' : i === n ? 'active' : '');
       }
-      document.getElementById('rm_rev_username').textContent='@'+username;
-      document.getElementById('rm_rev_sponsor').textContent='@'+(document.getElementById('rm_sponsorInput').value.trim()||CURRENT_USER);
-      const showBinary=regBinaryEnabled||rmAutoActive;
-      const uRow=document.getElementById('rm_rev_uplineRow');if(uRow)uRow.style.display=showBinary?'':'none';
-      document.getElementById('rm_rev_upline').textContent=rmAutoActive
-        ?(rmAutoSuggestion?'@'+rmAutoSuggestion.upline_username+' (auto)':'(auto)')
-        :('@'+(document.getElementById('rm_upline_username').value||'—'));
-      const pRow=document.getElementById('rm_rev_positionRow');if(pRow)pRow.style.display=showBinary?'':'none';
-      document.getElementById('rm_rev_position').textContent=rmAutoActive?'Auto (network)':document.getElementById('rm_position_display').textContent;
-      regGoStep(3);
+    }
+
+    function regSetHint(id, msg, ok) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = msg;
+      el.className = 'form-text' + (ok === true ? ' text-success' : ok === false ? ' text-danger' : '');
+    }
+
+    function regResetCodeState() {
+      document.getElementById('rm_packageInfo').classList.add('d-none');
+      document.getElementById('rm_validatedCode').value = '';
+      regSetHint('rm_codeHint', '', null);
+      regCodeData = {};
+      document.getElementById('rm_toStep2Btn').disabled = true;
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('input[name="binary_position_radio"]').forEach(r => {
+        r.addEventListener('change', function() {
+          document.getElementById('rm_binary_position').value = this.value;
+          document.getElementById('rm_position_display').textContent = this.value.charAt(0).toUpperCase() + this.value.slice(1);
+        });
+      });
+
+      document.querySelectorAll('[name="binary_mode"]').forEach(r => {
+        r.addEventListener('change', function() {
+          rmBinaryMode = this.value;
+          rmApplyBinary();
+        });
+      });
+      const rmToggleEl = document.getElementById('rm_hasBinary');
+      if (rmToggleEl) {
+        rmToggleEl.addEventListener('change', rmApplyBinary);
+      }
+
+      document.querySelectorAll('[name="payment_method"]').forEach(r => {
+        r.addEventListener('change', function() {
+          regResetCodeState();
+          const v = this.value,
+            isFree = v === 'free';
+          document.getElementById('rm_codeSection').style.display = 'none';
+          document.getElementById('rm_packageSection').style.display = 'none';
+          document.getElementById('rm_referralMode').value = isFree ? '1' : '';
+          const codeInput = document.getElementById('rm_reg_code');
+          if (isFree) {
+            document.getElementById('rm_toStep2Btn').disabled = false;
+            codeInput.removeAttribute('required');
+          } else if (v === 'ewallet') {
+            document.getElementById('rm_packageSection').style.display = 'block';
+            document.getElementById('rm_toStep2Btn').disabled = PACKAGES.length !== 1;
+            codeInput.removeAttribute('required');
+          } else {
+            document.getElementById('rm_codeSection').style.display = 'block';
+            document.getElementById('rm_toStep2Btn').disabled = true;
+            codeInput.setAttribute('required', '');
+          }
+          rmApplyBinary();
+        });
+      });
+
+      document.getElementById('rm_validateCodeBtn').addEventListener('click', async function() {
+        const code = document.getElementById('rm_reg_code').value.trim();
+        const isCd = code.startsWith('CD-');
+        const minLen = isCd ? 17 : 14;
+        if (code.length < minLen) {
+          regSetHint('rm_codeHint', isCd ? 'Enter a complete CD code (CD-XXXX-XXXX-XXXX)' : 'Enter a complete code (XXXX-XXXX-XXXX)', false);
+          return;
+        }
+        this.disabled = true;
+        this.textContent = '…';
+        try {
+          const fd = new FormData();
+          fd.append('code', code);
+          fd.append('csrf_token', CSRF_TOKEN);
+          const d = await (await fetch(APP_URL_JS + '/?page=validate_code' + IMP_QUERY, {
+            method: 'POST',
+            body: fd
+          })).json();
+          if (d.valid) {
+            regCodeData = d;
+            rmApplyBinary();
+            document.getElementById('rm_pkgName').textContent = d.package_name;
+            document.getElementById('rm_pkgDetails').textContent = 'Entry: ' + d.entry_fee + ' · Pair volume: ' + d.volume + ' · Cap: ' + d.cap_pesos + '/day';
+            document.getElementById('rm_packageInfo').classList.remove('d-none');
+            document.getElementById('rm_validatedCode').value = code;
+            document.getElementById('rm_toStep2Btn').disabled = false;
+            regSetHint('rm_codeHint', '✓ Code is valid!', true);
+          } else {
+            regSetHint('rm_codeHint', d.message || 'Invalid code.', false);
+          }
+        } catch (e) {
+          regSetHint('rm_codeHint', 'Network error.', false);
+        }
+        this.disabled = false;
+        this.textContent = 'Validate';
+      });
+
+      document.getElementById('rm_reg_code').addEventListener('input', function() {
+        let raw = this.value.replace(/[^A-Z0-9]/gi, '').toUpperCase(),
+          formatted = '';
+        if (raw.startsWith('CD')) {
+          const body = raw.slice(2).slice(0, 12);
+          const parts = [body.slice(0, 4), body.slice(4, 8), body.slice(8, 12)].filter(Boolean);
+          formatted = 'CD' + (parts.length ? '-' + parts.join('-') : '');
+        } else {
+          const clean = raw.slice(0, 12);
+          const parts = [clean.slice(0, 4), clean.slice(4, 8), clean.slice(8, 12)].filter(Boolean);
+          formatted = parts.join('-');
+        }
+        this.value = formatted;
+        regResetCodeState();
+      });
+
+      const rmPackageSelect = document.getElementById('rm_packageSelect');
+      if (rmPackageSelect) {
+        rmPackageSelect.addEventListener('change', function() {
+          if (!this.value) {
+            document.getElementById('rm_packageCard')?.classList.add('d-none');
+            document.getElementById('rm_toStep2Btn').disabled = true;
+            rmApplyBinary();
+            return;
+          }
+          const opt = this.options[this.selectedIndex];
+          regSelectedPkg = {
+            id: this.value,
+            name: opt.dataset.name,
+            fee: opt.dataset.fee,
+            bonus: opt.dataset.bonus,
+            cap: opt.dataset.cap,
+            pairing_enabled: opt.dataset.pairing === '1'
+          };
+          rmApplyBinary();
+          const card = document.getElementById('rm_packageCard');
+          if (card) {
+            document.getElementById('rm_pkgCardName').textContent = regSelectedPkg.name;
+            document.getElementById('rm_pkgCardDetails').textContent = 'Entry: ' + regSelectedPkg.fee + ' · Bonus: ' + regSelectedPkg.bonus + ' · Cap: ' + regSelectedPkg.cap + ' pairs/day';
+            card.classList.remove('d-none');
+          }
+          regSetHint('rm_packageHint', '✓ Package selected.', true);
+          document.getElementById('rm_toStep2Btn').disabled = false;
+        });
+      }
+
+      document.getElementById('rm_toStep2Btn').addEventListener('click', () => {
+        const isFree = document.querySelector('[name="payment_method"]:checked').value === 'free';
+        document.getElementById('rm_referralAlert').style.display = isFree ? 'block' : 'none';
+        regGoStep(2);
+      });
+
+      let rmUTimer;
+      document.getElementById('rm_username').addEventListener('input', function() {
+        regUsernameOk = false;
+        clearTimeout(rmUTimer);
+        const v = this.value.trim();
+        if (v.length < 3) {
+          regSetHint('rm_usernameHint', '', null);
+          return;
+        }
+        regSetHint('rm_usernameHint', 'Checking…', null);
+        rmUTimer = setTimeout(async () => {
+          const d = await (await fetch(APP_URL_JS + '/?page=check_username&username=' + encodeURIComponent(v) + IMP_QUERY)).json();
+          regUsernameOk = d.available;
+          regSetHint('rm_usernameHint', d.message, d.available);
+        }, 600);
+      });
+
+      let rmSTimer;
+      document.getElementById('rm_sponsorInput').addEventListener('input', function() {
+        regSponsorOk = false;
+        clearTimeout(rmSTimer);
+        const v = this.value.trim();
+        if (!v) {
+          regSetHint('rm_sponsorHint', '', null);
+          return;
+        }
+        regSetHint('rm_sponsorHint', 'Checking…', null);
+        rmSTimer = setTimeout(async () => {
+          const d = await (await fetch(APP_URL_JS + '/?page=check_username&username=' + encodeURIComponent(v) + IMP_QUERY)).json();
+          regSponsorOk = !d.available;
+          regSetHint('rm_sponsorHint', regSponsorOk ? 'Sponsor is valid.' : 'Sponsor not found.', regSponsorOk);
+        }, 600);
+      });
+
+      document.getElementById('rm_password_confirm').addEventListener('input', function() {
+        const ok = document.getElementById('rm_password').value === this.value;
+        regSetHint('rm_pwMatchHint', this.value ? (ok ? '✓ Passwords match.' : '✗ Passwords do not match.') : '', this.value ? ok : null);
+      });
+
+      document.getElementById('rm_toStep3Btn').addEventListener('click', function() {
+        const pw = document.getElementById('rm_password').value,
+          pwc = document.getElementById('rm_password_confirm').value,
+          username = document.getElementById('rm_username').value.trim();
+        if (!username) {
+          regSetHint('rm_usernameHint', 'Username is required.', false);
+          return;
+        }
+        if (!regUsernameOk) {
+          regSetHint('rm_usernameHint', 'Please choose a valid, available username.', false);
+          return;
+        }
+        const sponsorVal = document.getElementById('rm_sponsorInput').value.trim() || CURRENT_USER;
+        if (!regSponsorOk && sponsorVal !== CURRENT_USER) {
+          regSetHint('rm_sponsorHint', 'Please enter a valid sponsor.', false);
+          return;
+        }
+        if (pw.length < 8) {
+          alert('Password must be at least 8 characters.');
+          return;
+        }
+        if (pw !== pwc) {
+          regSetHint('rm_pwMatchHint', 'Passwords do not match.', false);
+          return;
+        }
+        const pos = document.getElementById('rm_binary_position').value;
+        if (regBinaryEnabled && !pos) {
+          alert('Please select a binary position (Left or Right).');
+          return;
+        }
+        const method = document.querySelector('[name="payment_method"]:checked').value,
+          isFree = method === 'free';
+        document.getElementById('rm_revFreeRow').style.display = isFree ? '' : 'none';
+        document.getElementById('rm_revPayRow').style.display = isFree ? 'none' : '';
+        document.getElementById('rm_revCodeRow').style.display = (!isFree && method === 'code') ? '' : 'none';
+        document.getElementById('rm_revPkgRow').style.display = isFree ? 'none' : '';
+        if (!isFree) {
+          document.getElementById('rm_rev_payment').textContent = method === 'code' ? '🎫 Registration Code' : '💳 E-Wallet';
+          document.getElementById('rm_rev_code').textContent = document.getElementById('rm_validatedCode').value || '—';
+          document.getElementById('rm_rev_package').textContent = method === 'code' ? (regCodeData.package_name || '—') : (regSelectedPkg.name || (PACKAGES.length === 1 ? PACKAGES[0].name : '—'));
+        }
+        document.getElementById('rm_rev_username').textContent = '@' + username;
+        document.getElementById('rm_rev_sponsor').textContent = '@' + (document.getElementById('rm_sponsorInput').value.trim() || CURRENT_USER);
+        const showBinary = regBinaryEnabled || rmAutoActive;
+        const uRow = document.getElementById('rm_rev_uplineRow');
+        if (uRow) uRow.style.display = showBinary ? '' : 'none';
+        document.getElementById('rm_rev_upline').textContent = rmAutoActive ?
+          (rmAutoSuggestion ? '@' + rmAutoSuggestion.upline_username + ' (auto)' : '(auto)') :
+          ('@' + (document.getElementById('rm_upline_username').value || '—'));
+        const pRow = document.getElementById('rm_rev_positionRow');
+        if (pRow) pRow.style.display = showBinary ? '' : 'none';
+        document.getElementById('rm_rev_position').textContent = rmAutoActive ? 'Auto (network)' : document.getElementById('rm_position_display').textContent;
+        regGoStep(3);
+      });
+
+      document.getElementById('regModalForm').addEventListener('submit', function() {
+        document.getElementById('rm_sponsor_username').value = document.getElementById('rm_sponsorInput').value.trim() || CURRENT_USER;
+        const btn = document.getElementById('rm_submitBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creating account…';
+      });
     });
+  </script>
 
-    document.getElementById('regModalForm').addEventListener('submit',function(){
-      document.getElementById('rm_sponsor_username').value=document.getElementById('rm_sponsorInput').value.trim()||CURRENT_USER;
-      const btn=document.getElementById('rm_submitBtn');btn.disabled=true;
-      btn.innerHTML='<span class="spinner-border spinner-border-sm me-2"></span>Creating account…';
-    });
-  });
-</script>
+  <link rel="stylesheet" href="<?= APP_URL ?>/assets/css/auth.css">
+  <style>
+    .reg-modal .modal-content {
+      max-width: 560px;
+      border-radius: 1.25rem;
+      overflow: hidden;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, .25), 0 4px 16px rgba(0, 0, 0, .1);
+    }
 
-<link rel="stylesheet" href="<?= APP_URL ?>/assets/css/auth.css">
-<style>
-  .reg-modal .modal-content{max-width:560px;border-radius:1.25rem;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.25),0 4px 16px rgba(0,0,0,.1);}
-  .reg-modal .modal-dialog{max-width:560px;}
-  .reg-modal .auth-body{padding:1.5rem 2.25rem;}
-  .reg-modal .steps-bar{padding:.875rem 2.25rem;}
-  .reg-modal .auth-footer-compact{text-align:center;padding:0 2.25rem 1.25rem;font-size:.8rem;color:#6b7280;}
-  .reg-modal .position-label{-webkit-hyphens:none;hyphens:none;white-space:nowrap;min-height:42px;}
-  @media(max-width:576px){
-    .reg-modal .modal-dialog{max-width:calc(100% - 1rem);margin:.5rem auto;}
-    .reg-modal .auth-body{padding:1.25rem 1rem;}
-    .reg-modal .steps-bar{padding:.75rem 1rem;}
-    .reg-modal .position-toggle{gap:.4rem;}
-    .reg-modal .position-label{padding:.6rem .4rem;font-size:.72rem;min-height:38px;}
-  }
-  @media(max-width:380px){
-    .reg-modal .position-toggle[style*="grid-template-columns:1fr 1fr 1fr"]{grid-template-columns:1fr !important;}
-    .reg-modal .position-toggle[style*="grid-template-columns:1fr 1fr 1fr"] .position-label{white-space:normal;}
-  }
-</style>
+    .reg-modal .modal-dialog {
+      max-width: 560px;
+    }
 
-<div class="modal fade reg-modal" id="regModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="d-flex align-items-center gap-3 px-4 py-3 border-bottom" style="background:#f8fafd;">
-        <div style="width:38px;height:38px;border-radius:.625rem;background:var(--primary);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
-          <img src="<?= APP_URL ?>/assets/img/logo.png" style="width:24px;height:24px;object-fit:contain;" alt="">
+    .reg-modal .auth-body {
+      padding: 1.5rem 2.25rem;
+    }
+
+    .reg-modal .steps-bar {
+      padding: .875rem 2.25rem;
+    }
+
+    .reg-modal .auth-footer-compact {
+      text-align: center;
+      padding: 0 2.25rem 1.25rem;
+      font-size: .8rem;
+      color: #6b7280;
+    }
+
+    .reg-modal .position-label {
+      -webkit-hyphens: none;
+      hyphens: none;
+      white-space: nowrap;
+      min-height: 42px;
+    }
+
+    @media(max-width:576px) {
+      .reg-modal .modal-dialog {
+        max-width: calc(100% - 1rem);
+        margin: .5rem auto;
+      }
+
+      .reg-modal .auth-body {
+        padding: 1.25rem 1rem;
+      }
+
+      .reg-modal .steps-bar {
+        padding: .75rem 1rem;
+      }
+
+      .reg-modal .position-toggle {
+        gap: .4rem;
+      }
+
+      .reg-modal .position-label {
+        padding: .6rem .4rem;
+        font-size: .72rem;
+        min-height: 38px;
+      }
+    }
+
+    @media(max-width:380px) {
+      .reg-modal .position-toggle[style*="grid-template-columns:1fr 1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+      }
+
+      .reg-modal .position-toggle[style*="grid-template-columns:1fr 1fr 1fr"] .position-label {
+        white-space: normal;
+      }
+    }
+  </style>
+
+  <div class="modal fade reg-modal" id="regModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="d-flex align-items-center gap-3 px-4 py-3 border-bottom" style="background:#f8fafd;">
+          <div style="width:38px;height:38px;border-radius:.625rem;background:var(--primary);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
+            <img src="<?= APP_URL ?>/assets/img/logo.png" style="width:24px;height:24px;object-fit:contain;" alt="">
+          </div>
+          <div class="flex-grow-1">
+            <div style="font-size:.875rem;font-weight:700;">Register New Member</div>
+            <div style="font-size:.72rem;color:var(--muted);">Registering as <strong>@<?= e($user['username']) ?></strong></div>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
         </div>
-        <div class="flex-grow-1">
-          <div style="font-size:.875rem;font-weight:700;">Register New Member</div>
-          <div style="font-size:.72rem;color:var(--muted);">Registering as <strong>@<?= e($user['username']) ?></strong></div>
+        <div class="steps-bar" id="rm_stepsBar">
+          <div class="reg-step active" id="rm_ind_1">
+            <div class="step-dot">1</div>
+            <div class="step-text">Select Package</div>
+          </div>
+          <div class="reg-step" id="rm_ind_2">
+            <div class="step-dot">2</div>
+            <div class="step-text">Account Setup</div>
+          </div>
+          <div class="reg-step" id="rm_ind_3">
+            <div class="step-dot">3</div>
+            <div class="step-text">Confirm</div>
+          </div>
         </div>
-        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">✕ Cancel</button>
-      </div>
-      <div class="steps-bar" id="rm_stepsBar">
-        <div class="reg-step active" id="rm_ind_1"><div class="step-dot">1</div><div class="step-text">Select Package</div></div>
-        <div class="reg-step" id="rm_ind_2"><div class="step-dot">2</div><div class="step-text">Account Setup</div></div>
-        <div class="reg-step" id="rm_ind_3"><div class="step-dot">3</div><div class="step-text">Confirm</div></div>
-      </div>
-      <form id="regModalForm" method="POST" action="<?= link_to('do_register') ?>">
-        <?= csrf_field() ?>
-        <input type="hidden" name="validated_code" id="rm_validatedCode">
-        <input type="hidden" name="sponsor_username" id="rm_sponsor_username">
-        <input type="hidden" name="upline_username" id="rm_upline_username">
-        <input type="hidden" name="binary_position" id="rm_binary_position">
-        <input type="hidden" name="referral_mode" id="rm_referralMode" value="">
+        <form id="regModalForm" method="POST" action="<?= link_to('do_register') ?>">
+          <?= csrf_field() ?>
+          <input type="hidden" name="validated_code" id="rm_validatedCode">
+          <input type="hidden" name="sponsor_username" id="rm_sponsor_username">
+          <input type="hidden" name="upline_username" id="rm_upline_username">
+          <input type="hidden" name="binary_position" id="rm_binary_position">
+          <input type="hidden" name="referral_mode" id="rm_referralMode" value="">
 
-        <!-- STEP 1 -->
-        <div class="auth-body" id="rm_step1">
-          <p class="text-muted mb-3" style="font-size:.85rem;">Choose payment method and package for the new member.</p>
-          <div class="mb-3">
-            <label class="form-label">Payment Method <span class="text-danger">*</span></label>
-            <div class="position-toggle" style="grid-template-columns:<?= setting('free_registration_enabled', '1') === '1' ? '1fr 1fr 1fr' : '1fr 1fr' ?>;">
-              <?php if (setting('free_registration_enabled', '1') === '1'): ?>
-              <div class="position-option"><input type="radio" id="rm_pay_free" name="payment_method" value="free" checked required><label class="position-label" for="rm_pay_free">🎁 Free</label></div>
-              <?php endif; ?>
-              <div class="position-option"><input type="radio" id="rm_pay_code" name="payment_method" value="code" <?= setting('free_registration_enabled', '1') === '1' ? '' : 'checked' ?>><label class="position-label" for="rm_pay_code">🎫 Code</label></div>
-              <div class="position-option"><input type="radio" id="rm_pay_ewallet" name="payment_method" value="ewallet"><label class="position-label" for="rm_pay_ewallet">💳 E-Wallet</label></div>
-            </div>
-          </div>
-          <div id="rm_codeSection">
+          <!-- STEP 1 -->
+          <div class="auth-body" id="rm_step1">
+            <p class="text-muted mb-3" style="font-size:.85rem;">Choose payment method and package for the new member.</p>
             <div class="mb-3">
-              <label class="form-label">Registration Code <span class="text-danger">*</span></label>
-              <div class="input-group">
-                <input type="text" id="rm_reg_code" name="reg_code" class="form-control font-mono" placeholder="XXXX-XXXX-XXXX" maxlength="18" style="text-transform:uppercase;letter-spacing:2px;font-size:1rem;" required>
-                <button type="button" class="btn btn-outline-primary" id="rm_validateCodeBtn">Validate</button>
+              <label class="form-label">Payment Method <span class="text-danger">*</span></label>
+              <div class="position-toggle" style="grid-template-columns:<?= setting('free_registration_enabled', '1') === '1' ? '1fr 1fr 1fr' : '1fr 1fr' ?>;">
+                <?php if (setting('free_registration_enabled', '1') === '1'): ?>
+                  <div class="position-option"><input type="radio" id="rm_pay_free" name="payment_method" value="free" checked required><label class="position-label" for="rm_pay_free">🎁 Free</label></div>
+                <?php endif; ?>
+                <div class="position-option"><input type="radio" id="rm_pay_code" name="payment_method" value="code" <?= setting('free_registration_enabled', '1') === '1' ? '' : 'checked' ?>><label class="position-label" for="rm_pay_code">🎫 Code</label></div>
+                <div class="position-option"><input type="radio" id="rm_pay_ewallet" name="payment_method" value="ewallet"><label class="position-label" for="rm_pay_ewallet">💳 E-Wallet</label></div>
               </div>
-              <div class="form-text" id="rm_codeHint"></div>
             </div>
-          </div>
-          <div id="rm_packageSection" style="display:none;">
-            <div class="mb-3">
-              <label class="form-label">Package <span class="text-danger">*</span></label>
-              <?php if (count($binaryPackages ?? []) === 1): ?>
-                <?php $mp = ($binaryPackages ?? [])[0]; ?>
-                <input type="hidden" name="package_id" id="rm_packageId" value="<?= (int)$mp['id'] ?>">
-                <div class="card border-primary"><div class="card-body"><div class="fw-bold text-primary"><?= e($mp['name']) ?></div><div style="font-size:.8rem;color:var(--muted);">Entry: <?= fmt_money((float)$mp['entry_fee']) ?> · Pair volume: <?= fmt_money((float)$mp['pairing_bonus']) ?> · Cap: <?= fmt_money((float)$mp['daily_pair_cap'] * (float)$mp['pairing_bonus']) ?>/day</div></div></div>
-                <div class="form-text text-success">✓ Package auto-selected.</div>
-              <?php else: ?>
-                <select class="form-select" id="rm_packageSelect" name="package_id">
-                  <option value="">Select a package…</option>
-                  <?php foreach ($binaryPackages ?? [] as $pkg): ?>
-                    <option value="<?= (int)$pkg['id'] ?>" data-name="<?= e($pkg['name']) ?>" data-fee="<?= fmt_money((float)$pkg['entry_fee']) ?>" data-bonus="<?= fmt_money((float)$pkg['pairing_bonus']) ?>" data-cap="<?= (int)$pkg['daily_pair_cap'] ?>" data-pairing="<?= (int)($pkg['pairing_enabled'] ?? 1) === 1 ? '1' : '0' ?>"><?= e($pkg['name']) ?> — <?= fmt_money((float)$pkg['entry_fee']) ?></option>
-                  <?php endforeach; ?>
-                </select>
-                <div class="form-text" id="rm_packageHint"></div>
-                <div id="rm_packageCard" class="code-verified d-none mt-2"><span style="font-size:1.2rem;">📦</span><div><div class="fw-bold" id="rm_pkgCardName"></div><div style="font-size:.75rem;margin-top:2px;" id="rm_pkgCardDetails"></div></div></div>
-              <?php endif; ?>
-            </div>
-          </div>
-          <div id="rm_packageInfo" class="code-verified d-none"><span style="font-size:1.2rem;">✅</span><div><div class="fw-bold" id="rm_pkgName"></div><div style="font-size:.75rem;margin-top:2px;" id="rm_pkgDetails"></div></div></div>
-
-          <div id="rm_binarySection">
-            <?php if ($pairingEnabled && setting('free_registration_enabled', '1') === '1'): ?>
-            <div class="mb-3">
-              <label class="form-label">Binary Placement</label>
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="rm_hasBinary" name="has_binary" value="1" checked>
-                <label class="form-check-label" for="rm_hasBinary">Has Binary</label>
-              </div>
-              <div class="form-text" id="rm_hasBinaryHint">Toggle ON to connect the member to the binary network now. Toggle OFF to defer the binary connection until the member activates.</div>
-            </div>
-            <?php else: ?>
-            <input type="hidden" name="has_binary" value="1">
-            <?php endif; ?>
-            <div id="rm_binaryModeSection" style="display:none;" class="mb-3">
-              <label class="form-label">Binary Connection</label>
-              <div class="position-toggle" style="grid-template-columns:1fr 1fr;">
-                <div class="position-option"><input type="radio" id="rm_mode_auto" name="binary_mode" value="auto" checked><label class="position-label" for="rm_mode_auto">✨ Auto</label></div>
-                <div class="position-option"><input type="radio" id="rm_mode_manual" name="binary_mode" value="manual"><label class="position-label" for="rm_mode_manual">🖐 Manual</label></div>
-              </div>
-              <p class="form-text" id="rm_autoPreviewHint">Auto places the new member at the best available position in the network.</p>
-            </div>
-            <div id="rm_manualSection">
-              <div class="slot-status" style="margin-bottom:1rem;">
-                <span>↙ Upline: <strong id="rm_upline_display">—</strong></span>
-                <span>Position: <strong id="rm_position_display">—</strong></span>
-              </div>
-              <div style="font-size:.78rem;color:var(--muted);margin-bottom:1rem;">Sponsor: <strong id="rm_sponsor_display">—</strong></div>
-
-              <!-- Position Selection -->
+            <div id="rm_codeSection">
               <div class="mb-3">
-                <label class="form-label">Binary Position <span class="text-danger">*</span></label>
+                <label class="form-label">Registration Code <span class="text-danger">*</span></label>
+                <div class="input-group">
+                  <input type="text" id="rm_reg_code" name="reg_code" class="form-control font-mono" placeholder="XXXX-XXXX-XXXX" maxlength="18" style="text-transform:uppercase;letter-spacing:2px;font-size:1rem;" required>
+                  <button type="button" class="btn btn-outline-primary" id="rm_validateCodeBtn">Validate</button>
+                </div>
+                <div class="form-text" id="rm_codeHint"></div>
+              </div>
+            </div>
+            <div id="rm_packageSection" style="display:none;">
+              <div class="mb-3">
+                <label class="form-label">Package <span class="text-danger">*</span></label>
+                <?php if (count($binaryPackages ?? []) === 1): ?>
+                  <?php $mp = ($binaryPackages ?? [])[0]; ?>
+                  <input type="hidden" name="package_id" id="rm_packageId" value="<?= (int)$mp['id'] ?>">
+                  <div class="card border-primary">
+                    <div class="card-body">
+                      <div class="fw-bold text-primary"><?= e($mp['name']) ?></div>
+                      <div style="font-size:.8rem;color:var(--muted);">Entry: <?= fmt_money((float)$mp['entry_fee']) ?> · Pair volume: <?= fmt_money((float)$mp['pairing_bonus']) ?> · Cap: <?= fmt_money((float)$mp['daily_pair_cap'] * (float)$mp['pairing_bonus']) ?>/day</div>
+                    </div>
+                  </div>
+                  <div class="form-text text-success">✓ Package auto-selected.</div>
+                <?php else: ?>
+                  <select class="form-select" id="rm_packageSelect" name="package_id">
+                    <option value="">Select a package…</option>
+                    <?php foreach ($binaryPackages ?? [] as $pkg): ?>
+                      <option value="<?= (int)$pkg['id'] ?>" data-name="<?= e($pkg['name']) ?>" data-fee="<?= fmt_money((float)$pkg['entry_fee']) ?>" data-bonus="<?= fmt_money((float)$pkg['pairing_bonus']) ?>" data-cap="<?= (int)$pkg['daily_pair_cap'] ?>" data-pairing="<?= (int)($pkg['pairing_enabled'] ?? 1) === 1 ? '1' : '0' ?>"><?= e($pkg['name']) ?> — <?= fmt_money((float)$pkg['entry_fee']) ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                  <div class="form-text" id="rm_packageHint"></div>
+                  <div id="rm_packageCard" class="code-verified d-none mt-2"><span style="font-size:1.2rem;">📦</span>
+                    <div>
+                      <div class="fw-bold" id="rm_pkgCardName"></div>
+                      <div style="font-size:.75rem;margin-top:2px;" id="rm_pkgCardDetails"></div>
+                    </div>
+                  </div>
+                <?php endif; ?>
+              </div>
+            </div>
+            <div id="rm_packageInfo" class="code-verified d-none"><span style="font-size:1.2rem;">✅</span>
+              <div>
+                <div class="fw-bold" id="rm_pkgName"></div>
+                <div style="font-size:.75rem;margin-top:2px;" id="rm_pkgDetails"></div>
+              </div>
+            </div>
+
+            <div id="rm_binarySection">
+              <?php if ($pairingEnabled && setting('free_registration_enabled', '1') === '1'): ?>
+                <div class="mb-3">
+                  <label class="form-label">Binary Placement</label>
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="rm_hasBinary" name="has_binary" value="1" checked>
+                    <label class="form-check-label" for="rm_hasBinary">Has Binary</label>
+                  </div>
+                  <div class="form-text" id="rm_hasBinaryHint">Toggle ON to connect the member to the binary network now. Toggle OFF to defer the binary connection until the member activates.</div>
+                </div>
+              <?php else: ?>
+                <input type="hidden" name="has_binary" value="1">
+              <?php endif; ?>
+              <div id="rm_binaryModeSection" style="display:none;" class="mb-3">
+                <label class="form-label">Binary Connection</label>
                 <div class="position-toggle" style="grid-template-columns:1fr 1fr;">
-                  <div class="position-option"><input type="radio" id="rm_pos_left" name="binary_position_radio" value="left" required><label class="position-label" id="rm_pos_label_left" for="rm_pos_left">↙ Left</label></div>
-                  <div class="position-option"><input type="radio" id="rm_pos_right" name="binary_position_radio" value="right"><label class="position-label" id="rm_pos_label_right" for="rm_pos_right">↘ Right</label></div>
+                  <div class="position-option"><input type="radio" id="rm_mode_auto" name="binary_mode" value="auto" checked><label class="position-label" for="rm_mode_auto">✨ Auto</label></div>
+                  <div class="position-option"><input type="radio" id="rm_mode_manual" name="binary_mode" value="manual"><label class="position-label" for="rm_mode_manual">🖐 Manual</label></div>
+                </div>
+                <p class="form-text" id="rm_autoPreviewHint">Auto places the new member at the best available position in the network.</p>
+              </div>
+              <div id="rm_manualSection">
+                <div class="slot-status" style="margin-bottom:1rem;">
+                  <span>↙ Upline: <strong id="rm_upline_display">—</strong></span>
+                  <span>Position: <strong id="rm_position_display">—</strong></span>
+                </div>
+                <div style="font-size:.78rem;color:var(--muted);margin-bottom:1rem;">Sponsor: <strong id="rm_sponsor_display">—</strong></div>
+
+                <!-- Position Selection -->
+                <div class="mb-3">
+                  <label class="form-label">Binary Position <span class="text-danger">*</span></label>
+                  <div class="position-toggle" style="grid-template-columns:1fr 1fr;">
+                    <div class="position-option"><input type="radio" id="rm_pos_left" name="binary_position_radio" value="left" required><label class="position-label" id="rm_pos_label_left" for="rm_pos_left">↙ Left</label></div>
+                    <div class="position-option"><input type="radio" id="rm_pos_right" name="binary_position_radio" value="right"><label class="position-label" id="rm_pos_label_right" for="rm_pos_right">↘ Right</label></div>
+                  </div>
                 </div>
               </div>
             </div>
+
+            <button type="button" class="btn btn-primary w-100 btn-lg" id="rm_toStep2Btn" disabled>Continue →</button>
           </div>
 
-          <button type="button" class="btn btn-primary w-100 btn-lg" id="rm_toStep2Btn" disabled>Continue →</button>
-        </div>
-
-        <!-- STEP 2 -->
-        <div class="auth-body" id="rm_step2" style="display:none;">
-          <div id="rm_referralAlert" class="alert alert-info py-2 mb-3" style="font-size:.85rem;display:none;">🔗 No payment is required now — the member can activate their account later with a registration code or e-wallet.</div>
-          <div class="mb-3">
-            <label class="form-label">Username <span class="text-danger">*</span></label>
-            <input type="text" id="rm_username" name="username" class="form-control" placeholder="3–40 chars, letters/numbers/_" minlength="3" maxlength="40" autocomplete="off" required>
-            <div class="form-text" id="rm_usernameHint"></div>
-          </div>
-          <div class="row g-3 mb-3">
-            <div class="col-md-6">
-              <label class="form-label">Password <span class="text-danger">*</span></label>
-              <div class="input-group">
-                <input type="password" id="rm_password" name="password" class="form-control" placeholder="Min. 8 characters" minlength="8" required>
-                <button type="button" class="btn btn-outline-secondary" onclick="rmTogglePw('rm_password',this)">👁</button>
+          <!-- STEP 2 -->
+          <div class="auth-body" id="rm_step2" style="display:none;">
+            <div id="rm_referralAlert" class="alert alert-info py-2 mb-3" style="font-size:.85rem;display:none;">🔗 No payment is required now — the member can activate their account later with a registration code or e-wallet.</div>
+            <div class="mb-3">
+              <label class="form-label">Username <span class="text-danger">*</span></label>
+              <input type="text" id="rm_username" name="username" class="form-control" placeholder="3–40 chars, letters/numbers/_" minlength="3" maxlength="40" autocomplete="off" required>
+              <div class="form-text" id="rm_usernameHint"></div>
+            </div>
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label">Password <span class="text-danger">*</span></label>
+                <div class="input-group">
+                  <input type="password" id="rm_password" name="password" class="form-control" placeholder="Min. 8 characters" minlength="8" required>
+                  <button type="button" class="btn btn-outline-secondary" onclick="rmTogglePw('rm_password',this)">👁</button>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Confirm Password <span class="text-danger">*</span></label>
+                <div class="input-group">
+                  <input type="password" id="rm_password_confirm" name="password_confirm" class="form-control" placeholder="Repeat password" required>
+                  <button type="button" class="btn btn-outline-secondary" onclick="rmTogglePw('rm_password_confirm',this)">👁</button>
+                </div>
+                <div class="form-text" id="rm_pwMatchHint"></div>
               </div>
             </div>
-            <div class="col-md-6">
-              <label class="form-label">Confirm Password <span class="text-danger">*</span></label>
-              <div class="input-group">
-                <input type="password" id="rm_password_confirm" name="password_confirm" class="form-control" placeholder="Repeat password" required>
-                <button type="button" class="btn btn-outline-secondary" onclick="rmTogglePw('rm_password_confirm',this)">👁</button>
-              </div>
-              <div class="form-text" id="rm_pwMatchHint"></div>
+            <div class="mb-3">
+              <label class="form-label">Sponsor Username <span class="text-danger">*</span></label>
+              <input type="text" id="rm_sponsorInput" class="form-control" placeholder="Sponsor's username" autocomplete="off" required>
+              <div class="form-text" id="rm_sponsorHint"></div>
+            </div>
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-outline-secondary" onclick="regGoStep(1)">← Back</button>
+              <button type="button" class="btn btn-primary flex-grow-1" id="rm_toStep3Btn">Review →</button>
             </div>
           </div>
-          <div class="mb-3">
-            <label class="form-label">Sponsor Username <span class="text-danger">*</span></label>
-            <input type="text" id="rm_sponsorInput" class="form-control" placeholder="Sponsor's username" autocomplete="off" required>
-            <div class="form-text" id="rm_sponsorHint"></div>
-          </div>
-          <div class="d-flex gap-2">
-            <button type="button" class="btn btn-outline-secondary" onclick="regGoStep(1)">← Back</button>
-            <button type="button" class="btn btn-primary flex-grow-1" id="rm_toStep3Btn">Review →</button>
-          </div>
-        </div>
 
-        <!-- STEP 3 -->
-        <div class="auth-body" id="rm_step3" style="display:none;">
-          <p class="text-muted mb-3" style="font-size:.85rem;">Review before completing registration.</p>
-          <div class="card mb-3">
-            <div class="card-header"><span class="card-title">📋 Registration Summary</span></div>
-            <div class="card-body">
-              <table class="info-table">
-                <tr id="rm_revFreeRow" style="display:none;"><td>Activation</td><td><span class="badge bg-warning text-dark">Pending</span></td></tr>
-                <tr id="rm_revPayRow"><td>Payment</td><td id="rm_rev_payment">—</td></tr>
-                <tr id="rm_revCodeRow"><td>Code</td><td><span class="reg-code" id="rm_rev_code">—</span></td></tr>
-                <tr id="rm_revPkgRow"><td>Package</td><td id="rm_rev_package">—</td></tr>
-                <tr><td>Username</td><td id="rm_rev_username" class="fw-bold">—</td></tr>
-                <tr><td>Sponsor</td><td id="rm_rev_sponsor">—</td></tr>
-                <tr id="rm_rev_uplineRow"><td>Upline</td><td id="rm_rev_upline">—</td></tr>
-                <tr id="rm_rev_positionRow"><td>Position</td><td id="rm_rev_position">—</td></tr>
-              </table>
+          <!-- STEP 3 -->
+          <div class="auth-body" id="rm_step3" style="display:none;">
+            <p class="text-muted mb-3" style="font-size:.85rem;">Review before completing registration.</p>
+            <div class="card mb-3">
+              <div class="card-header"><span class="card-title">📋 Registration Summary</span></div>
+              <div class="card-body">
+                <table class="info-table">
+                  <tr id="rm_revFreeRow" style="display:none;">
+                    <td>Activation</td>
+                    <td><span class="badge bg-warning text-dark">Pending</span></td>
+                  </tr>
+                  <tr id="rm_revPayRow">
+                    <td>Payment</td>
+                    <td id="rm_rev_payment">—</td>
+                  </tr>
+                  <tr id="rm_revCodeRow">
+                    <td>Code</td>
+                    <td><span class="reg-code" id="rm_rev_code">—</span></td>
+                  </tr>
+                  <tr id="rm_revPkgRow">
+                    <td>Package</td>
+                    <td id="rm_rev_package">—</td>
+                  </tr>
+                  <tr>
+                    <td>Username</td>
+                    <td id="rm_rev_username" class="fw-bold">—</td>
+                  </tr>
+                  <tr>
+                    <td>Sponsor</td>
+                    <td id="rm_rev_sponsor">—</td>
+                  </tr>
+                  <tr id="rm_rev_uplineRow">
+                    <td>Upline</td>
+                    <td id="rm_rev_upline">—</td>
+                  </tr>
+                  <tr id="rm_rev_positionRow">
+                    <td>Position</td>
+                    <td id="rm_rev_position">—</td>
+                  </tr>
+                </table>
+              </div>
+            </div>
+            <div class="alert alert-warning py-2 mb-3" style="font-size:.8rem;">⚠️ Binary position cannot be changed after registration.</div>
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-outline-secondary" onclick="regGoStep(2)">← Back</button>
+              <button type="submit" class="btn btn-primary flex-grow-1 btn-lg" id="rm_submitBtn">✓ Complete Registration</button>
             </div>
           </div>
-          <div class="alert alert-warning py-2 mb-3" style="font-size:.8rem;">⚠️ Binary position cannot be changed after registration.</div>
-          <div class="d-flex gap-2">
-            <button type="button" class="btn btn-outline-secondary" onclick="regGoStep(2)">← Back</button>
-            <button type="submit" class="btn btn-primary flex-grow-1 btn-lg" id="rm_submitBtn">✓ Complete Registration</button>
-          </div>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
   </div>
-</div>
 <?php endif; ?>
 
 <?php require 'views/partials/footer.php'; ?>
