@@ -313,7 +313,7 @@ if (!$isLoggedIn && !$prefillSponsor) {
                       <?= $lockSponsor ? 'readonly' : 'autocomplete="off"' ?> required>
                     <div class="form-text" id="sponsorHint"></div>
                   </div>
-                  <?php if ($isLoggedIn && !$isReferralMode && ($registrarHasBinary ?? false)): ?>
+                  <?php if ($isLoggedIn && !$isReferralMode && ($registrarHasBinary ?? false) && $freeEnabled): ?>
                   <div id="hasBinaryRow" class="mb-3">
                     <label class="form-label">Binary Placement</label>
                     <div class="form-check form-switch">
@@ -504,6 +504,9 @@ if (!$isLoggedIn && !$prefillSponsor) {
       if (left) left.checked = false;
       if (right) right.checked = false;
       setHint('uplineHint', 'Not required for this package.', null);
+    } else if (left && right && !left.checked && !right.checked) {
+      const target = !left.disabled ? left : right;
+      if (!left.disabled || !right.disabled) { target.checked = true; checkPos(target.value); }
     }
   }
 

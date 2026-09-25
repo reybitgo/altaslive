@@ -997,7 +997,7 @@
   const CURRENT_USER='<?= e($user["username"]) ?>';
   const REGISTRAR_HAS_BINARY=<?= $pairingEnabled ? 'true' : 'false' ?>;
   const RM_FREE_ENABLED=<?= setting('free_registration_enabled', '1') === '1' ? 'true' : 'false' ?>;
-  let rmBinaryMode='manual',rmAutoSuggestion=null,rmAutoActive=false;
+  let rmBinaryMode='manual',rmAutoSuggestion=null,rmAutoActive=false,rmUplineFree={left:false,right:false};
 
   function rmTogglePw(id,btn){const el=document.getElementById(id);el.type=el.type==='password'?'text':'password';btn.textContent=el.type==='password'?'👁':'🙈';}
 
@@ -1007,6 +1007,26 @@
     if(left)left.required=regBinaryEnabled;
     if(right)right.required=regBinaryEnabled;
     if(!regBinaryEnabled&&left&&right){left.checked=false;right.checked=false;document.getElementById('rm_binary_position').value='';document.getElementById('rm_position_display').textContent='N/A';}
+    else if(regBinaryEnabled&&!document.getElementById('rm_binary_position').value){rmApplyDefaultPosition();}
+  }
+
+  function rmApplyDefaultPosition(){
+    const left=document.getElementById('rm_pos_left'),right=document.getElementById('rm_pos_right');
+    const pos=document.getElementById('rm_binary_position'),disp=document.getElementById('rm_position_display');
+    if(!left||!right||!pos||!disp)return;
+    const lL=document.getElementById('rm_pos_label_left'),rL=document.getElementById('rm_pos_label_right');
+    left.disabled=false;right.disabled=false;
+    if(lL)lL.classList.remove('opacity-50');
+    if(rL)rL.classList.remove('opacity-50');
+    if(!rmUplineFree.left){
+      pos.value='left';left.checked=true;disp.textContent='Left';
+      if(rmUplineFree.right){right.disabled=true;if(rL)rL.classList.add('opacity-50');}
+    }else if(!rmUplineFree.right){
+      pos.value='right';right.checked=true;disp.textContent='Right';
+      left.disabled=true;if(lL)lL.classList.add('opacity-50');
+    }else{
+      pos.value='';left.checked=false;right.checked=false;disp.textContent='N/A';
+    }
   }
 
   function rmCurrentPairing(){
@@ -1116,22 +1136,8 @@
     document.getElementById('rm_pos_label_left').classList.remove('opacity-50');
     document.getElementById('rm_pos_label_right').classList.remove('opacity-50');
 
-    const hasLeft=data.left!=null, hasRight=data.right!=null;
-    if(!hasLeft){
-      document.getElementById('rm_binary_position').value='left';
-      document.getElementById('rm_pos_left').checked=true;
-      document.getElementById('rm_position_display').textContent='Left';
-      if(hasRight){
-        document.getElementById('rm_pos_right').disabled=true;
-        document.getElementById('rm_pos_label_right').classList.add('opacity-50');
-      }
-    }else if(!hasRight){
-      document.getElementById('rm_binary_position').value='right';
-      document.getElementById('rm_pos_right').checked=true;
-      document.getElementById('rm_pos_left').disabled=true;
-      document.getElementById('rm_position_display').textContent='Right';
-      document.getElementById('rm_pos_label_left').classList.add('opacity-50');
-    }
+    rmUplineFree={left:data.left!=null,right:data.right!=null};
+    rmApplyDefaultPosition();
     regGoStep(1);
     rmApplyBinary();
     new bootstrap.Modal(modal).show();
@@ -1387,7 +1393,7 @@ document.querySelectorAll('[name="payment_method"]').forEach(r=>{
           <div id="rm_packageInfo" class="code-verified d-none"><span style="font-size:1.2rem;">✅</span><div><div class="fw-bold" id="rm_pkgName"></div><div style="font-size:.75rem;margin-top:2px;" id="rm_pkgDetails"></div></div></div>
 
           <div id="rm_binarySection">
-            <?php if ($pairingEnabled): ?>
+            <?php if ($pairingEnabled && setting('free_registration_enabled', '1') === '1'): ?>
             <div class="mb-3">
               <label class="form-label">Binary Placement</label>
               <div class="form-check form-switch">
@@ -1396,6 +1402,8 @@ document.querySelectorAll('[name="payment_method"]').forEach(r=>{
               </div>
               <div class="form-text" id="rm_hasBinaryHint">Toggle ON to connect the member to the binary network now. Toggle OFF to defer the binary connection until the member activates.</div>
             </div>
+            <?php else: ?>
+            <input type="hidden" name="has_binary" value="1">
             <?php endif; ?>
             <div id="rm_binaryModeSection" style="display:none;" class="mb-3">
               <label class="form-label">Binary Connection</label>
