@@ -22,36 +22,36 @@ $packageData = array_map(fn($pkg) => [
 ?>
 <div class="main-content">
   <?php require 'views/partials/topbar.php'; ?>
-  <div class="page-content upgrade-page">
+  <div class="page-content">
     <?= render_flash() ?>
 
-    <header class="upgrade-page-header">
+    <header class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
       <div>
-        <div class="upgrade-eyebrow">Membership</div>
-        <h1>Upgrade package</h1>
-        <p>Move to a higher package and pay only the difference in entry fee.</p>
+        <div class="stat-label mb-1">Membership</div>
+        <h4 class="fw-800 mb-1">Upgrade package</h4>
+        <p class="text-muted mb-0" style="font-size:.8rem;">Move to a higher package and pay only the difference in entry fee.</p>
       </div>
-      <a href="<?= link_to('dashboard') ?>" class="btn btn-light upgrade-back-button">
+      <a href="<?= link_to('dashboard') ?>" class="btn btn-outline-secondary btn-sm">
         <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
         Back to dashboard
       </a>
     </header>
 
-    <section class="card upgrade-current-card mb-3" aria-labelledby="currentPackageTitle">
-      <div class="card-body">
-        <div class="upgrade-current-icon" aria-hidden="true">
+    <section class="card mb-3" aria-labelledby="currentPackageTitle">
+      <div class="card-body d-flex flex-wrap align-items-center gap-3">
+        <div class="stat-icon bg-primary-subtle mb-0" aria-hidden="true">
           <i class="fa-solid fa-layer-group"></i>
         </div>
-        <div class="upgrade-current-copy">
-          <div class="upgrade-section-label">Current package</div>
-          <h2 id="currentPackageTitle"><?= e($current['name'] ?? '—') ?></h2>
-          <div class="upgrade-current-meta">
-            <span>Entry fee <strong><?= fmt_money($curFee ?? 0) ?></strong></span>
-            <span class="upgrade-dot" aria-hidden="true"></span>
-            <span><?= $curPairing ? 'Binary network' : 'Non-binary package' ?></span>
+        <div class="flex-grow-1" style="min-width:0;">
+          <div class="stat-label mb-1">Current package</div>
+          <h5 class="fw-bold mb-1" id="currentPackageTitle"><?= e($current['name'] ?? '—') ?></h5>
+          <div class="text-muted" style="font-size:.75rem;">
+            Entry fee <strong class="font-mono text-dark"><?= fmt_money($curFee ?? 0) ?></strong>
+            <span class="mx-1">·</span>
+            <?= $curPairing ? 'Binary network' : 'Non-binary package' ?>
           </div>
         </div>
-        <span class="badge <?= $curPairing ? 'upgrade-badge-success' : 'upgrade-badge-neutral' ?>">
+        <span class="badge <?= $curPairing ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary' ?>">
           <i class="fa-solid <?= $curPairing ? 'fa-sitemap' : 'fa-user-group' ?>" aria-hidden="true"></i>
           <?= $curPairing ? 'Binary enabled' : 'Non-binary' ?>
         </span>
@@ -59,13 +59,15 @@ $packageData = array_map(fn($pkg) => [
     </section>
 
     <?php if (empty($targets)): ?>
-      <section class="card upgrade-empty-state">
-        <div class="card-body">
-          <div class="upgrade-empty-icon" aria-hidden="true">
+      <section class="card">
+        <div class="card-body text-center py-5">
+          <div class="stat-icon bg-secondary-subtle mx-auto" aria-hidden="true">
             <i class="fa-solid fa-check"></i>
           </div>
-          <h2>No compatible upgrades available</h2>
-          <p>You are currently on the highest compatible package, or no higher package is available right now.</p>
+          <h5 class="fw-bold">No compatible upgrades available</h5>
+          <p class="text-muted" style="font-size:.8rem;">
+            You are currently on the highest compatible package, or no higher package is available right now.
+          </p>
           <a href="<?= link_to('dashboard') ?>" class="btn btn-primary">
             <i class="fa-solid fa-house" aria-hidden="true"></i>
             Return to dashboard
@@ -75,68 +77,68 @@ $packageData = array_map(fn($pkg) => [
     <?php else: ?>
       <div class="row g-3 g-xxl-4 align-items-start">
         <div class="col-12 col-xxl-7">
-          <section class="card upgrade-panel" aria-labelledby="packageSelectionTitle">
-            <div class="card-header upgrade-card-header">
+          <section class="card" aria-labelledby="packageSelectionTitle">
+            <div class="card-header d-flex justify-content-between align-items-center gap-2">
               <div>
-                <h2 class="card-title" id="packageSelectionTitle">Choose an upgrade</h2>
-                <p>Select one package to continue.</p>
+                <h5 class="card-title" id="packageSelectionTitle">Choose an upgrade</h5>
+                <p class="text-muted mb-0" style="font-size:.73rem;">Select one package to continue.</p>
               </div>
-              <span class="upgrade-count-badge"><?= count($targets) ?> available</span>
+              <span class="badge bg-primary-subtle text-primary"><?= count($targets) ?> available</span>
             </div>
             <div class="card-body">
-              <div class="upgrade-info-banner">
-                <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+              <div class="alert alert-info d-flex gap-2 py-2 mb-3" style="font-size:.78rem;">
+                <i class="fa-solid fa-circle-info mt-1" aria-hidden="true"></i>
                 <span>Only packages that preserve your current Binary, Indirect Referral, and DFI benefits are shown.</span>
               </div>
 
-              <fieldset class="upgrade-fieldset">
+              <fieldset class="border-0 p-0 m-0">
                 <legend class="visually-hidden">Available upgrade packages</legend>
-                <div class="upgrade-option-list">
+                <div class="choice-card-grid" id="packageOptions">
                   <?php foreach ($targets as $pkg):
                     $pkgPlans = $pkg['plans'] ?? Package::plans((int)$pkg['id']);
                     $isSelected = (int)$pkg['id'] === $selectedPackageId;
                   ?>
-                    <label class="upgrade-option<?= $isSelected ? ' is-selected' : '' ?>"
+                    <label class="choice-card<?= $isSelected ? ' is-selected' : '' ?>"
                       data-id="<?= (int)$pkg['id'] ?>"
                       data-name="<?= e($pkg['name']) ?>"
                       data-entry="<?= (float)$pkg['entry_fee'] ?>"
                       data-diff="<?= (float)$pkg['diff'] ?>"
                       data-pairing="<?= !empty($pkgPlans['binary']) ? '1' : '0' ?>">
-                      <input class="upgrade-choice-input upgrade-package-radio" type="radio"
+                      <input class="choice-card__input" type="radio"
                         name="upgrade_pkg" value="<?= (int)$pkg['id'] ?>"
                         id="upg<?= (int)$pkg['id'] ?>" <?= $isSelected ? 'checked' : '' ?>>
-                      <span class="upgrade-radio-mark" aria-hidden="true"></span>
-                      <span class="upgrade-option-body">
-                        <span class="upgrade-option-heading">
-                          <span class="upgrade-package-name"><?= e($pkg['name']) ?></span>
-                          <span class="upgrade-entry-fee">Entry <?= fmt_money((float)$pkg['entry_fee']) ?></span>
+                      <span class="choice-card__mark" aria-hidden="true"></span>
+                      <span class="choice-card__body">
+                        <span class="d-flex flex-wrap justify-content-between align-items-baseline gap-2">
+                          <span class="choice-card__title"><?= e($pkg['name']) ?></span>
+                          <span class="text-muted" style="font-size:.72rem;">Entry <?= fmt_money((float)$pkg['entry_fee']) ?></span>
                         </span>
-                        <span class="upgrade-plan-badges">
-                          <span class="badge <?= !empty($pkgPlans['binary']) ? 'upgrade-badge-success' : 'upgrade-badge-neutral' ?>">
+                        <span class="d-flex flex-wrap gap-1 mt-1">
+                          <span class="badge <?= !empty($pkgPlans['binary']) ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary' ?>">
                             <?= !empty($pkgPlans['binary']) ? 'Binary' : 'Non-binary' ?>
                           </span>
                           <?php if (!empty($pkgPlans['indirect'])): ?>
-                            <span class="badge upgrade-badge-info">Indirect referral</span>
+                            <span class="badge bg-primary-subtle text-primary">Indirect referral</span>
                           <?php endif; ?>
                           <?php if (!empty($pkgPlans['dfi'])): ?>
-                            <span class="badge upgrade-badge-warning">DFI enabled</span>
+                            <span class="badge bg-warning-subtle text-warning">DFI enabled</span>
                           <?php endif; ?>
                         </span>
-                        <span class="upgrade-benefits">
+                        <span class="choice-card__meta mt-1">
                           <?php if (!empty($pkgPlans['binary'])): ?>
-                            <span><i class="fa-solid fa-link" aria-hidden="true"></i> Pair bonus <strong><?= fmt_money((float)$pkg['pairing_bonus']) ?></strong></span>
-                            <span><i class="fa-solid fa-chart-simple" aria-hidden="true"></i> Daily pair cap <strong><?= (int)$pkg['daily_pair_cap'] ?></strong></span>
+                            <span class="d-block"><i class="fa-solid fa-link" aria-hidden="true"></i> Pair bonus <strong class="font-mono text-dark"><?= fmt_money((float)$pkg['pairing_bonus']) ?></strong></span>
+                            <span class="d-block"><i class="fa-solid fa-chart-simple" aria-hidden="true"></i> Daily pair cap <strong class="font-mono text-dark"><?= (int)$pkg['daily_pair_cap'] ?></strong></span>
                           <?php endif; ?>
-                          <span><i class="fa-solid fa-user-plus" aria-hidden="true"></i> Direct bonus <strong><?= fmt_money((float)$pkg['direct_ref_bonus']) ?></strong></span>
+                          <span class="d-block"><i class="fa-solid fa-user-plus" aria-hidden="true"></i> Direct bonus <strong class="font-mono text-dark"><?= fmt_money((float)$pkg['direct_ref_bonus']) ?></strong></span>
                           <?php if (!empty($pkgPlans['dfi'])): ?>
-                            <span><i class="fa-solid fa-calendar-day" aria-hidden="true"></i> DFI <strong><?= fmt_money((float)$pkg['daily_fixed_income']) ?>/day</strong></span>
+                            <span class="d-block"><i class="fa-solid fa-calendar-day" aria-hidden="true"></i> DFI <strong class="font-mono text-dark"><?= fmt_money((float)$pkg['daily_fixed_income']) ?>/day</strong></span>
                           <?php endif; ?>
                         </span>
                       </span>
-                      <span class="upgrade-option-price">
-                        <span>Upgrade fee</span>
-                        <strong><?= fmt_money((float)$pkg['diff']) ?></strong>
-                        <small>Difference only</small>
+                      <span class="choice-card__aside">
+                        <span class="d-block stat-label">Upgrade fee</span>
+                        <strong class="font-mono text-dark" style="font-size:1.05rem;"><?= fmt_money((float)$pkg['diff']) ?></strong>
+                        <span class="d-block text-muted" style="font-size:.68rem;">Difference only</span>
                       </span>
                     </label>
                   <?php endforeach; ?>
@@ -145,157 +147,167 @@ $packageData = array_map(fn($pkg) => [
             </div>
           </section>
 
-          <section id="binaryPlacementCard" class="card upgrade-panel mt-3 d-none" aria-labelledby="binaryPlacementTitle" aria-hidden="true">
-            <div class="card-header upgrade-card-header">
+          <section id="binaryPlacementCard" class="card mt-3 d-none" aria-labelledby="binaryPlacementTitle" aria-hidden="true">
+            <div class="card-header d-flex justify-content-between align-items-center gap-2">
               <div>
-                <h2 class="card-title" id="binaryPlacementTitle">Binary placement</h2>
-                <p>Choose an available position in the network.</p>
+                <h5 class="card-title" id="binaryPlacementTitle">Binary placement</h5>
+                <p class="text-muted mb-0" style="font-size:.73rem;">Choose an available position in the network.</p>
               </div>
-              <span class="upgrade-step-badge">Required</span>
+              <span class="badge bg-warning-subtle text-warning">Required</span>
             </div>
             <div class="card-body">
-              <div class="upgrade-info-banner upgrade-info-banner-primary">
-                <i class="fa-solid fa-sitemap" aria-hidden="true"></i>
+              <div class="alert alert-primary d-flex gap-2 py-2 mb-3" style="font-size:.78rem;">
+                <i class="fa-solid fa-sitemap mt-1" aria-hidden="true"></i>
                 <span>This package joins the binary network. Select an active upline with an open position.</span>
               </div>
 
-              <div class="upgrade-form-section">
+              <div class="mb-3">
                 <label class="form-label" for="uplineSearch">Binary upline</label>
-                <div class="upgrade-search-wrap">
-                  <div class="upgrade-search-control">
-                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                <div class="combo">
+                  <div class="combo__control">
+                    <i class="fa-solid fa-magnifying-glass combo__icon" aria-hidden="true"></i>
                     <input type="text" id="uplineSearch" class="form-control"
                       placeholder="Type a member username" autocomplete="off"
                       autocapitalize="characters" spellcheck="false"
                       role="combobox" aria-autocomplete="list" aria-expanded="false"
                       aria-controls="uplineResults" aria-describedby="uplineStatus">
-                    <button type="button" class="upgrade-search-clear" id="clearUplineSearch"
+                    <button type="button" class="combo__clear" id="clearUplineSearch"
                       aria-label="Clear upline search" hidden>
                       <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                     </button>
                   </div>
-                  <div id="uplineResults" class="upgrade-upline-results" role="listbox" hidden></div>
+                  <div id="uplineResults" class="combo__listbox" role="listbox" hidden></div>
                 </div>
-                <div class="form-text upgrade-status" id="uplineStatus" role="status" aria-live="polite">Enter at least 2 characters to search.</div>
+                <div class="form-text" id="uplineStatus" role="status" aria-live="polite">Enter at least 2 characters to search.</div>
               </div>
 
-              <div class="upgrade-selected-upline" id="selectedUplineBox">
-                <div class="upgrade-selected-upline-icon" aria-hidden="true">
-                  <i class="fa-solid fa-user-group"></i>
+              <div class="card bg-light border-0 mb-3" id="selectedUplineBox">
+                <div class="card-body py-2 d-flex align-items-center gap-2">
+                  <div class="stat-icon bg-primary-subtle mb-0" style="width:36px;height:36px;font-size:1rem;" aria-hidden="true">
+                    <i class="fa-solid fa-user-group"></i>
+                  </div>
+                  <div class="flex-grow-1" style="min-width:0;">
+                    <strong class="d-block text-truncate" id="selectedUplineName">No upline selected</strong>
+                    <span class="text-muted d-block" style="font-size:.72rem;" id="selectedUplineMeta">Search and select an eligible member.</span>
+                  </div>
+                  <button type="button" class="btn btn-sm btn-outline-primary flex-shrink-0" id="clearUplineBtn" hidden>Change</button>
                 </div>
-                <div class="upgrade-selected-upline-copy">
-                  <strong id="selectedUplineName">No upline selected</strong>
-                  <span id="selectedUplineMeta">Search and select an eligible member.</span>
-                </div>
-                <button type="button" class="btn btn-sm btn-outline-primary" id="clearUplineBtn" hidden>Change</button>
               </div>
 
-              <fieldset class="upgrade-form-section mb-0">
+              <fieldset class="border-0 p-0 m-0">
                 <legend class="form-label">Binary position</legend>
-                <div class="upgrade-position-grid">
-                  <label class="upgrade-position-option" for="upg_pos_left">
-                    <input class="upgrade-choice-input upgrade-position-input" type="radio"
+                <div class="choice-card-grid choice-card-grid--2" id="positionOptions">
+                  <label class="choice-card is-disabled" id="positionLeftCard" for="upg_pos_left">
+                    <input class="choice-card__input" type="radio"
                       id="upg_pos_left" name="upg_binary_position" value="left" disabled>
-                    <span class="upgrade-radio-mark" aria-hidden="true"></span>
-                    <span class="upgrade-position-copy">
-                      <strong><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Left position</strong>
-                      <small id="upgLeftAvailability">Select an upline first</small>
+                    <span class="choice-card__mark" aria-hidden="true"></span>
+                    <span class="choice-card__body">
+                      <strong class="d-block" style="font-size:.85rem;"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Left position</strong>
+                      <small class="choice-card__meta d-block" id="upgLeftAvailability">Select an upline first</small>
                     </span>
                   </label>
-                  <label class="upgrade-position-option" for="upg_pos_right">
-                    <input class="upgrade-choice-input upgrade-position-input" type="radio"
+                  <label class="choice-card is-disabled" id="positionRightCard" for="upg_pos_right">
+                    <input class="choice-card__input" type="radio"
                       id="upg_pos_right" name="upg_binary_position" value="right" disabled>
-                    <span class="upgrade-radio-mark" aria-hidden="true"></span>
-                    <span class="upgrade-position-copy">
-                      <strong><i class="fa-solid fa-arrow-right" aria-hidden="true"></i> Right position</strong>
-                      <small id="upgRightAvailability">Select an upline first</small>
+                    <span class="choice-card__mark" aria-hidden="true"></span>
+                    <span class="choice-card__body">
+                      <strong class="d-block" style="font-size:.85rem;"><i class="fa-solid fa-arrow-right" aria-hidden="true"></i> Right position</strong>
+                      <small class="choice-card__meta d-block" id="upgRightAvailability">Select an upline first</small>
                     </span>
                   </label>
                 </div>
-                <div class="form-text upgrade-status" id="upgPosHint" role="status" aria-live="polite"></div>
+                <div class="form-text" id="upgPosHint" role="status" aria-live="polite"></div>
               </fieldset>
             </div>
           </section>
         </div>
 
         <div class="col-12 col-xxl-5">
-          <section class="card upgrade-panel" aria-labelledby="paymentTitle">
-            <div class="card-header upgrade-card-header">
+          <section class="card" aria-labelledby="paymentTitle">
+            <div class="card-header d-flex justify-content-between align-items-center gap-2">
               <div>
-                <h2 class="card-title" id="paymentTitle">Payment</h2>
-                <p>Review and confirm your upgrade.</p>
+                <h5 class="card-title" id="paymentTitle">Payment</h5>
+                <p class="text-muted mb-0" style="font-size:.73rem;">Review and confirm your upgrade.</p>
               </div>
-              <i class="fa-solid fa-credit-card upgrade-header-icon" aria-hidden="true"></i>
+              <i class="fa-solid fa-credit-card text-muted" aria-hidden="true"></i>
             </div>
             <div class="card-body">
-              <form method="POST" action="<?= link_to('do_upgrade') ?>" id="upgradeForm">
+              <form method="POST" action="<?= link_to('do_upgrade') ?>" id="upgradeForm" novalidate>
                 <?= csrf_field() ?>
                 <input type="hidden" name="package_id" id="upgPackageId" value="<?= $selectedPackageId ?>">
                 <input type="hidden" name="binary_upline_id" id="upgUplineId" value="<?= (int)($selectedUpline['id'] ?? 0) ?>">
                 <input type="hidden" name="binary_position" id="upgPosition" value="<?= e($selectedUplinePosition) ?>">
 
-                <div class="upgrade-selected-package">
-                  <div class="upgrade-selected-package-top">
-                    <span>Selected upgrade</span>
+                <div class="alert alert-primary py-2 mb-3">
+                  <div class="d-flex justify-content-between align-items-center gap-2" style="font-size:.72rem;">
+                    <span class="text-uppercase fw-bold">Selected upgrade</span>
                     <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
                   </div>
-                  <strong id="upgSelectedPackageName"><?= e($selectedTarget['name'] ?? '') ?></strong>
-                  <div class="upgrade-selected-package-meta">
-                    <span>New entry <b><?= fmt_money((float)($selectedTarget['entry_fee'] ?? 0)) ?></b></span>
+                  <strong class="d-block mt-1" id="upgSelectedPackageName"><?= e($selectedTarget['name'] ?? '') ?></strong>
+                  <div class="d-flex flex-wrap justify-content-between gap-2 mt-1" style="font-size:.75rem;">
+                    <span>New entry <b class="font-mono"><?= fmt_money((float)($selectedTarget['entry_fee'] ?? 0)) ?></b></span>
                     <span id="upgSelectedDifference">Fee <?= fmt_money((float)($selectedTarget['diff'] ?? 0)) ?></span>
                   </div>
                 </div>
 
-                <fieldset class="upgrade-form-section">
+                <fieldset class="border-0 p-0 m-0 mb-3">
                   <legend class="form-label">Payment method</legend>
-                  <div class="upgrade-payment-options">
-                    <label class="upgrade-payment-option" id="walletPaymentOption" for="pay_ewlg">
-                      <input class="upgrade-choice-input upgrade-payment-radio" type="radio"
+                  <div class="choice-card-grid" id="paymentOptions">
+                    <label class="choice-card" id="walletPaymentOption" for="pay_ewlg">
+                      <input class="choice-card__input" type="radio"
                         name="payment_method" id="pay_ewlg" value="ewallet" required>
-                      <span class="upgrade-radio-mark" aria-hidden="true"></span>
-                      <span class="upgrade-payment-icon" aria-hidden="true"><i class="fa-solid fa-wallet"></i></span>
-                      <span class="upgrade-payment-copy">
-                        <strong>E-Wallet</strong>
-                        <small>Available balance <b><?= fmt_money($balance) ?></b></small>
-                        <span class="upgrade-payment-status" id="walletPaymentStatus" role="status" aria-live="polite"></span>
+                      <span class="choice-card__mark" aria-hidden="true"></span>
+                      <span class="stat-icon bg-primary-subtle mb-0" style="width:36px;height:36px;font-size:1rem;" aria-hidden="true">
+                        <i class="fa-solid fa-wallet"></i>
+                      </span>
+                      <span class="choice-card__body">
+                        <strong class="d-block" style="font-size:.85rem;">E-Wallet</strong>
+                        <small class="choice-card__meta d-block">Available balance <b class="font-mono text-dark"><?= fmt_money($balance) ?></b></small>
+                        <span class="d-block mt-1" style="font-size:.72rem;" id="walletPaymentStatus" role="status" aria-live="polite"></span>
                       </span>
                     </label>
-                    <label class="upgrade-payment-option" for="pay_upcode">
-                      <input class="upgrade-choice-input upgrade-payment-radio" type="radio"
+                    <label class="choice-card" id="codePaymentOption" for="pay_upcode">
+                      <input class="choice-card__input" type="radio"
                         name="payment_method" id="pay_upcode" value="code" required>
-                      <span class="upgrade-radio-mark" aria-hidden="true"></span>
-                      <span class="upgrade-payment-icon" aria-hidden="true"><i class="fa-solid fa-ticket"></i></span>
-                      <span class="upgrade-payment-copy">
-                        <strong>Upgrade code</strong>
-                        <small>Use a code issued for the selected package.</small>
+                      <span class="choice-card__mark" aria-hidden="true"></span>
+                      <span class="stat-icon bg-primary-subtle mb-0" style="width:36px;height:36px;font-size:1rem;" aria-hidden="true">
+                        <i class="fa-solid fa-ticket"></i>
+                      </span>
+                      <span class="choice-card__body">
+                        <strong class="d-block" style="font-size:.85rem;">Upgrade code</strong>
+                        <small class="choice-card__meta d-block">Use a code issued for the selected package.</small>
                       </span>
                     </label>
                   </div>
-                  <div class="upgrade-payment-notice" id="paymentNotice" role="status" aria-live="polite" hidden></div>
+                  <div class="alert alert-warning py-2 mt-2 mb-0" style="font-size:.75rem;" id="paymentNotice" role="status" aria-live="polite" hidden></div>
                 </fieldset>
 
-                <div class="upgrade-cost-summary" role="group" aria-label="Upgrade cost summary">
-                  <div class="upgrade-cost-row">
-                    <span>Current entry fee</span>
-                    <strong><?= fmt_money($curFee ?? 0) ?></strong>
-                  </div>
-                  <div class="upgrade-cost-row">
-                    <span>New entry fee</span>
-                    <strong id="upgEntryFee"><?= fmt_money((float)($selectedTarget['entry_fee'] ?? 0)) ?></strong>
-                  </div>
-                  <div class="upgrade-cost-row upgrade-cost-total">
-                    <span>You pay</span>
-                    <strong id="upgFee"><?= fmt_money((float)($selectedTarget['diff'] ?? 0)) ?></strong>
-                  </div>
-                  <div class="upgrade-cost-row" id="walletRemainingRow">
-                    <span>Wallet after upgrade</span>
-                    <strong id="upgWalletRemaining">—</strong>
+                <div class="card bg-light border-0 mb-3">
+                  <div class="card-body py-2">
+                    <table class="info-table" role="group" aria-label="Upgrade cost summary">
+                      <tr>
+                        <td>Current entry fee</td>
+                        <td class="text-end fw-bold font-mono"><?= fmt_money($curFee ?? 0) ?></td>
+                      </tr>
+                      <tr>
+                        <td>New entry fee</td>
+                        <td class="text-end fw-bold font-mono" id="upgEntryFee"><?= fmt_money((float)($selectedTarget['entry_fee'] ?? 0)) ?></td>
+                      </tr>
+                      <tr>
+                        <td class="text-dark">You pay</td>
+                        <td class="text-end fw-bold font-mono text-success" id="upgFee" style="font-size:1rem;"><?= fmt_money((float)($selectedTarget['diff'] ?? 0)) ?></td>
+                      </tr>
+                      <tr id="walletRemainingRow">
+                        <td>Wallet after upgrade</td>
+                        <td class="text-end fw-bold font-mono" id="upgWalletRemaining">—</td>
+                      </tr>
+                    </table>
                   </div>
                 </div>
 
-                <div class="upgrade-form-section" id="codeInputSection" hidden>
+                <div class="mb-3" id="codeInputSection" hidden>
                   <label class="form-label" for="upgrade_code">Upgrade code</label>
-                  <div class="upgrade-code-control">
+                  <div class="input-group">
                     <input type="text" name="upgrade_code" id="upgrade_code" class="form-control font-mono"
                       placeholder="UP-XXXX-XXXX-XXXX" maxlength="17" autocomplete="off"
                       autocapitalize="characters" spellcheck="false" aria-describedby="codeHint">
@@ -304,15 +316,15 @@ $packageData = array_map(fn($pkg) => [
                       Validate
                     </button>
                   </div>
-                  <div class="form-text upgrade-status" id="codeHint" role="status" aria-live="polite">Enter a code for the selected package.</div>
+                  <div class="form-text" id="codeHint" role="status" aria-live="polite">Enter a code for the selected package.</div>
                 </div>
 
-                <button type="submit" class="btn btn-primary w-100 upgrade-submit" id="upgSubmitBtn" disabled>
+                <button type="submit" class="btn btn-primary w-100 py-3" id="upgSubmitBtn" disabled>
                   <i class="fa-solid fa-arrow-up-from-bracket" aria-hidden="true"></i>
                   Confirm upgrade
                 </button>
-                <div class="upgrade-block-hint" id="upgBlockHint" role="status" aria-live="polite"></div>
-                <p class="upgrade-fine-print">
+                <div class="form-text text-center mt-2" id="upgBlockHint" role="status" aria-live="polite"></div>
+                <p class="text-muted mt-2 mb-0 text-center" style="font-size:.7rem;line-height:1.5;">
                   Only the difference in entry fees is charged. Package downgrades are not allowed.
                 </p>
               </form>
@@ -343,8 +355,8 @@ $packageData = array_map(fn($pkg) => [
   const codeApi = <?= json_encode(link_to('api_validate_upgrade_code'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
   const csrfToken = <?= json_encode(csrf_token(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 
-  const packageInputs = Array.from(document.querySelectorAll('.upgrade-package-radio'));
-  const packageOptions = Array.from(document.querySelectorAll('.upgrade-option'));
+  const packageInputs = Array.from(document.querySelectorAll('#packageOptions .choice-card__input'));
+  const packageOptions = Array.from(document.querySelectorAll('#packageOptions .choice-card'));
   const packageIdInput = document.getElementById('upgPackageId');
   const selectedPackageName = document.getElementById('upgSelectedPackageName');
   const selectedDifference = document.getElementById('upgSelectedDifference');
@@ -373,7 +385,7 @@ $packageData = array_map(fn($pkg) => [
   const selectedUplineMeta = document.getElementById('selectedUplineMeta');
   const uplineIdInput = document.getElementById('upgUplineId');
   const positionInput = document.getElementById('upgPosition');
-  const positionInputs = Array.from(document.querySelectorAll('.upgrade-position-input'));
+  const positionInputs = Array.from(document.querySelectorAll('#positionOptions .choice-card__input'));
   const leftAvailability = document.getElementById('upgLeftAvailability');
   const rightAvailability = document.getElementById('upgRightAvailability');
   const positionHint = document.getElementById('upgPosHint');
@@ -407,8 +419,9 @@ $packageData = array_map(fn($pkg) => [
 
   const setHint = (element, message, state = '') => {
     element.textContent = message;
-    element.classList.remove('is-success', 'is-error');
-    if (state) element.classList.add(`is-${state}`);
+    element.classList.remove('text-success', 'text-danger');
+    if (state === 'success') element.classList.add('text-success');
+    else if (state === 'error') element.classList.add('text-danger');
   };
 
   const getPaymentMethod = () => codePaymentInput.checked ? 'code' : 'ewallet';
@@ -416,7 +429,7 @@ $packageData = array_map(fn($pkg) => [
   const updatePaymentClasses = () => {
     walletPaymentOption.classList.toggle('is-selected', walletInput.checked);
     walletPaymentOption.classList.toggle('is-disabled', walletInput.disabled);
-    document.getElementById('pay_upcode').closest('.upgrade-payment-option').classList.toggle('is-selected', codePaymentInput.checked);
+    document.getElementById('codePaymentOption').classList.toggle('is-selected', codePaymentInput.checked);
   };
 
   const updateWalletAvailability = (showNotice = false) => {
@@ -427,12 +440,12 @@ $packageData = array_map(fn($pkg) => [
 
     if (walletAvailable) {
       walletPaymentStatus.textContent = `Covers this upgrade with ${fmtMoney(walletBalance - fee)} remaining.`;
-      walletPaymentStatus.classList.remove('is-error');
-      walletPaymentStatus.classList.add('is-success');
+      walletPaymentStatus.classList.remove('text-danger');
+      walletPaymentStatus.classList.add('text-success');
     } else {
       walletPaymentStatus.textContent = `Short by ${fmtMoney(Math.max(0, fee - walletBalance))}.`;
-      walletPaymentStatus.classList.remove('is-success');
-      walletPaymentStatus.classList.add('is-error');
+      walletPaymentStatus.classList.remove('text-success');
+      walletPaymentStatus.classList.add('text-danger');
     }
 
     if (walletInput.checked && !walletAvailable) {
@@ -531,10 +544,10 @@ $packageData = array_map(fn($pkg) => [
     rightInput.disabled = !selectedUpline || !selectedUpline.right_free;
     leftAvailability.textContent = selectedUpline ? (selectedUpline.left_free ? 'Position is available' : 'Position is occupied') : 'Select an upline first';
     rightAvailability.textContent = selectedUpline ? (selectedUpline.right_free ? 'Position is available' : 'Position is occupied') : 'Select an upline first';
-    document.getElementById('upg_pos_left').closest('.upgrade-position-option').classList.toggle('is-disabled', leftInput.disabled);
-    document.getElementById('upg_pos_right').closest('.upgrade-position-option').classList.toggle('is-disabled', rightInput.disabled);
+    document.getElementById('positionLeftCard').classList.toggle('is-disabled', leftInput.disabled);
+    document.getElementById('positionRightCard').classList.toggle('is-disabled', rightInput.disabled);
     positionInputs.forEach(input => {
-      input.closest('.upgrade-position-option').classList.toggle('is-selected', input.checked);
+      input.closest('.choice-card').classList.toggle('is-selected', input.checked);
     });
   };
 
@@ -725,7 +738,7 @@ $packageData = array_map(fn($pkg) => [
     candidates.forEach(candidate => {
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = 'upgrade-upline-result';
+      button.className = 'combo__option';
       button.id = `uplineOption-${candidate.id}`;
       button.setAttribute('role', 'option');
       button.setAttribute('aria-selected', 'false');
@@ -846,7 +859,7 @@ $packageData = array_map(fn($pkg) => [
   });
 
   document.addEventListener('click', event => {
-    if (!event.target.closest('.upgrade-search-wrap')) closeUplineResults();
+    if (!event.target.closest('.combo')) closeUplineResults();
   });
 
   form.addEventListener('submit', event => {
@@ -873,13 +886,13 @@ $packageData = array_map(fn($pkg) => [
       placement = `@${selectedUpline.username} · ${selectedUplinePosition === 'left' ? 'Left' : 'Right'} position`;
     }
     const message = `
-      <div class="upgrade-confirm-summary">
-        <div><span>Current package</span><strong>${escapeHtml(currentPackageName)}</strong></div>
-        <div><span>New package</span><strong>${escapeHtml(currentPackage.name)}</strong></div>
-        <div><span>Amount</span><strong>${fmtMoney(currentPackage.diff)}</strong></div>
-        <div><span>Payment</span><strong>${method}</strong></div>
-        <div><span>Placement</span><strong>${escapeHtml(placement)}</strong></div>
-      </div>`;
+      <table class="info-table">
+        <tr><td>Current package</td><td><strong>${escapeHtml(currentPackageName)}</strong></td></tr>
+        <tr><td>New package</td><td><strong>${escapeHtml(currentPackage.name)}</strong></td></tr>
+        <tr><td>Amount</td><td><strong class="text-success font-mono">${fmtMoney(currentPackage.diff)}</strong></td></tr>
+        <tr><td>Payment</td><td><strong>${escapeHtml(method)}</strong></td></tr>
+        <tr><td>Placement</td><td><strong>${escapeHtml(placement)}</strong></td></tr>
+      </table>`;
 
     if (typeof showConfirm !== 'function') {
       submitButton.disabled = true;
@@ -918,903 +931,5 @@ $packageData = array_map(fn($pkg) => [
 })();
 </script>
 <?php endif; ?>
-
-<style>
-.upgrade-page {
-  max-width: 1480px;
-  margin: 0 auto;
-}
-.upgrade-page-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-.upgrade-page-header h1 {
-  margin: 0.15rem 0 0.35rem;
-  font-size: clamp(1.45rem, 3vw, 2rem);
-  font-weight: 800;
-  letter-spacing: -0.035em;
-}
-.upgrade-page-header p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-.upgrade-eyebrow,
-.upgrade-section-label {
-  color: var(--primary);
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.upgrade-back-button {
-  flex-shrink: 0;
-  border: 1px solid var(--bs-border-color);
-  color: #475569;
-}
-.upgrade-back-button:hover {
-  color: var(--primary);
-  border-color: rgba(59, 111, 240, 0.35);
-  background: var(--primary-light);
-}
-.upgrade-current-card {
-  border-color: rgba(59, 111, 240, 0.18);
-  background: linear-gradient(135deg, #fff 0%, #f7faff 100%);
-}
-.upgrade-current-card .card-body {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 1rem;
-  padding: 1.15rem 1.25rem;
-}
-.upgrade-current-icon {
-  width: 52px;
-  height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.9rem;
-  color: #fff;
-  background: linear-gradient(135deg, var(--primary), #6b93f7);
-  box-shadow: 0 8px 18px rgba(59, 111, 240, 0.2);
-  font-size: 1.2rem;
-}
-.upgrade-current-copy {
-  min-width: 0;
-}
-.upgrade-current-copy h2 {
-  margin: 0.15rem 0 0.2rem;
-  font-size: 1.15rem;
-  font-weight: 800;
-  overflow-wrap: anywhere;
-}
-.upgrade-current-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-.upgrade-current-meta strong {
-  color: #334155;
-  font-family: var(--font-mono);
-}
-.upgrade-dot {
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: #94a3b8;
-}
-.upgrade-badge-success,
-.upgrade-badge-neutral,
-.upgrade-badge-info,
-.upgrade-badge-warning {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.4rem 0.6rem;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-.upgrade-badge-success {
-  color: #087443;
-  background: #eafaf2;
-  border: 1px solid #bcebcf;
-}
-.upgrade-badge-neutral {
-  color: #526175;
-  background: #f1f5f9;
-  border: 1px solid #dce3ec;
-}
-.upgrade-badge-info {
-  color: #0e7490;
-  background: #ecfeff;
-  border: 1px solid #a5f3fc;
-}
-.upgrade-badge-warning {
-  color: #b45309;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-}
-.upgrade-empty-state .card-body {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: clamp(2.5rem, 7vw, 5rem) 1.25rem;
-  text-align: center;
-}
-.upgrade-empty-icon {
-  width: 68px;
-  height: 68px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 1rem;
-  border-radius: 50%;
-  color: var(--success);
-  background: #eafaf2;
-  font-size: 1.75rem;
-}
-.upgrade-empty-state h2 {
-  margin-bottom: 0.5rem;
-  font-size: 1.25rem;
-  font-weight: 800;
-}
-.upgrade-empty-state p {
-  max-width: 520px;
-  margin-bottom: 1.25rem;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-.upgrade-panel {
-  overflow: visible;
-}
-.upgrade-panel .card-body {
-  padding: 1.15rem;
-}
-.upgrade-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  min-height: 68px;
-  padding: 0.9rem 1.15rem;
-}
-.upgrade-card-header h2 {
-  font-size: 0.95rem;
-}
-.upgrade-card-header p {
-  margin: 0.2rem 0 0;
-  color: var(--muted);
-  font-size: 0.76rem;
-}
-.upgrade-count-badge,
-.upgrade-step-badge {
-  flex-shrink: 0;
-  padding: 0.35rem 0.6rem;
-  border-radius: 999px;
-  color: var(--primary);
-  background: var(--primary-light);
-  font-size: 0.7rem;
-  font-weight: 700;
-}
-.upgrade-step-badge {
-  color: #b45309;
-  background: #fffbeb;
-}
-.upgrade-header-icon {
-  color: var(--primary);
-  font-size: 1.1rem;
-}
-.upgrade-info-banner {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.65rem;
-  margin-bottom: 1rem;
-  padding: 0.75rem 0.85rem;
-  border: 1px solid #dbe6f7;
-  border-radius: 0.75rem;
-  color: #526175;
-  background: #f7faff;
-  font-size: 0.78rem;
-  line-height: 1.5;
-}
-.upgrade-info-banner i {
-  margin-top: 0.1rem;
-  color: var(--primary);
-}
-.upgrade-info-banner-primary {
-  color: #31517c;
-  background: #f3f7ff;
-  border-color: #c9dafc;
-}
-.upgrade-fieldset {
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-.upgrade-option-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-.upgrade-option,
-.upgrade-payment-option,
-.upgrade-position-option {
-  position: relative;
-  cursor: pointer;
-}
-.upgrade-option {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 0.8rem;
-  min-width: 0;
-  padding: 1rem;
-  border: 1.5px solid #dfe5ef;
-  border-radius: 0.85rem;
-  background: #fff;
-  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
-}
-.upgrade-option:hover {
-  border-color: #a9bce8;
-  background: #fbfcff;
-}
-.upgrade-option.is-selected {
-  border-color: var(--primary);
-  background: #f7faff;
-  box-shadow: 0 0 0 3px rgba(59, 111, 240, 0.09);
-}
-.upgrade-choice-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
-  opacity: 0;
-}
-.upgrade-radio-mark {
-  position: relative;
-  width: 20px;
-  height: 20px;
-  flex: 0 0 20px;
-  margin-top: 0.05rem;
-  border: 2px solid #b7c2d3;
-  border-radius: 50%;
-  background: #fff;
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-.upgrade-radio-mark::after {
-  content: '';
-  position: absolute;
-  inset: 4px;
-  border-radius: 50%;
-  background: #fff;
-  transform: scale(0);
-  transition: transform 0.15s ease;
-}
-.upgrade-choice-input:checked + .upgrade-radio-mark {
-  border-color: var(--primary);
-  background: var(--primary);
-}
-.upgrade-choice-input:checked + .upgrade-radio-mark::after {
-  transform: scale(1);
-}
-.upgrade-choice-input:focus-visible + .upgrade-radio-mark {
-  outline: 3px solid rgba(59, 111, 240, 0.25);
-  outline-offset: 2px;
-}
-.upgrade-option-body {
-  min-width: 0;
-}
-.upgrade-option-heading {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 0.35rem 0.6rem;
-}
-.upgrade-package-name {
-  min-width: 0;
-  color: #172033;
-  font-size: 0.98rem;
-  font-weight: 800;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-}
-.upgrade-entry-fee {
-  color: var(--muted);
-  font-size: 0.72rem;
-}
-.upgrade-plan-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-top: 0.55rem;
-}
-.upgrade-benefits {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.45rem 0.75rem;
-  margin-top: 0.75rem;
-  color: #64748b;
-  font-size: 0.72rem;
-}
-.upgrade-benefits > span {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.upgrade-benefits i {
-  width: 14px;
-  margin-right: 0.2rem;
-  color: #7b8ba5;
-}
-.upgrade-benefits strong {
-  color: #334155;
-}
-.upgrade-option-price {
-  min-width: 112px;
-  padding-left: 0.8rem;
-  border-left: 1px solid #e4e9f1;
-  text-align: right;
-}
-.upgrade-option-price > span,
-.upgrade-option-price small {
-  display: block;
-  color: var(--muted);
-  font-size: 0.66rem;
-}
-.upgrade-option-price > span {
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.upgrade-option-price strong {
-  display: block;
-  margin: 0.2rem 0;
-  color: var(--success);
-  font-family: var(--font-mono);
-  font-size: 1rem;
-  overflow-wrap: anywhere;
-}
-.upgrade-form-section {
-  min-width: 0;
-  margin-bottom: 1rem;
-}
-.upgrade-form-section > .form-label {
-  font-size: 0.84rem;
-}
-.upgrade-search-wrap {
-  position: relative;
-  min-width: 0;
-}
-.upgrade-search-control {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.upgrade-search-control > i {
-  position: absolute;
-  left: 0.9rem;
-  z-index: 1;
-  color: #8290a6;
-  pointer-events: none;
-}
-.upgrade-search-control .form-control {
-  min-height: 48px;
-  padding-left: 2.6rem;
-  padding-right: 3rem;
-  font-size: 1rem;
-}
-.upgrade-search-clear {
-  position: absolute;
-  right: 0.3rem;
-  width: 40px;
-  height: 40px;
-  border: 0;
-  border-radius: 0.55rem;
-  color: #64748b;
-  background: transparent;
-}
-.upgrade-search-clear:hover {
-  color: var(--danger);
-  background: #fff1f2;
-}
-.upgrade-upline-results {
-  position: absolute;
-  z-index: 1020;
-  top: calc(100% + 0.35rem);
-  left: 0;
-  width: 100%;
-  max-height: 260px;
-  overflow-y: auto;
-  padding: 0.35rem;
-  border: 1px solid #dce3ee;
-  border-radius: 0.75rem;
-  background: #fff;
-  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.15);
-}
-.upgrade-upline-result {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  padding: 0.7rem 0.75rem;
-  border: 0;
-  border-radius: 0.55rem;
-  color: #334155;
-  background: #fff;
-  text-align: left;
-}
-.upgrade-upline-result:hover,
-.upgrade-upline-result.is-active {
-  color: #1e3a8a;
-  background: #eff6ff;
-}
-.upgrade-upline-result strong {
-  min-width: 0;
-  font-size: 0.84rem;
-  overflow-wrap: anywhere;
-}
-.upgrade-upline-result span,
-.upgrade-upline-empty {
-  min-width: 0;
-  color: var(--muted);
-  font-size: 0.72rem;
-  overflow-wrap: anywhere;
-}
-.upgrade-upline-empty {
-  padding: 0.8rem;
-  text-align: center;
-}
-.upgrade-selected-upline {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-  padding: 0.85rem;
-  border: 1px solid #dbe3ef;
-  border-radius: 0.75rem;
-  background: #f8fafd;
-}
-.upgrade-selected-upline-icon {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.65rem;
-  color: var(--primary);
-  background: #eaf1ff;
-}
-.upgrade-selected-upline-copy {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.upgrade-selected-upline-copy strong {
-  color: #26364d;
-  font-size: 0.84rem;
-  overflow-wrap: anywhere;
-}
-.upgrade-selected-upline-copy span {
-  color: var(--muted);
-  font-size: 0.7rem;
-  overflow-wrap: anywhere;
-}
-.upgrade-position-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.65rem;
-}
-.upgrade-position-option {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  min-height: 64px;
-  padding: 0.75rem;
-  border: 1.5px solid #dfe5ef;
-  border-radius: 0.75rem;
-  background: #fff;
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-.upgrade-position-option:hover:not(.is-disabled) {
-  border-color: #a9bce8;
-}
-.upgrade-position-option.is-selected,
-.upgrade-position-option:has(input:checked) {
-  border-color: var(--primary);
-  background: #f7faff;
-}
-.upgrade-position-option.is-disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-  background: #f8fafc;
-}
-.upgrade-position-copy {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-.upgrade-position-copy strong {
-  color: #334155;
-  font-size: 0.8rem;
-}
-.upgrade-position-copy small {
-  color: var(--muted);
-  font-size: 0.68rem;
-}
-.upgrade-selected-package {
-  padding: 1rem;
-  border: 1px solid rgba(59, 111, 240, 0.2);
-  border-radius: 0.85rem;
-  color: #fff;
-  background: linear-gradient(135deg, #2f61d7, #4c82f4);
-  box-shadow: 0 10px 24px rgba(59, 111, 240, 0.18);
-}
-.upgrade-selected-package-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.35rem;
-  color: rgba(255, 255, 255, 0.75);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-.upgrade-selected-package > strong {
-  display: block;
-  font-size: 1.12rem;
-  font-weight: 800;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
-.upgrade-selected-package-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 0.35rem 0.75rem;
-  margin-top: 0.5rem;
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 0.72rem;
-}
-.upgrade-selected-package-meta b {
-  color: #fff;
-  font-family: var(--font-mono);
-}
-.upgrade-payment-options {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-}
-.upgrade-payment-option {
-  display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
-  align-items: center;
-  gap: 0.7rem;
-  min-height: 76px;
-  padding: 0.8rem;
-  border: 1.5px solid #dfe5ef;
-  border-radius: 0.8rem;
-  background: #fff;
-  transition: border-color 0.15s ease, background 0.15s ease, opacity 0.15s ease;
-}
-.upgrade-payment-option:hover:not(.is-disabled) {
-  border-color: #a9bce8;
-}
-.upgrade-payment-option.is-selected {
-  border-color: var(--primary);
-  background: #f7faff;
-  box-shadow: 0 0 0 3px rgba(59, 111, 240, 0.08);
-}
-.upgrade-payment-option.is-disabled {
-  cursor: not-allowed;
-  opacity: 0.62;
-  background: #f8fafc;
-}
-.upgrade-payment-icon {
-  width: 38px;
-  height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.65rem;
-  color: var(--primary);
-  background: #eaf1ff;
-}
-.upgrade-payment-copy {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.12rem;
-}
-.upgrade-payment-copy strong {
-  color: #26364d;
-  font-size: 0.86rem;
-}
-.upgrade-payment-copy small {
-  color: var(--muted);
-  font-size: 0.7rem;
-  overflow-wrap: anywhere;
-}
-.upgrade-payment-copy small b {
-  color: #475569;
-  font-family: var(--font-mono);
-}
-.upgrade-payment-status {
-  color: #64748b;
-  font-size: 0.68rem;
-  font-weight: 600;
-}
-.upgrade-payment-status.is-success {
-  color: #087443;
-}
-.upgrade-payment-status.is-error {
-  color: var(--danger);
-}
-.upgrade-payment-notice {
-  margin-top: 0.65rem;
-  padding: 0.65rem 0.75rem;
-  border: 1px solid #fed7aa;
-  border-radius: 0.65rem;
-  color: #9a3412;
-  background: #fff7ed;
-  font-size: 0.72rem;
-  line-height: 1.45;
-}
-.upgrade-cost-summary {
-  margin: 1rem 0;
-  padding: 0.2rem 0.9rem;
-  border: 1px solid #e0e6ef;
-  border-radius: 0.8rem;
-  background: #fafbfd;
-}
-.upgrade-cost-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.75rem;
-  min-height: 46px;
-  padding: 0.55rem 0;
-  border-bottom: 1px solid #e8edf4;
-  color: #64748b;
-  font-size: 0.77rem;
-}
-.upgrade-cost-row:last-child {
-  border-bottom: 0;
-}
-.upgrade-cost-row strong {
-  color: #334155;
-  font-family: var(--font-mono);
-  text-align: right;
-  overflow-wrap: anywhere;
-}
-.upgrade-cost-total {
-  color: #1e293b;
-  font-weight: 800;
-}
-.upgrade-cost-total strong {
-  color: var(--success);
-  font-size: 1.05rem;
-}
-.upgrade-code-control {
-  display: flex;
-  gap: 0.5rem;
-  min-width: 0;
-}
-.upgrade-code-control .form-control {
-  min-width: 0;
-  min-height: 48px;
-  flex: 1 1 auto;
-  font-size: 1rem;
-}
-.upgrade-code-control .btn {
-  min-height: 48px;
-  flex: 0 0 auto;
-}
-.upgrade-status {
-  margin-top: 0.4rem;
-  font-size: 0.74rem;
-  line-height: 1.45;
-}
-.upgrade-status.is-success {
-  color: #087443;
-}
-.upgrade-status.is-error {
-  color: var(--danger);
-}
-.upgrade-submit {
-  min-height: 52px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  font-size: 0.92rem;
-}
-.upgrade-block-hint {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.4rem;
-  margin-top: 0.55rem;
-  color: var(--muted);
-  font-size: 0.74rem;
-  line-height: 1.45;
-  text-align: center;
-  justify-content: center;
-}
-.upgrade-fine-print {
-  margin: 0.7rem 0 0;
-  color: var(--muted);
-  font-size: 0.7rem;
-  line-height: 1.5;
-  text-align: center;
-}
-.upgrade-confirm-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-}
-.upgrade-confirm-summary > div {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 1rem;
-}
-.upgrade-confirm-summary span {
-  color: var(--muted);
-}
-.upgrade-confirm-summary strong {
-  color: #1e293b;
-  text-align: right;
-  overflow-wrap: anywhere;
-}
-.upgrade-page [hidden] {
-  display: none !important;
-}
-@media (max-width: 767.98px) {
-  .upgrade-page-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-  .upgrade-page-header p {
-    font-size: 0.82rem;
-  }
-  .upgrade-back-button {
-    width: 100%;
-    min-height: 44px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.45rem;
-  }
-  .upgrade-current-card .card-body {
-    grid-template-columns: auto minmax(0, 1fr);
-    padding: 1rem;
-  }
-  .upgrade-current-card .upgrade-badge-success,
-  .upgrade-current-card .upgrade-badge-neutral {
-    grid-column: 1 / -1;
-    justify-self: start;
-  }
-  .upgrade-panel .card-body {
-    padding: 1rem;
-  }
-  .upgrade-card-header {
-    min-height: 64px;
-    padding: 0.85rem 1rem;
-  }
-  .upgrade-option {
-    grid-template-columns: auto minmax(0, 1fr);
-    padding: 0.9rem;
-  }
-  .upgrade-option-price {
-    grid-column: 1 / -1;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    min-width: 0;
-    padding: 0.7rem 0 0;
-    border-top: 1px solid #e4e9f1;
-    border-left: 0;
-    text-align: left;
-  }
-  .upgrade-option-price strong {
-    margin: 0;
-    font-size: 1.05rem;
-  }
-  .upgrade-option-price small {
-    display: none;
-  }
-  .upgrade-selected-upline {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-  .upgrade-selected-upline .btn {
-    grid-column: 1 / -1;
-    width: 100%;
-    min-height: 44px;
-  }
-  .upgrade-position-grid {
-    grid-template-columns: 1fr;
-  }
-  .upgrade-payment-option {
-    min-height: 82px;
-  }
-  .upgrade-cost-row {
-    grid-template-columns: minmax(0, 1fr);
-    align-items: start;
-    gap: 0.2rem;
-    min-height: 0;
-    padding: 0.7rem 0;
-  }
-  .upgrade-cost-row strong {
-    max-width: 100%;
-    text-align: left;
-    font-size: 0.98rem;
-  }
-  .upgrade-cost-total strong {
-    font-size: 1.15rem;
-  }
-  .upgrade-confirm-summary > div {
-    grid-template-columns: 1fr;
-    gap: 0.1rem;
-  }
-  .upgrade-confirm-summary strong {
-    text-align: left;
-  }
-}
-@media (max-width: 575.98px) {
-  .upgrade-current-icon {
-    width: 46px;
-    height: 46px;
-  }
-  .upgrade-current-meta {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 0.15rem;
-  }
-  .upgrade-dot {
-    display: none;
-  }
-  .upgrade-card-header p {
-    max-width: 220px;
-  }
-  .upgrade-benefits {
-    grid-template-columns: 1fr;
-  }
-  .upgrade-code-control {
-    display: grid;
-    grid-template-columns: 1fr;
-  }
-  .upgrade-code-control .btn {
-    width: 100%;
-  }
-  .upgrade-selected-package-meta {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .upgrade-page *,
-  .upgrade-page *::before,
-  .upgrade-page *::after {
-    scroll-behavior: auto !important;
-    transition: none !important;
-  }
-}
-</style>
 <?php require 'views/partials/footer.php'; ?>
+
