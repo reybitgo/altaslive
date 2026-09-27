@@ -385,7 +385,7 @@ $streamOxford = count($streamWords) > 2
         </div>
 
         <h3>1. Parties</h3>
-        <p>These Terms of Service ("Terms") govern the relationship between <?= e($siteName) ?> ("the Platform," "we," "us") and any individual who registers as a member ("Member," "you"). <?= e($siteName) ?> is operated by its founding administrators, based in Santiago, Isabela, Philippines.</p>
+        <p>These Terms of Service ("Terms") govern the relationship between <?= e($siteName) ?> ("the Platform," "we," "us") and any individual who registers as a member ("Member," "you"). <?= e($siteName) ?> is operated by its founding administrators, based in Rang-ay, Cabatuan, Isabela, Philippines.</p>
 
         <h3>2. Eligibility</h3>
         <p>To register, you must: (a) be at least 18 years of age; (b) be a resident of the Philippines or a Filipino national abroad; (c) possess a valid USDT TRC20 or USDT BEP20 wallet address for receiving payouts; (d) have a valid registration code issued by an existing member or the admin team; and (e) agree to these Terms in full.</p>
@@ -424,7 +424,7 @@ $streamOxford = count($streamWords) > 2
         <h3>12. Contact</h3>
         <p>For questions regarding these Terms, contact: <a href="mailto:support@altasfarm.com" style="color:var(--green-mid);">support@altasfarm.com</a></p>
 
-        <p class="meta-line"><?= e($siteName) ?> · Santiago, Isabela, Philippines · Version 1.0, effective January 1, 2025</p>
+        <p class="meta-line"><?= e($siteName) ?> · Rang-ay, Cabatuan, Isabela, Philippines · Version 1.0, effective January 1, 2025</p>
       </div>
     </div>
   </div>
