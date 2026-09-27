@@ -212,14 +212,14 @@ $legalDocs = [
   <meta property="og:url" content="<?= $base ?>/">
   <meta property="og:site_name" content="<?= e($siteName) ?>">
   <meta property="og:locale" content="en_PH">
-  <meta property="og:image" content="<?= $frontend ?>/hero-bg.jpg">
+  <meta property="og:image" content="<?= $base ?>/hero-bg.jpg">
 
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="<?= e($siteName) ?> | Philippine Poultry Production &amp; Distribution">
   <meta
     name="twitter:description"
     content="A working Philippine poultry business with production, grow-out, distribution, and a structured partner network.">
-  <meta name="twitter:image" content="<?= $frontend ?>/hero-bg.jpg">
+  <meta name="twitter:image" content="<?= $base ?>/hero-bg.jpg">
 
   <meta name="theme-color" content="#17371d">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -256,7 +256,7 @@ $legalDocs = [
         'availableLanguage' => ['English', 'Filipino'],
       ]],
       'sameAs' => array_values(array_filter([
-        'https://www.facebook.com/people/Altas-Farm/61595099030024/',
+        'https://www.facebook.com/altasfarm',
         $telegramUrl,
       ])),
       'areaServed' => [
@@ -350,7 +350,7 @@ $legalDocs = [
       overflow: hidden;
       background:
         linear-gradient(115deg, rgba(14, 38, 20, .97) 0%, rgba(24, 63, 31, .91) 54%, rgba(24, 63, 31, .48) 100%),
-        url('<?= $frontend ?>/hero-bg.jpg') center/cover no-repeat;
+        url('<?= $base ?>/hero-bg.jpg') center/cover no-repeat;
       color: #fff;
       min-height: 700px;
       display: flex;
@@ -873,7 +873,7 @@ $legalDocs = [
       overflow: hidden;
       background:
         linear-gradient(135deg, rgba(23, 55, 29, .98), rgba(35, 82, 45, .95)),
-        url('<?= $frontend ?>/why.jpg') center/cover no-repeat;
+        url('<?= $base ?>/why.jpg') center/cover no-repeat;
       color: #fff;
     }
 
@@ -1528,7 +1528,7 @@ $legalDocs = [
 
         <div class="nav-cta">
           <a href="<?= $base ?>/?page=login" class="nav-btn-login">Login</a>
-          <a href="<?= $base ?>/?page=register" class="nav-btn-register">Partner / Join</a>
+          <a href="<?= $base ?>/?page=register" class="nav-btn-register">Partner Login / Join</a>
         </div>
 
         <button
@@ -1554,7 +1554,7 @@ $legalDocs = [
     <a href="#about" onclick="toggleMobileMenu()">About</a>
     <div style="margin-top:1.5rem;display:flex;flex-direction:column;gap:.75rem;">
       <a href="<?= $base ?>/?page=login" style="color:var(--gold);text-align:center;">Member Login</a>
-      <a href="<?= $base ?>/?page=register" class="btn-gold" style="text-align:center;">Partner / Join</a>
+      <a href="<?= $base ?>/?page=register" class="btn-gold" style="text-align:center;">Join the Partner Program</a>
     </div>
   </div>
 
@@ -1649,7 +1649,7 @@ $legalDocs = [
         <div class="af-intro-grid">
           <div class="af-image-frame fade-up">
             <img
-              src="<?= $frontend ?>/farm.jpg"
+              src="<?= $frontend ?>/about.jpg"
               alt="Chickens at an Altas Farm partner operation"
               loading="lazy">
             <div class="af-image-note">
@@ -1669,7 +1669,7 @@ $legalDocs = [
               commercial relationship.
             </p>
             <p>
-              The system therefore separates the physical farm operation from the
+              The website therefore separates the physical farm operation from the
               optional partner program. A customer can understand the farm without
               having to understand the network first.
             </p>
@@ -1706,10 +1706,10 @@ $legalDocs = [
           </div>
 
           <div class="af-info-card fade-up">
-            <div class="af-icon">🐔</div>
+            <div class="af-icon">🌾</div>
             <div class="af-info-title">Grow-Out</div>
             <div class="af-info-text">
-              Where available, the farm continues raising the chickens instead of requiring
+              Where available, the farm continues raising the birds instead of requiring
               the customer to manage the day-to-day production work.
             </div>
           </div>
@@ -1807,7 +1807,7 @@ $legalDocs = [
               <img src="<?= $frontend ?>/pkg-starter.jpg" alt="Poultry chicks" loading="lazy">
             </div>
             <div class="af-product-body">
-              <div class="af-product-kicker">Supply</div>
+              <div class="af-product-kicker">Poultry</div>
               <div class="af-product-title">Chicks</div>
               <div class="af-product-text">
                 Poultry supplied according to the applicable farm order and production schedule.
@@ -1818,13 +1818,13 @@ $legalDocs = [
 
           <article class="af-product-card fade-up">
             <div class="af-product-image">
-              <img src="<?= $frontend ?>/hero-bg.jpg" alt="Live poultry" loading="lazy">
+              <img src="<?= $frontend ?>/about.jpg" alt="Live poultry" loading="lazy">
             </div>
             <div class="af-product-body">
-              <div class="af-product-kicker">Production</div>
+              <div class="af-product-kicker">Poultry</div>
               <div class="af-product-title">Live Poultry</div>
               <div class="af-product-text">
-                Live chickens supplied or fulfilled according to the applicable order arrangement.
+                Live birds supplied or fulfilled according to the applicable order arrangement.
               </div>
               <div class="af-product-foot">Subject to production and fulfillment terms.</div>
             </div>
@@ -1846,7 +1846,7 @@ $legalDocs = [
 
           <article class="af-product-card fade-up">
             <div class="af-product-image">
-              <img src="<?= $frontend ?>/live.jpg" alt="Bulk poultry order" loading="lazy">
+              <img src="<?= $frontend ?>/hero-bg.jpg" alt="Bulk poultry order" loading="lazy">
             </div>
             <div class="af-product-body">
               <div class="af-product-kicker">Commercial</div>
@@ -1860,7 +1860,7 @@ $legalDocs = [
 
           <article class="af-product-card fade-up">
             <div class="af-product-image">
-              <img src="<?= $frontend ?>/manage.jpg" alt="Farm-managed poultry grow-out" loading="lazy">
+              <img src="<?= $frontend ?>/why.jpg" alt="Farm-managed poultry grow-out" loading="lazy">
             </div>
             <div class="af-product-body">
               <div class="af-product-kicker">Farm Service</div>
@@ -1874,7 +1874,7 @@ $legalDocs = [
 
           <article class="af-product-card fade-up">
             <div class="af-product-image">
-              <img src="<?= $frontend ?>/partner.jpg" alt="Farm partnership" loading="lazy">
+              <img src="<?= $frontend ?>/about.jpg" alt="Farm partnership" loading="lazy">
             </div>
             <div class="af-product-body">
               <div class="af-product-kicker">Business</div>
@@ -1938,7 +1938,7 @@ $legalDocs = [
 
           <div class="af-image-frame fade-up">
             <img
-              src="<?= $frontend ?>/flow.jpg"
+              src="<?= $frontend ?>/why.jpg"
               alt="Farmer handling poultry and collecting eggs"
               loading="lazy">
             <div class="af-image-note">
@@ -2082,7 +2082,7 @@ $legalDocs = [
         <div class="af-evidence-grid">
           <div class="af-evidence-main fade-up">
             <img
-              src="<?= $frontend ?>/hero-bg.jpg"
+              src="<?= $frontend ?>/about.jpg"
               alt="Poultry operation"
               loading="lazy">
             <div class="af-evidence-caption">
@@ -2226,7 +2226,7 @@ $legalDocs = [
             </button>
             <div class="af-faq-a">
               Where a particular arrangement provides a grow-out option, the farm continues
-              raising the chickens through the applicable production cycle. The exact conditions
+              raising the birds through the applicable production cycle. The exact conditions
               are governed by the terms attached to that arrangement.
             </div>
           </div>
@@ -2237,7 +2237,7 @@ $legalDocs = [
               <span class="af-faq-icon">+</span>
             </button>
             <div class="af-faq-a">
-              The farm is officially located at Rang-ay, Cabatuan, Isabela
+              The website identifies the business address as Rang-ay, Cabatuan, Isabela
               3315, Philippines. Walk-in visits are by appointment.
             </div>
           </div>
@@ -2274,7 +2274,7 @@ $legalDocs = [
             <div class="af-eyebrow">About Altas Farm</div>
             <h2 class="af-section-title">A local business with a digital operating layer.</h2>
             <p class="af-section-lead">
-              The system is deliberately designed to make the process easier to understand:
+              The public website is intended to make the company easier to understand:
               what the farm produces, how the operation works, how products are handled,
               how the partner program is structured, and where to find the relevant business
               and legal information.
@@ -2454,7 +2454,7 @@ $legalDocs = [
         <p>Members select from the farm entries offered at the time of registration. Each entry carries a defined poultry order specification and a one-time amount. The farm uses received bulk payments to schedule and produce the corresponding chicks. The member account also carries the platform features associated with the selected package.</p>
 
         <h3>5. Farm Cycle and Platform Earnings</h3>
-        <p>The physical farm cycle begins when the farm receives the bulk payment for an entry and schedules the corresponding chicks for hatching. The normal hatch lead time is 21 days. A member may receive the chicks according to the entry specification or elect the farm grow-out option, under which the farm raises the chickens toward marketable size. The current grow-out arrangement provides a 15% return on an eligible entry when the grow-out cycle is completed, according to the applicable farm terms. Selected entries may also include a Loyalty Reward cycle. This is not presented as a fixed-income product; it is the farm's way of giving back to members who choose to support the farm's growth with their entry. Referral commissions, where applicable, remain separate and are credited according to their package rules.</p>
+        <p>The physical farm cycle begins when the farm receives the bulk payment for an entry and schedules the corresponding chicks for hatching. The normal hatch lead time is 21 days. A member may receive the chicks according to the entry specification or elect the farm grow-out option, under which the farm raises the birds toward marketable size. The current grow-out arrangement provides a 15% return on an eligible entry when the grow-out cycle is completed, according to the applicable farm terms. Selected entries may also include a Loyalty Reward cycle. This is not presented as a fixed-income product; it is the farm's way of giving back to members who choose to support the farm's growth with their entry. Referral commissions, where applicable, remain separate and are credited according to their package rules.</p>
 
         <h3>6. Payouts</h3>
         <p>All payouts are made via <?= $payoutMethodsText ?>. The minimum withdrawal amount is <?= fmt_money($minPayout) ?>. Withdrawals are processed within 24–72 business hours. <?= e($siteName) ?> is not liable for losses caused by incorrect wallet addresses or account details provided by the member. Ensure your payout details are correct before submitting a withdrawal request — blockchain transactions are irreversible.</p>
@@ -2637,7 +2637,7 @@ $legalDocs = [
 
         <h3>Facebook Page</h3>
         <p>Follow us for farm updates, community stories, and network announcements:</p>
-        <p><a href="https://www.facebook.com/people/Altas-Farm/61595099030024/" target="_blank" rel="noopener" style="font-size:1.1rem;font-weight:700;color:var(--green-mid);">facebook.com/altasfarm</a></p>
+        <p><a href="https://www.facebook.com/altasfarm" target="_blank" rel="noopener" style="font-size:1.1rem;font-weight:700;color:var(--green-mid);">facebook.com/altasfarm</a></p>
 
         <h3>Office Address</h3>
         <p><?= e($siteName) ?><br>
@@ -2720,7 +2720,7 @@ $legalDocs = [
 
           <div class="footer-social" aria-label="Social media links">
             <a
-              href="https://www.facebook.com/people/Altas-Farm/61595099030024/"
+              href="https://www.facebook.com/altasfarm"
               target="_blank"
               rel="noopener"
               aria-label="Facebook"

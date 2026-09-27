@@ -1,5 +1,4 @@
 <?php
-
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/db.php';
@@ -191,15 +190,18 @@ $legalDocs = [
   <meta charset="UTF-8">
   <meta
     name="viewport"
-    content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+    content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover"
+  >
 
   <title><?= e($siteName) ?> | Philippine Poultry Production &amp; Distribution</title>
   <meta
     name="description"
-    content="<?= e($siteName) ?> is a Philippine poultry business based in Isabela, focused on poultry production, farm-managed grow-out, bulk orders, distribution, and a transparently disclosed partner program.">
+    content="<?= e($siteName) ?> is a Philippine poultry business based in Isabela, focused on poultry production, farm-managed grow-out, bulk orders, distribution, and a transparently disclosed partner program."
+  >
   <meta
     name="keywords"
-    content="<?= e($siteName) ?>, Philippine poultry farm, Isabela poultry, chicks, eggs, live poultry, poultry production, bulk poultry orders, farm partnerships">
+    content="<?= e($siteName) ?>, Philippine poultry farm, Isabela poultry, chicks, eggs, live poultry, poultry production, bulk poultry orders, farm partnerships"
+  >
   <meta name="robots" content="index, follow">
   <meta name="author" content="<?= e($siteName) ?>">
   <link rel="canonical" href="<?= $base ?>/">
@@ -208,7 +210,8 @@ $legalDocs = [
   <meta property="og:title" content="<?= e($siteName) ?> | Philippine Poultry Production &amp; Distribution">
   <meta
     property="og:description"
-    content="Poultry production, farm-managed grow-out, bulk orders, distribution, and a transparently disclosed partner program.">
+    content="Poultry production, farm-managed grow-out, bulk orders, distribution, and a transparently disclosed partner program."
+  >
   <meta property="og:url" content="<?= $base ?>/">
   <meta property="og:site_name" content="<?= e($siteName) ?>">
   <meta property="og:locale" content="en_PH">
@@ -218,7 +221,8 @@ $legalDocs = [
   <meta name="twitter:title" content="<?= e($siteName) ?> | Philippine Poultry Production &amp; Distribution">
   <meta
     name="twitter:description"
-    content="A working Philippine poultry business with production, grow-out, distribution, and a structured partner network.">
+    content="A working Philippine poultry business with production, grow-out, distribution, and a structured partner network."
+  >
   <meta name="twitter:image" content="<?= $frontend ?>/hero-bg.jpg">
 
   <meta name="theme-color" content="#17371d">
@@ -230,7 +234,8 @@ $legalDocs = [
 
   <link
     rel="manifest"
-    href='data:application/manifest+json;charset=utf-8,{"name":"<?= e($siteName) ?>","short_name":"<?= e($siteName) ?>","start_url":".","display":"standalone","background_color":"#faf7f0","theme_color":"#17371d","icons":[{"src":"<?= $frontend ?>/favicon.png","sizes":"192x192","type":"image/png"},{"src":"<?= $frontend ?>/favicon.png","sizes":"512x512","type":"image/png"}]}'>
+    href='data:application/manifest+json;charset=utf-8,{"name":"<?= e($siteName) ?>","short_name":"<?= e($siteName) ?>","start_url":".","display":"standalone","background_color":"#faf7f0","theme_color":"#17371d","icons":[{"src":"<?= $frontend ?>/favicon.png","sizes":"192x192","type":"image/png"},{"src":"<?= $frontend ?>/favicon.png","sizes":"512x512","type":"image/png"}]}'
+  >
 
   <script type="application/ld+json">
     <?= json_encode([
@@ -256,7 +261,7 @@ $legalDocs = [
         'availableLanguage' => ['English', 'Filipino'],
       ]],
       'sameAs' => array_values(array_filter([
-        'https://www.facebook.com/people/Altas-Farm/61595099030024/',
+        'https://www.facebook.com/altasfarm',
         $telegramUrl,
       ])),
       'areaServed' => [
@@ -269,7 +274,8 @@ $legalDocs = [
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link
     href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap"
-    rel="stylesheet">
+    rel="stylesheet"
+  >
   <link rel="stylesheet" href="<?= $frontend ?>/style.css?v=<?= $styleV ?>">
 
   <!-- Homepage restructure: scoped additions, existing visual system retained. -->
@@ -307,15 +313,15 @@ $legalDocs = [
     .site-header nav {
       background: rgba(17, 42, 22, .97);
       backdrop-filter: blur(14px);
-      border-bottom: 1px solid rgba(255, 255, 255, .08);
+      border-bottom: 1px solid rgba(255,255,255,.08);
     }
 
     .af-utility {
       background: var(--af-deep);
-      color: rgba(255, 255, 255, .7);
+      color: rgba(255,255,255,.7);
       font-size: .74rem;
       letter-spacing: .03em;
-      border-bottom: 1px solid rgba(255, 255, 255, .06);
+      border-bottom: 1px solid rgba(255,255,255,.06);
     }
 
     .af-utility-inner {
@@ -337,7 +343,7 @@ $legalDocs = [
     }
 
     .af-utility strong {
-      color: rgba(255, 255, 255, .92);
+      color: rgba(255,255,255,.92);
       font-weight: 600;
     }
 
@@ -376,10 +382,10 @@ $legalDocs = [
       align-items: center;
       gap: .55rem;
       padding: .42rem .72rem;
-      border: 1px solid rgba(255, 255, 255, .18);
+      border: 1px solid rgba(255,255,255,.18);
       border-radius: 999px;
-      background: rgba(255, 255, 255, .05);
-      color: rgba(255, 255, 255, .82);
+      background: rgba(255,255,255,.05);
+      color: rgba(255,255,255,.82);
       font-size: .72rem;
       font-weight: 700;
       letter-spacing: .12em;
@@ -402,7 +408,7 @@ $legalDocs = [
     .af-hero-lead {
       max-width: 670px;
       margin: 0;
-      color: rgba(255, 255, 255, .77);
+      color: rgba(255,255,255,.77);
       font-size: 1.08rem;
       line-height: 1.8;
     }
@@ -439,8 +445,8 @@ $legalDocs = [
 
     .af-btn-secondary {
       color: #fff;
-      border-color: rgba(255, 255, 255, .28);
-      background: rgba(255, 255, 255, .03);
+      border-color: rgba(255,255,255,.28);
+      background: rgba(255,255,255,.03);
     }
 
     .af-hero-facts {
@@ -449,8 +455,8 @@ $legalDocs = [
       gap: 1px;
       margin-top: 2.7rem;
       max-width: 650px;
-      background: rgba(255, 255, 255, .12);
-      border: 1px solid rgba(255, 255, 255, .1);
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.1);
       border-radius: 14px;
       overflow: hidden;
     }
@@ -470,15 +476,15 @@ $legalDocs = [
       margin-top: .2rem;
       font-size: .72rem;
       line-height: 1.4;
-      color: rgba(255, 255, 255, .55);
+      color: rgba(255,255,255,.55);
     }
 
     .af-hero-card {
       padding: 1rem;
       border-radius: 24px;
-      background: rgba(250, 247, 240, .08);
-      border: 1px solid rgba(255, 255, 255, .13);
-      box-shadow: 0 25px 80px rgba(0, 0, 0, .19);
+      background: rgba(250,247,240,.08);
+      border: 1px solid rgba(255,255,255,.13);
+      box-shadow: 0 25px 80px rgba(0,0,0,.19);
       backdrop-filter: blur(12px);
     }
 
@@ -502,7 +508,7 @@ $legalDocs = [
       font-size: .68rem;
       text-transform: uppercase;
       letter-spacing: .12em;
-      color: rgba(255, 255, 255, .5);
+      color: rgba(255,255,255,.5);
     }
 
     .af-hero-card-title {
@@ -515,7 +521,7 @@ $legalDocs = [
     .af-hero-card-meta {
       text-align: right;
       font-size: .76rem;
-      color: rgba(255, 255, 255, .62);
+      color: rgba(255,255,255,.62);
     }
 
     .af-section {
@@ -596,9 +602,9 @@ $legalDocs = [
       width: min(290px, calc(100% - 36px));
       padding: 1rem 1.1rem;
       border-radius: 14px;
-      background: rgba(23, 55, 29, .94);
+      background: rgba(23,55,29,.94);
       color: #fff;
-      box-shadow: 0 16px 35px rgba(0, 0, 0, .15);
+      box-shadow: 0 16px 35px rgba(0,0,0,.15);
     }
 
     .af-image-note strong {
@@ -610,7 +616,7 @@ $legalDocs = [
     .af-image-note span {
       display: block;
       margin-top: .25rem;
-      color: rgba(255, 255, 255, .58);
+      color: rgba(255,255,255,.58);
       font-size: .74rem;
       line-height: 1.5;
     }
@@ -685,7 +691,7 @@ $legalDocs = [
     }
 
     .af-info-card.dark .af-icon {
-      background: rgba(255, 255, 255, .08);
+      background: rgba(255,255,255,.08);
       color: #f3d67c;
     }
 
@@ -708,7 +714,7 @@ $legalDocs = [
     }
 
     .af-info-card.dark .af-info-text {
-      color: rgba(255, 255, 255, .62);
+      color: rgba(255,255,255,.62);
     }
 
     .af-process {
@@ -872,7 +878,7 @@ $legalDocs = [
       position: relative;
       overflow: hidden;
       background:
-        linear-gradient(135deg, rgba(23, 55, 29, .98), rgba(35, 82, 45, .95)),
+        linear-gradient(135deg, rgba(23,55,29,.98), rgba(35,82,45,.95)),
         url('<?= $frontend ?>/why.jpg') center/cover no-repeat;
       color: #fff;
     }
@@ -884,7 +890,7 @@ $legalDocs = [
       width: 360px;
       height: 360px;
       border-radius: 50%;
-      background: rgba(212, 160, 23, .12);
+      background: rgba(212,160,23,.12);
     }
 
     .af-partner-inner {
@@ -905,7 +911,7 @@ $legalDocs = [
     }
 
     .af-partner-band .af-section-lead {
-      color: rgba(255, 255, 255, .65);
+      color: rgba(255,255,255,.65);
     }
 
     .af-partner-points {
@@ -915,9 +921,9 @@ $legalDocs = [
 
     .af-partner-point {
       padding: 1rem 1.1rem;
-      border: 1px solid rgba(255, 255, 255, .12);
+      border: 1px solid rgba(255,255,255,.12);
       border-radius: 14px;
-      background: rgba(255, 255, 255, .04);
+      background: rgba(255,255,255,.04);
     }
 
     .af-partner-point strong {
@@ -929,7 +935,7 @@ $legalDocs = [
     .af-partner-point span {
       display: block;
       margin-top: .25rem;
-      color: rgba(255, 255, 255, .56);
+      color: rgba(255,255,255,.56);
       font-size: .76rem;
       line-height: 1.6;
     }
@@ -947,7 +953,7 @@ $legalDocs = [
       border: 1px solid var(--af-border);
       border-radius: 18px;
       background: #fff;
-      box-shadow: 0 10px 30px rgba(26, 56, 31, .035);
+      box-shadow: 0 10px 30px rgba(26,56,31,.035);
     }
 
     .af-package-image {
@@ -1098,7 +1104,7 @@ $legalDocs = [
       inset: auto 18px 18px;
       padding: 1rem 1.1rem;
       border-radius: 14px;
-      background: rgba(23, 55, 29, .92);
+      background: rgba(23,55,29,.92);
       color: #fff;
     }
 
@@ -1111,7 +1117,7 @@ $legalDocs = [
     .af-evidence-caption span {
       display: block;
       margin-top: .25rem;
-      color: rgba(255, 255, 255, .58);
+      color: rgba(255,255,255,.58);
       font-size: .75rem;
       line-height: 1.55;
     }
@@ -1273,7 +1279,7 @@ $legalDocs = [
     }
 
     .af-contact-box p {
-      color: rgba(255, 255, 255, .64);
+      color: rgba(255,255,255,.64);
       line-height: 1.8;
       font-size: .85rem;
     }
@@ -1286,11 +1292,11 @@ $legalDocs = [
 
     .af-contact-detail {
       padding: .9rem 0;
-      border-top: 1px solid rgba(255, 255, 255, .1);
+      border-top: 1px solid rgba(255,255,255,.1);
     }
 
     .af-contact-detail-label {
-      color: rgba(255, 255, 255, .42);
+      color: rgba(255,255,255,.42);
       font-size: .65rem;
       letter-spacing: .1em;
       text-transform: uppercase;
@@ -1338,7 +1344,6 @@ $legalDocs = [
     }
 
     @media (max-width: 980px) {
-
       .af-hero-inner,
       .af-intro-grid,
       .af-business-grid,
@@ -1386,7 +1391,6 @@ $legalDocs = [
     }
 
     @media (max-width: 760px) {
-
       .af-utility-left span:not(:first-child),
       .af-utility-right span:not(:first-child) {
         display: none;
@@ -1448,7 +1452,6 @@ $legalDocs = [
     }
 
     @media (max-width: 640px) {
-
       .af-container,
       .af-hero-inner,
       .af-utility-inner {
@@ -1513,7 +1516,8 @@ $legalDocs = [
             alt="<?= e($siteName) ?> logo"
             width="auto"
             height="36"
-            onerror="this.style.display='none'">
+            onerror="this.style.display='none'"
+          >
           <span class="nav-logo-text"><?= e($siteName) ?></span>
         </a>
 
@@ -1528,7 +1532,7 @@ $legalDocs = [
 
         <div class="nav-cta">
           <a href="<?= $base ?>/?page=login" class="nav-btn-login">Login</a>
-          <a href="<?= $base ?>/?page=register" class="nav-btn-register">Partner / Join</a>
+          <a href="<?= $base ?>/?page=register" class="nav-btn-register">Partner Login / Join</a>
         </div>
 
         <button
@@ -1536,7 +1540,8 @@ $legalDocs = [
           aria-label="Toggle Menu"
           aria-controls="mobileMenu"
           aria-expanded="false"
-          onclick="toggleMobileMenu()">☰</button>
+          onclick="toggleMobileMenu()"
+        >☰</button>
       </div>
     </nav>
   </header>
@@ -1554,7 +1559,7 @@ $legalDocs = [
     <a href="#about" onclick="toggleMobileMenu()">About</a>
     <div style="margin-top:1.5rem;display:flex;flex-direction:column;gap:.75rem;">
       <a href="<?= $base ?>/?page=login" style="color:var(--gold);text-align:center;">Member Login</a>
-      <a href="<?= $base ?>/?page=register" class="btn-gold" style="text-align:center;">Partner / Join</a>
+      <a href="<?= $base ?>/?page=register" class="btn-gold" style="text-align:center;">Join the Partner Program</a>
     </div>
   </div>
 
@@ -1604,7 +1609,8 @@ $legalDocs = [
         <div class="af-hero-card fade-up">
           <img
             src="<?= $frontend ?>/about.jpg"
-            alt="Poultry at an Altas Farm partner operation">
+            alt="Poultry at an Altas Farm partner operation"
+          >
           <div class="af-hero-card-bottom">
             <div>
               <div class="af-hero-card-label">The business starts here</div>
@@ -1649,9 +1655,10 @@ $legalDocs = [
         <div class="af-intro-grid">
           <div class="af-image-frame fade-up">
             <img
-              src="<?= $frontend ?>/farm.jpg"
+              src="<?= $frontend ?>/about.jpg"
               alt="Chickens at an Altas Farm partner operation"
-              loading="lazy">
+              loading="lazy"
+            >
             <div class="af-image-note">
               <strong>Farm-managed production</strong>
               <span>
@@ -1669,7 +1676,7 @@ $legalDocs = [
               commercial relationship.
             </p>
             <p>
-              The system therefore separates the physical farm operation from the
+              The website therefore separates the physical farm operation from the
               optional partner program. A customer can understand the farm without
               having to understand the network first.
             </p>
@@ -1706,10 +1713,10 @@ $legalDocs = [
           </div>
 
           <div class="af-info-card fade-up">
-            <div class="af-icon">🐔</div>
+            <div class="af-icon">🌾</div>
             <div class="af-info-title">Grow-Out</div>
             <div class="af-info-text">
-              Where available, the farm continues raising the chickens instead of requiring
+              Where available, the farm continues raising the birds instead of requiring
               the customer to manage the day-to-day production work.
             </div>
           </div>
@@ -1807,7 +1814,7 @@ $legalDocs = [
               <img src="<?= $frontend ?>/pkg-starter.jpg" alt="Poultry chicks" loading="lazy">
             </div>
             <div class="af-product-body">
-              <div class="af-product-kicker">Supply</div>
+              <div class="af-product-kicker">Poultry</div>
               <div class="af-product-title">Chicks</div>
               <div class="af-product-text">
                 Poultry supplied according to the applicable farm order and production schedule.
@@ -1818,13 +1825,13 @@ $legalDocs = [
 
           <article class="af-product-card fade-up">
             <div class="af-product-image">
-              <img src="<?= $frontend ?>/hero-bg.jpg" alt="Live poultry" loading="lazy">
+              <img src="<?= $frontend ?>/about.jpg" alt="Live poultry" loading="lazy">
             </div>
             <div class="af-product-body">
-              <div class="af-product-kicker">Production</div>
+              <div class="af-product-kicker">Poultry</div>
               <div class="af-product-title">Live Poultry</div>
               <div class="af-product-text">
-                Live chickens supplied or fulfilled according to the applicable order arrangement.
+                Live birds supplied or fulfilled according to the applicable order arrangement.
               </div>
               <div class="af-product-foot">Subject to production and fulfillment terms.</div>
             </div>
@@ -1846,7 +1853,7 @@ $legalDocs = [
 
           <article class="af-product-card fade-up">
             <div class="af-product-image">
-              <img src="<?= $frontend ?>/live.jpg" alt="Bulk poultry order" loading="lazy">
+              <img src="<?= $frontend ?>/hero-bg.jpg" alt="Bulk poultry order" loading="lazy">
             </div>
             <div class="af-product-body">
               <div class="af-product-kicker">Commercial</div>
@@ -1860,7 +1867,7 @@ $legalDocs = [
 
           <article class="af-product-card fade-up">
             <div class="af-product-image">
-              <img src="<?= $frontend ?>/manage.jpg" alt="Farm-managed poultry grow-out" loading="lazy">
+              <img src="<?= $frontend ?>/why.jpg" alt="Farm-managed poultry grow-out" loading="lazy">
             </div>
             <div class="af-product-body">
               <div class="af-product-kicker">Farm Service</div>
@@ -1874,7 +1881,7 @@ $legalDocs = [
 
           <article class="af-product-card fade-up">
             <div class="af-product-image">
-              <img src="<?= $frontend ?>/partner.jpg" alt="Farm partnership" loading="lazy">
+              <img src="<?= $frontend ?>/about.jpg" alt="Farm partnership" loading="lazy">
             </div>
             <div class="af-product-body">
               <div class="af-product-kicker">Business</div>
@@ -1938,9 +1945,10 @@ $legalDocs = [
 
           <div class="af-image-frame fade-up">
             <img
-              src="<?= $frontend ?>/flow.jpg"
+              src="<?= $frontend ?>/why.jpg"
               alt="Farmer handling poultry and collecting eggs"
-              loading="lazy">
+              loading="lazy"
+            >
             <div class="af-image-note">
               <strong>Business visibility matters.</strong>
               <span>
@@ -2012,7 +2020,8 @@ $legalDocs = [
                 <img
                   src="<?= e($f['image_url']) ?>"
                   alt="<?= e($f['name']) ?> package"
-                  loading="lazy">
+                  loading="lazy"
+                >
               </div>
 
               <div class="af-package-body">
@@ -2040,12 +2049,14 @@ $legalDocs = [
                   <button
                     type="button"
                     class="af-small-btn"
-                    onclick="openPkgDetails(<?= $id ?>)">Full details</button>
+                    onclick="openPkgDetails(<?= $id ?>)"
+                  >Full details</button>
 
                   <?php if (!$isFull): ?>
                     <a
                       href="<?= $base ?>/?page=register"
-                      class="af-small-btn primary">Continue to registration</a>
+                      class="af-small-btn primary"
+                    >Continue to registration</a>
                   <?php else: ?>
                     <span class="af-small-btn primary" style="opacity:.55;cursor:not-allowed;">Registration closed</span>
                   <?php endif; ?>
@@ -2082,9 +2093,10 @@ $legalDocs = [
         <div class="af-evidence-grid">
           <div class="af-evidence-main fade-up">
             <img
-              src="<?= $frontend ?>/hero-bg.jpg"
+              src="<?= $frontend ?>/about.jpg"
               alt="Poultry operation"
-              loading="lazy">
+              loading="lazy"
+            >
             <div class="af-evidence-caption">
               <strong>Actual farm activity</strong>
               <span>
@@ -2150,12 +2162,14 @@ $legalDocs = [
                 class="af-legal-card legal-img fade-up"
                 role="button"
                 tabindex="0"
-                aria-label="View <?= e($title) ?>">
+                aria-label="View <?= e($title) ?>"
+              >
                 <div class="af-legal-image">
                   <img
                     src="<?= $frontend ?>/img/legalities/<?= e($file) ?>"
                     alt="<?= e($title) ?>"
-                    loading="lazy">
+                    loading="lazy"
+                  >
                 </div>
                 <div class="af-legal-body">
                   <div class="af-legal-title"><?= e($title) ?></div>
@@ -2226,7 +2240,7 @@ $legalDocs = [
             </button>
             <div class="af-faq-a">
               Where a particular arrangement provides a grow-out option, the farm continues
-              raising the chickens through the applicable production cycle. The exact conditions
+              raising the birds through the applicable production cycle. The exact conditions
               are governed by the terms attached to that arrangement.
             </div>
           </div>
@@ -2237,7 +2251,7 @@ $legalDocs = [
               <span class="af-faq-icon">+</span>
             </button>
             <div class="af-faq-a">
-              The farm is officially located at Rang-ay, Cabatuan, Isabela
+              The website identifies the business address as Rang-ay, Cabatuan, Isabela
               3315, Philippines. Walk-in visits are by appointment.
             </div>
           </div>
@@ -2259,7 +2273,8 @@ $legalDocs = [
           <button
             type="button"
             class="af-small-btn"
-            onclick="openModal('modal-faq')">Open full FAQ</button>
+            onclick="openModal('modal-faq')"
+          >Open full FAQ</button>
         </div>
       </div>
     </section>
@@ -2274,7 +2289,7 @@ $legalDocs = [
             <div class="af-eyebrow">About Altas Farm</div>
             <h2 class="af-section-title">A local business with a digital operating layer.</h2>
             <p class="af-section-lead">
-              The system is deliberately designed to make the process easier to understand:
+              The public website is intended to make the company easier to understand:
               what the farm produces, how the operation works, how products are handled,
               how the partner program is structured, and where to find the relevant business
               and legal information.
@@ -2318,7 +2333,8 @@ $legalDocs = [
               <button
                 type="button"
                 class="af-btn af-btn-primary"
-                onclick="openModal('modal-contact')">Contact Information</button>
+                onclick="openModal('modal-contact')"
+              >Contact Information</button>
             </div>
           </div>
         </div>
@@ -2454,7 +2470,7 @@ $legalDocs = [
         <p>Members select from the farm entries offered at the time of registration. Each entry carries a defined poultry order specification and a one-time amount. The farm uses received bulk payments to schedule and produce the corresponding chicks. The member account also carries the platform features associated with the selected package.</p>
 
         <h3>5. Farm Cycle and Platform Earnings</h3>
-        <p>The physical farm cycle begins when the farm receives the bulk payment for an entry and schedules the corresponding chicks for hatching. The normal hatch lead time is 21 days. A member may receive the chicks according to the entry specification or elect the farm grow-out option, under which the farm raises the chickens toward marketable size. The current grow-out arrangement provides a 15% return on an eligible entry when the grow-out cycle is completed, according to the applicable farm terms. Selected entries may also include a Loyalty Reward cycle. This is not presented as a fixed-income product; it is the farm's way of giving back to members who choose to support the farm's growth with their entry. Referral commissions, where applicable, remain separate and are credited according to their package rules.</p>
+        <p>The physical farm cycle begins when the farm receives the bulk payment for an entry and schedules the corresponding chicks for hatching. The normal hatch lead time is 21 days. A member may receive the chicks according to the entry specification or elect the farm grow-out option, under which the farm raises the birds toward marketable size. The current grow-out arrangement provides a 15% return on an eligible entry when the grow-out cycle is completed, according to the applicable farm terms. Selected entries may also include a Loyalty Reward cycle. This is not presented as a fixed-income product; it is the farm's way of giving back to members who choose to support the farm's growth with their entry. Referral commissions, where applicable, remain separate and are credited according to their package rules.</p>
 
         <h3>6. Payouts</h3>
         <p>All payouts are made via <?= $payoutMethodsText ?>. The minimum withdrawal amount is <?= fmt_money($minPayout) ?>. Withdrawals are processed within 24–72 business hours. <?= e($siteName) ?> is not liable for losses caused by incorrect wallet addresses or account details provided by the member. Ensure your payout details are correct before submitting a withdrawal request — blockchain transactions are irreversible.</p>
@@ -2637,7 +2653,7 @@ $legalDocs = [
 
         <h3>Facebook Page</h3>
         <p>Follow us for farm updates, community stories, and network announcements:</p>
-        <p><a href="https://www.facebook.com/people/Altas-Farm/61595099030024/" target="_blank" rel="noopener" style="font-size:1.1rem;font-weight:700;color:var(--green-mid);">facebook.com/altasfarm</a></p>
+        <p><a href="https://www.facebook.com/altasfarm" target="_blank" rel="noopener" style="font-size:1.1rem;font-weight:700;color:var(--green-mid);">facebook.com/altasfarm</a></p>
 
         <h3>Office Address</h3>
         <p><?= e($siteName) ?><br>
@@ -2697,7 +2713,8 @@ $legalDocs = [
           <div class="footer-brand-name" itemprop="name"><?= e($siteName) ?></div>
           <div
             class="footer-brand-desc"
-            itemprop="description">
+            itemprop="description"
+          >
             Philippine poultry production, products, farm-managed grow-out,
             distribution, and a transparently disclosed partner program.
             <br>
@@ -2710,7 +2727,8 @@ $legalDocs = [
             itemprop="address"
             itemscope
             itemtype="https://schema.org/PostalAddress"
-            style="font-style:normal;font-size:.82rem;color:rgba(255,255,255,.45);margin-top:1rem;line-height:1.7;">
+            style="font-style:normal;font-size:.82rem;color:rgba(255,255,255,.45);margin-top:1rem;line-height:1.7;"
+          >
             <span itemprop="streetAddress">Rang-ay</span>,
             <span itemprop="addressLocality">Cabatuan</span>,
             <span itemprop="addressRegion">Isabela</span>
@@ -2720,23 +2738,26 @@ $legalDocs = [
 
           <div class="footer-social" aria-label="Social media links">
             <a
-              href="https://www.facebook.com/people/Altas-Farm/61595099030024/"
+              href="https://www.facebook.com/altasfarm"
               target="_blank"
               rel="noopener"
               aria-label="Facebook"
-              title="<?= e($siteName) ?> on Facebook">f</a>
+              title="<?= e($siteName) ?> on Facebook"
+            >f</a>
             <?php if ($telegramUrl): ?>
               <a
                 href="<?= e($telegramUrl) ?>"
                 target="_blank"
                 rel="noopener"
                 aria-label="Telegram"
-                title="<?= e($siteName) ?> on Telegram">✈</a>
+                title="<?= e($siteName) ?> on Telegram"
+              >✈</a>
             <?php endif; ?>
             <a
               href="mailto:support@altasfarm.com"
               aria-label="Email Support"
-              title="Email support@altasfarm.com">✉</a>
+              title="Email support@altasfarm.com"
+            >✉</a>
           </div>
         </div>
 
@@ -2775,9 +2796,7 @@ $legalDocs = [
 
       <div class="footer-bottom">
         <div class="footer-copy">
-          © 2024–<script>
-            document.write(new Date().getFullYear())
-          </script>
+          © 2024–<script>document.write(new Date().getFullYear())</script>
           <?= e($siteName) ?> · All rights reserved · Philippines 🇵🇭
         </div>
         <div class="footer-legal">
@@ -2795,17 +2814,17 @@ $legalDocs = [
 
   <script>
     window.PKG_DETAILS = <?= json_encode(
-                            $planFacts,
-                            JSON_PRESERVE_ZERO_FRACTION | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
-                          ) ?>;
+      $planFacts,
+      JSON_PRESERVE_ZERO_FRACTION | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+    ) ?>;
 
     window.PKG_GLOBALS = <?= json_encode(
-                            [
-                              'site_name' => $siteName,
-                              'min_payout' => $minPayout,
-                            ],
-                            JSON_PRESERVE_ZERO_FRACTION | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
-                          ) ?>;
+      [
+        'site_name' => $siteName,
+        'min_payout' => $minPayout,
+      ],
+      JSON_PRESERVE_ZERO_FRACTION | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+    ) ?>;
 
     function toggleHomeFaq(button) {
       const item = button.closest('.af-faq-item');
@@ -2813,7 +2832,7 @@ $legalDocs = [
 
       const wasOpen = item.classList.contains('open');
 
-      document.querySelectorAll('.af-faq-item.open').forEach(function(node) {
+      document.querySelectorAll('.af-faq-item.open').forEach(function (node) {
         node.classList.remove('open');
         const icon = node.querySelector('.af-faq-icon');
         if (icon) icon.textContent = '+';
@@ -2826,11 +2845,11 @@ $legalDocs = [
       }
     }
 
-    (function() {
+    (function () {
       const mobileToggle = document.querySelector('.nav-mobile-toggle');
 
       if (mobileToggle) {
-        document.addEventListener('click', function() {
+        document.addEventListener('click', function () {
           mobileToggle.setAttribute(
             'aria-expanded',
             document.getElementById('mobileMenu')?.classList.contains('open') ? 'true' : 'false'
@@ -2855,5 +2874,4 @@ $legalDocs = [
   </script>
 
 </body>
-
 </html>
