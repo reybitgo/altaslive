@@ -27,6 +27,116 @@ $gcashEnabled = setting('gcash_enabled', '1') === '1';
 $mayaEnabled  = setting('maya_enabled', '1') === '1';
 $minPayout   = (float) setting('min_payout', '500');
 
+/*
+ * Frontend package copy, keyed by lower-cased package name.
+ *
+ * Editorial copy only — no commission, cap, or payout figures live here,
+ * so the cards stay in step with the compliance-safe tone of the rest of
+ * the page. Any package renamed or added in the admin panel falls back to
+ * the neutral copy below.
+ */
+$pkgCopyFallback = [
+    'desc'    => 'A defined participation level with a corresponding farm '
+              . 'arrangement and package-specific partner features.',
+    'bullets' => [
+        'Defined farm participation amount',
+        'Production cycle governed by the applicable farm terms',
+        'Farm-managed grow-out where eligible',
+        'Partner features vary by package',
+    ],
+];
+
+$pkgCopy = [
+    'basic' => [
+        'desc'    => 'An accessible starting point for partners entering poultry '
+                  . 'participation with Altas Farm, centered on the essential farm '
+                  . 'arrangement and core partner access.',
+        'bullets' => [
+            'Entry-level poultry participation',
+            'Placement within the applicable poultry production cycle',
+            'Farm-managed poultry grow-out where eligible',
+            'Access to core partner account features',
+        ],
+    ],
+    'starter' => [
+        'desc'    => 'For partners ready to move beyond the entry level, with increased '
+                  . 'poultry participation and additional tools for staying engaged with '
+                  . 'their farm activity.',
+        'bullets' => [
+            'Increased poultry participation',
+            'Scheduled inclusion in the applicable poultry production cycle',
+            'Farm-managed poultry grow-out where eligible',
+            'Starter-level partner and referral features',
+        ],
+    ],
+    'pro' => [
+        'desc'    => 'A more active participation tier for partners seeking greater '
+                  . 'poultry involvement, with a larger participation arrangement and '
+                  . 'expanded partner functionality.',
+        'bullets' => [
+            'Higher poultry participation level',
+            'Poultry production coordinated through the farm',
+            'Farm-managed poultry grow-out where eligible',
+            'Enhanced partner, referral, and activity-tracking features',
+        ],
+    ],
+    'elite' => [
+        'desc'    => 'Built for partners taking a more substantial position in poultry '
+                  . 'production, combining a higher participation level with a broader '
+                  . 'set of partner benefits.',
+        'bullets' => [
+            'Substantial poultry participation',
+            'Priority within the applicable poultry production schedule, subject to farm terms',
+            'Farm-managed poultry grow-out where eligible',
+            'Broader Elite partner and referral features',
+        ],
+    ],
+    'silver' => [
+        'desc'    => 'A higher-scale poultry participation option for partners who want '
+                  . 'to commit to a more significant farm arrangement while maintaining '
+                  . 'clear visibility over their participation.',
+        'bullets' => [
+            'Large poultry participation level',
+            'Participation tied to an applicable poultry production cycle',
+            'Farm-managed poultry grow-out where eligible',
+            'Expanded Silver partner account and tracking features',
+        ],
+    ],
+    'gold' => [
+        'desc'    => 'Designed for partners pursuing a larger poultry participation '
+                  . 'position, with a stronger emphasis on scale and access to the '
+                  . 'benefits associated with a higher partner tier.',
+        'bullets' => [
+            'Higher-volume poultry participation',
+            'Coordinated poultry production and fulfillment under applicable farm terms',
+            'Farm-managed poultry grow-out where eligible',
+            'Gold-level partner and referral features',
+        ],
+    ],
+    'diamond' => [
+        'desc'    => 'A major poultry participation tier for partners operating at a '
+                  . 'significantly larger scale, paired with the more comprehensive '
+                  . 'partner benefits available at the Diamond level.',
+        'bullets' => [
+            'High-volume poultry participation',
+            'Poultry production managed through the applicable farm cycle',
+            'Farm-managed poultry grow-out where eligible',
+            'Comprehensive Diamond partner, referral, and activity features',
+        ],
+    ],
+    'platinum' => [
+        'desc'    => 'The top participation tier in the package structure, intended for '
+                  . 'partners seeking the largest poultry participation arrangement and '
+                  . 'the broadest package-level access.',
+        'bullets' => [
+            'Highest poultry participation level',
+            'Placement within the applicable poultry production cycle',
+            'Farm-managed poultry grow-out where eligible',
+            'Full Platinum-level partner and platform features',
+        ],
+    ],
+];
+
 $packages = Package::all(true);
 $pkgCount = count($packages);
 
@@ -34,8 +144,9 @@ $planFacts = [];
 $minEntry  = PHP_INT_MAX;
 
 foreach ($packages as $p) {
-  $id  = (int) $p['id'];
-  $fee = (float) $p['entry_fee'];
+  $id   = (int) $p['id'];
+  $fee  = (float) $p['entry_fee'];
+  $copy = $pkgCopy[strtolower(trim((string) $p['name']))] ?? $pkgCopyFallback;
 
   if ($fee < $minEntry) {
     $minEntry = $fee;
@@ -43,6 +154,8 @@ foreach ($packages as $p) {
 
   $planFacts[$id] = [
     'name'        => (string) $p['name'],
+    'desc'        => $copy['desc'],
+    'bullets'     => $copy['bullets'],
     'image_url'   => !empty($p['image'])
       ? $base . '/uploads/' . $p['image']
       : $frontend . '/pkg-starter.jpg',
@@ -961,6 +1074,7 @@ $legalDocs = [
       width: 100%;
       height: 100%;
       object-fit: cover;
+      object-position: center bottom;
     }
 
     .af-package-body {
@@ -2025,15 +2139,13 @@ $legalDocs = [
                 </div>
 
                 <div class="af-package-description">
-                  A defined participation level with a corresponding farm arrangement
-                  and package-specific partner features.
+                  <?= e($f['desc']) ?>
                 </div>
 
                 <ul class="af-package-list">
-                  <li>Defined farm participation amount</li>
-                  <li>Production cycle governed by the applicable farm terms</li>
-                  <li>Farm-managed grow-out where eligible</li>
-                  <li>Partner features vary by package</li>
+                  <?php foreach ($f['bullets'] as $bullet): ?>
+                    <li><?= e($bullet) ?></li>
+                  <?php endforeach; ?>
                 </ul>
 
                 <div class="af-package-actions">
