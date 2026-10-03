@@ -1,0 +1,29 @@
+[2026-06-06 04:04:51 PST] [INFO ] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[2026-06-06 04:04:51 PST] [INFO ] Transfer limit reset started — Altas Farm
+[2026-06-06 04:04:51 PST] [INFO ] Date      : Sat, 06 Jun 2026
+[2026-06-06 04:04:51 PST] [INFO ] Is Monday : NO (daily reset only)
+[2026-06-06 04:04:51 PST] [OK   ] Database connection established.
+[2026-06-06 04:04:51 PST] [INFO ] Members (total)              : 15
+[2026-06-06 04:04:51 PST] [INFO ] Members with daily usage     : 4
+[2026-06-06 04:04:51 PST] [INFO ] Members with weekly usage    : 5
+[2026-06-06 04:04:51 PST] [OK   ] Daily limit reset. Rows updated: 4
+[2026-06-06 04:04:51 PST] [INFO ] Weekly limit reset skipped (not Monday).
+[2026-06-06 04:04:51 PST] [OK   ] Verification passed — all daily counters confirmed at 0.
+[2026-06-06 04:04:51 PST] [INFO ] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[2026-06-06 04:04:51 PST] [OK   ] Reset complete. Duration: 78.68ms
+[2026-06-06 04:04:51 PST] [INFO ] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[2026-06-06 04:09:25 PST] [INFO ] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[2026-06-06 04:09:25 PST] [INFO ] Transfer limit reset started — Altas Farm
+[2026-06-06 04:09:25 PST] [INFO ] Date      : Sat, 06 Jun 2026
+[2026-06-06 04:09:25 PST] [INFO ] Is Monday : YES (weekly reset will run)
+[2026-06-06 04:09:25 PST] [OK   ] Database connection established.
+[2026-06-06 04:09:25 PST] [INFO ] Members (total)              : 15
+[2026-06-06 04:09:25 PST] [INFO ] Members with daily usage     : 0
+[2026-06-06 04:09:25 PST] [INFO ] Members with weekly usage    : 5
+[2026-06-06 04:09:25 PST] [OK   ] Daily limit reset. Rows updated: 0
+[2026-06-06 04:09:25 PST] [OK   ] Weekly limit reset (Monday). Rows updated: 5
+[2026-06-06 04:09:25 PST] [OK   ] Verification passed — all daily counters confirmed at 0.
+[2026-06-06 04:09:25 PST] [OK   ] Verification passed — all weekly counters confirmed at 0.
+[2026-06-06 04:09:25 PST] [INFO ] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[2026-06-06 04:09:25 PST] [OK   ] Reset complete. Duration: 89.91ms
+[2026-06-06 04:09:25 PST] [INFO ] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

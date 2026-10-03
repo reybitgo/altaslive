@@ -1,0 +1,54 @@
+[2026-06-02 17:21:57 PST] [INFO ] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[2026-06-02 17:21:57 PST] [INFO ] Midnight reset started — Altas Farm
+[2026-06-02 17:21:57 PST] [INFO ] Environment : development
+[2026-06-02 17:21:57 PST] [INFO ] Database    : u938213108_altas_db
+[2026-06-02 17:21:57 PST] [INFO ] Server time : Tue, 02 Jun 2026 05:21:57 PM PST
+[2026-06-02 17:21:57 PST] [OK   ] Database connection established.
+[2026-06-02 17:21:57 PST] [INFO ] Members (total)         : 10
+[2026-06-02 17:21:57 PST] [INFO ] Members (active)        : 9
+[2026-06-02 17:21:57 PST] [INFO ] Members with pairs today  : 0
+[2026-06-02 17:21:57 PST] [INFO ] Total pairs today       : 0
+[2026-06-02 17:21:57 PST] [OK   ] pairs_paid_today reset to 0. Rows updated: 0
+[2026-06-02 17:21:57 PST] [OK   ] Verification passed — all pairs_paid_today confirmed at 0.
+[2026-06-02 17:21:57 PST] [OK   ] last_reset timestamp updated: 2026-06-02 17:21:57
+[2026-06-02 17:21:57 PST] [INFO ] Cap expiration: No members past reactivation window.
+[2026-06-02 17:21:58 PST] [OK   ] DFI payout: 297 paid to 9 member(s), 0 skipped.
+[2026-06-02 17:21:58 PST] [INFO ] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[2026-06-02 17:21:58 PST] [OK   ] Reset complete. Duration: 172.57ms
+[2026-06-02 17:21:58 PST] [INFO ] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[2026-06-04 14:45:59 PST] [INFO ] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[2026-06-04 14:45:59 PST] [INFO ] Midnight reset started — Altas Farm
+[2026-06-04 14:45:59 PST] [INFO ] Environment : development
+[2026-06-04 14:45:59 PST] [INFO ] Database    : u938213108_altas_db
+[2026-06-04 14:45:59 PST] [INFO ] Server time : Thu, 04 Jun 2026 02:45:59 PM PST
+[2026-06-04 14:45:59 PST] [OK   ] Database connection established.
+[2026-06-04 14:45:59 PST] [INFO ] Members (total)         : 14
+[2026-06-04 14:45:59 PST] [INFO ] Members (active)        : 13
+[2026-06-04 14:45:59 PST] [INFO ] Members with pairs today  : 0
+[2026-06-04 14:45:59 PST] [INFO ] Total pairs today       : 0
+[2026-06-04 14:45:59 PST] [OK   ] pairs_paid_today reset to 0. Rows updated: 0
+[2026-06-04 14:45:59 PST] [OK   ] Verification passed — all pairs_paid_today confirmed at 0.
+[2026-06-04 14:45:59 PST] [OK   ] last_reset timestamp updated: 2026-06-04 14:45:59
+[2026-06-04 14:45:59 PST] [INFO ] Cap expiration: No members past reactivation window.
+[2026-06-04 14:45:59 PST] [OK   ] DFI payout: 429 paid to 13 member(s), 0 skipped.
+[2026-06-04 14:45:59 PST] [INFO ] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[2026-06-04 14:45:59 PST] [OK   ] Reset complete. Duration: 264.07ms
+[2026-06-04 14:45:59 PST] [INFO ] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[2026-06-14 10:23:55 PST] [INFO ] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[2026-06-14 10:23:55 PST] [INFO ] Midnight reset started — Altas Farm
+[2026-06-14 10:23:55 PST] [INFO ] Environment : development
+[2026-06-14 10:23:55 PST] [INFO ] Database    : u938213108_altas_db
+[2026-06-14 10:23:55 PST] [INFO ] Server time : Sun, 14 Jun 2026 10:23:55 AM PST
+[2026-06-14 10:23:55 PST] [OK   ] Database connection established.
+[2026-06-14 10:23:56 PST] [INFO ] Members (total)         : 4
+[2026-06-14 10:23:56 PST] [INFO ] Members (active)        : 3
+[2026-06-14 10:23:56 PST] [INFO ] Members with paired PV today : 0
+[2026-06-14 10:23:56 PST] [INFO ] Total paired PV today   : 0.00
+[2026-06-14 10:23:56 PST] [OK   ] paired_pv_today reset to 0. Rows updated: 0
+[2026-06-14 10:23:56 PST] [OK   ] Verification passed — all paired_pv_today confirmed at 0.
+[2026-06-14 10:23:56 PST] [OK   ] last_reset timestamp updated: 2026-06-14 10:23:56
+[2026-06-14 10:23:56 PST] [INFO ] Cap expiration: No members past reactivation window.
+[2026-06-14 10:23:56 PST] [OK   ] DFI payout: 99 paid to 3 member(s), 0 skipped.
+[2026-06-14 10:23:56 PST] [INFO ] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[2026-06-14 10:23:56 PST] [OK   ] Reset complete. Duration: 321.92ms
+[2026-06-14 10:23:56 PST] [INFO ] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
