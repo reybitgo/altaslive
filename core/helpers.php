@@ -454,3 +454,13 @@ function _pagination_page_range(int $current, int $total): array
     }
     return $out;
 }
+
+/** rows per page */
+function per_page(int $default = 10, int $min = 5): int { $val = (int)(['per_page'] ?? $default); return max($min, $val); }
+
+/** upload */
+function upload_image(array $file, string $subDir, string $prefix, ?string $oldPath = null, int $maxBytes = 5242880): ?string { if (empty($file['tmp_name']) || (int)($file['error']??0)===UPLOAD_ERR_NO_FILE) return null; if ((int)$file['error']!==UPLOAD_ERR_OK) throw new RuntimeException('upload'); $mime=mime_content_type($file['tmp_name']); $allowed=['image/jpeg'=>'jpg','image/png'=>'png','image/gif'=>'gif','image/webp'=>'webp']; if (!isset($allowed[$mime])) throw new InvalidArgumentException('type'); if ((int)$file['size']>$maxBytes) throw new InvalidArgumentException('size'); $root=dirname(__DIR__).DIRECTORY_SEPARATOR.'uploads'.DIRECTORY_SEPARATOR; $dir=$root.str_replace(['/','\\\\'],DIRECTORY_SEPARATOR,$subDir).DIRECTORY_SEPARATOR; if(!is_dir($dir)) mkdir($dir,0755,true); $name=$prefix.'_'.time().'.'.$allowed[$mime]; if(!move_uploaded_file($file['tmp_name'], $dir.$name)) throw new RuntimeException('save'); if($oldPath) delete_uploaded_file($oldPath); return $subDir.'/'.$name; }
+
+/** delete */
+function delete_uploaded_file(?string $p): void { if(!$p)return; $root=dirname(__DIR__).DIRECTORY_SEPARATOR.'uploads'.DIRECTORY_SEPARATOR; $path=$root.str_replace(['/','\\\\'],DIRECTORY_SEPARATOR,$p); if(file_exists($path)) @unlink($path); }
+
