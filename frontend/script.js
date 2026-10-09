@@ -53,8 +53,12 @@ document.querySelectorAll('a[href^="#"]').forEach((a) => {
     const target = document.querySelector(href);
     if (!target) return;
     e.preventDefault();
-    const offset = target.getBoundingClientRect().top + window.scrollY - 80;
-    window.scrollTo({ top: offset, behavior: "smooth" });
+    // Offset by the real header height (it changes between desktop/mobile and
+    // as fonts load) so the anchor target is never hidden behind the fixed nav.
+    const header = document.querySelector(".site-header");
+    const headerH = header ? header.offsetHeight : 80;
+    const offset = target.getBoundingClientRect().top + window.scrollY - headerH - 12;
+    window.scrollTo({ top: Math.max(offset, 0), behavior: "smooth" });
   });
 });
 

@@ -23,6 +23,56 @@ $scriptV = @filemtime(__DIR__ . '/script.js') ?: 20260927;
 $siteName    = 'Altas Farm';
 $siteTagline = setting('site_tagline', 'Grow the farm. Share in the harvest.');
 
+/*
+ * Exact business location.
+ *
+ * Source: the Google Maps place page for "Altas Farm"
+ * (https://maps.app.goo.gl/3xmJeKfKTj1NyaJ29, resolved 2026-10-09).
+ * The single source of truth for the on-page OpenStreetMap embed, the
+ * "Get directions" links, and the Organization geo coordinates in the
+ * structured-data block. Keep the embed URL derived from these values so
+ * the map and the markup can never drift apart.
+ */
+$mapShortUrl    = 'https://maps.app.goo.gl/3xmJeKfKTj1NyaJ29';
+$siteLat        = '16.9266802';
+$siteLng        = '121.616111';
+$mapDirectionsUrl = 'https://www.google.com/maps/dir/?api=1&destination='
+  . rawurlencode($siteLat . ',' . $siteLng);
+$osmPageUrl     = 'https://www.openstreetmap.org/?mlat=' . $siteLat
+  . '&mlon=' . $siteLng . '#map=18/' . $siteLat . '/' . $siteLng;
+$osmBbox        = sprintf(
+  '%.7F,%.7F,%.7F,%.7F',
+  (float) $siteLng - 0.0040,
+  (float) $siteLat - 0.0028,
+  (float) $siteLng + 0.0040,
+  (float) $siteLat + 0.0028
+);
+$osmEmbedUrl    = 'https://www.openstreetmap.org/export/embed.html?bbox='
+  . rawurlencode($osmBbox)
+  . '&layer=mapnik&marker=' . rawurlencode($siteLat . ',' . $siteLng);
+
+/*
+ * Public contact numbers, stored in E.164 form.
+ *
+ * Single source of truth for the on-page "Call or text" links and the
+ * structured-data contactPoint. The display label is derived from the same
+ * value, so the number a visitor reads can never disagree with the one the
+ * `tel:` link dials.
+ */
+$contactPhones = ['+639060987081', '+639996689052'];
+
+/**
+ * Renders an E.164 PH number for display: +63XXXXXXXXXX → +63 9XX XXX XXXX.
+ * Anything that does not match the expected shape is shown as-is rather
+ * than mangled.
+ */
+$formatPhone = static function (string $e164): string {
+  if (preg_match('/^\+63(\d{3})(\d{3})(\d{4})$/', $e164, $m)) {
+    return "+63 {$m[1]} {$m[2]} {$m[3]}";
+  }
+  return $e164;
+};
+
 $gcashEnabled = setting('gcash_enabled', '1') === '1';
 $mayaEnabled  = setting('maya_enabled', '1') === '1';
 $minPayout   = (float) setting('min_payout', '500');
@@ -354,6 +404,12 @@ $legalDocs = [
       'logo' => $base . '/logo.png',
       'description' => 'A Philippine poultry production and distribution business with a structured partner program.',
       'foundingDate' => '2024',
+      'geo' => [
+        '@type' => 'GeoCoordinates',
+        'latitude' => (float) $siteLat,
+        'longitude' => (float) $siteLng,
+      ],
+      'hasMap' => $mapShortUrl,
       'address' => [
         '@type' => 'PostalAddress',
         'streetAddress' => 'Rang-ay',
@@ -365,6 +421,7 @@ $legalDocs = [
       'contactPoint' => [[
         '@type' => 'ContactPoint',
         'email' => 'contact@altasfarm.com',
+        'telephone' => $contactPhones,
         'contactType' => 'customer support',
         'availableLanguage' => ['English', 'Filipino'],
       ]],
@@ -1416,6 +1473,77 @@ $legalDocs = [
       font-size: .86rem;
     }
 
+    /* Contact section: details beside the location map. */
+    .af-contact-grid--map {
+      grid-template-columns: minmax(0, 1.02fr) minmax(0, 1fr);
+      align-items: stretch;
+    }
+
+    .af-map-col {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .af-map-frame {
+      position: relative;
+      flex: 1 1 auto;
+      border: 1px solid var(--af-border);
+      border-radius: 20px;
+      overflow: hidden;
+      background: var(--af-soft);
+      box-shadow: var(--af-shadow);
+    }
+
+    .af-map-frame iframe {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 360px;
+      border: 0;
+    }
+
+    .af-map-meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: .6rem 1rem;
+      font-size: .78rem;
+      color: var(--af-muted);
+    }
+
+    .af-map-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .6rem;
+    }
+
+    .af-map-actions a {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      padding: .5rem .9rem;
+      border: 1px solid var(--af-border);
+      border-radius: 999px;
+      background: var(--af-white);
+      color: var(--af-deep);
+      font-size: .78rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background .2s ease, border-color .2s ease;
+    }
+
+    .af-map-actions a:hover {
+      background: var(--af-soft);
+      border-color: var(--af-green);
+    }
+
+    /* Fixed header would otherwise cover the top of any anchor target. */
+    main section[id] {
+      scroll-margin-top: calc(var(--header-h, 100px) + 12px);
+    }
+
     .af-final-cta {
       padding: 72px 0 84px;
       background: #f0f3ed;
@@ -1638,6 +1766,7 @@ $legalDocs = [
           <li><a href="#partners">Partners</a></li>
           <li><a href="#transparency">Transparency</a></li>
           <li><a href="#about">About</a></li>
+          <li><a href="#contact">Contact</a></li>
         </ul>
 
         <div class="nav-cta">
@@ -1666,6 +1795,7 @@ $legalDocs = [
     <a href="#partners" onclick="toggleMobileMenu()">Partners</a>
     <a href="#transparency" onclick="toggleMobileMenu()">Transparency</a>
     <a href="#about" onclick="toggleMobileMenu()">About</a>
+    <a href="#contact" onclick="toggleMobileMenu()">Contact</a>
     <div style="margin-top:1.5rem;display:flex;flex-direction:column;gap:.75rem;">
       <a href="<?= $base ?>/?page=login" style="color:var(--gold);text-align:center;">Member Login</a>
       <a href="<?= $base ?>/?page=register" class="btn-gold" style="text-align:center;">Partner / Join</a>
@@ -2431,6 +2561,122 @@ $legalDocs = [
                 type="button"
                 class="af-btn af-btn-primary"
                 onclick="openModal('modal-contact')">Contact Information</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         CONTACT + LOCATION MAP
+         The marker sits on the exact business location as published on
+         the Google Maps listing (see $mapShortUrl at the top of this
+         file); the embed is OpenStreetMap so the page carries no
+         Google tracking script.
+    ============================================================ -->
+    <section class="af-section" id="contact">
+      <div class="af-container">
+        <div class="af-section-head center">
+          <div class="af-eyebrow">Contact</div>
+          <h2 class="af-section-title">Reach the farm, or find us on the map.</h2>
+          <p class="af-section-lead">
+            Product availability, bulk orders, partnership inquiries, account support, and
+            compliance concerns all go through the same channels below. Walk-in visits are
+            by appointment only — message ahead so someone can receive you.
+          </p>
+        </div>
+
+        <div class="af-contact-grid af-contact-grid--map">
+          <div class="af-contact-box fade-up">
+            <h3>Talk to the business.</h3>
+            <p>
+              We reply within 24 hours on business days (Monday–Saturday). Include your
+              registered email and member ID for faster account resolution.
+            </p>
+
+            <div class="af-contact-details">
+              <div class="af-contact-detail">
+                <div class="af-contact-detail-label">Email</div>
+                <div class="af-contact-detail-value">
+                  <a href="mailto:support@altasfarm.com" style="color:#fff;">support@altasfarm.com</a>
+                </div>
+              </div>
+              <div class="af-contact-detail">
+                <div class="af-contact-detail-label">Call or text</div>
+                <div class="af-contact-detail-value">
+                  <?php foreach ($contactPhones as $i => $phone): ?>
+                    <?php if ($i > 0) echo '<br>'; ?>
+                    <a href="tel:<?= e($phone) ?>" style="color:#fff;"><?= e($formatPhone($phone)) ?></a>
+                  <?php endforeach; ?>
+                </div>
+              </div>
+              <div class="af-contact-detail">
+                <div class="af-contact-detail-label">Office address</div>
+                <div class="af-contact-detail-value">
+                  <?= e($siteName) ?><br>
+                  Rang-ay, Cabatuan, Isabela 3315, Philippines
+                </div>
+              </div>
+              <div class="af-contact-detail">
+                <div class="af-contact-detail-label">Support hours</div>
+                <div class="af-contact-detail-value">Monday–Saturday · 8:00 AM–6:00 PM PST (UTC+8)</div>
+              </div>
+              <div class="af-contact-detail">
+                <div class="af-contact-detail-label">Location</div>
+                <div class="af-contact-detail-value">
+                  <a
+                    href="<?= e($mapShortUrl) ?>"
+                    target="_blank"
+                    rel="noopener"
+                    style="color:#fff;">Altas Farm Map</a>
+                </div>
+              </div>
+              <div class="af-contact-detail">
+                <div class="af-contact-detail-label">Online</div>
+                <div class="af-contact-detail-value">
+                  <a
+                    href="https://www.facebook.com/people/Altas-Farm/61595099030024/"
+                    target="_blank"
+                    rel="noopener"
+                    style="color:#fff;">Facebook</a>
+                  <?php if ($telegramUrl): ?>
+                    · <a href="<?= e($telegramUrl) ?>" target="_blank" rel="noopener" style="color:#fff;">Telegram</a>
+                  <?php endif; ?>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top:1.5rem;display:flex;flex-wrap:wrap;gap:.75rem;">
+              <a href="mailto:support@altasfarm.com" class="af-btn af-btn-primary">Email the farm</a>
+              <a href="tel:<?= e($contactPhones[0]) ?>" class="af-btn" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.5);">Call or text</a>
+            </div>
+          </div>
+
+          <div class="af-map-col fade-up">
+            <div class="af-map-frame">
+              <iframe
+                src="<?= e($osmEmbedUrl) ?>"
+                title="Map of the <?= e($siteName) ?> location in Cabatuan, Isabela"
+                loading="lazy"
+                referrerpolicy="no-referrer-when-downgrade"
+                allowfullscreen></iframe>
+            </div>
+
+            <div class="af-map-meta">
+              <span>
+                Map data ©
+                <a
+                  href="https://www.openstreetmap.org/copyright"
+                  target="_blank"
+                  rel="noopener"
+                  style="color:inherit;text-decoration:underline;">OpenStreetMap</a>
+                contributors
+              </span>
+              <div class="af-map-actions">
+                <a href="<?= e($mapDirectionsUrl) ?>" target="_blank" rel="noopener">🧭 Get directions</a>
+                <a href="<?= e($mapShortUrl) ?>" target="_blank" rel="noopener">📍 Google Maps listing</a>
+                <a href="<?= e($osmPageUrl) ?>" target="_blank" rel="noopener">🔍 Larger map</a>
+              </div>
             </div>
           </div>
         </div>
