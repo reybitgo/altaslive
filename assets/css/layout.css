@@ -215,6 +215,18 @@
   flex-direction: column;
 }
 
+/* ── Modals ──────────────────────────────────────────────────*/
+/* Bootstrap 5.3's .modal-dialog-scrollable sets overflow-y:auto on
+   .modal-body but the flex container (.modal-content) has no definite
+   height, so the body grows to fit all form fields and the footer gets
+   clipped by .modal-content's overflow:hidden on small viewports.
+   Give the body a viewport-relative max-height so it scrolls internally
+   while header + footer stay visible. */
+.modal-dialog-scrollable .modal-body {
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+}
+
 /* ── Topbar ──────────────────────────────────────────────────*/
 .topbar-wrapper {
   height: var(--topbar-h);
