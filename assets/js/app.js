@@ -119,3 +119,36 @@ function copyText(text) {
     showToast("Copied: " + text, "info");
   });
 }
+
+// ── Keep the active sidebar item centered in view ────────────
+// The sidebar scrolls on its own, so every fresh page load leaves
+// it at scrollTop 0 — the active link can sit below the fold and
+// the user has to hunt for it. Re-center it inside whichever
+// element actually scrolls the nav (desktop .sidebar or the
+// mobile offcanvas body).
+function centerActiveNavItem(box) {
+  const active = box.querySelector(".nav-item-link.active");
+  if (!active || !box.clientHeight) return; // no active item / hidden box
+
+  const boxTop = box.getBoundingClientRect().top;
+  const itemTop = active.getBoundingClientRect().top - boxTop;
+  const wanted =
+    box.scrollTop + itemTop - (box.clientHeight - active.offsetHeight) / 2;
+  const max = Math.max(0, box.scrollHeight - box.clientHeight);
+  // Clamp: items near the top/bottom can't reach the center, but
+  // they stay visible either way.
+  box.scrollTop = Math.min(Math.max(wanted, 0), max);
+}
+
+function centerActiveSidebar() {
+  document
+    .querySelectorAll(".sidebar, #mobileSidebar .offcanvas-body")
+    .forEach(centerActiveNavItem);
+}
+
+centerActiveSidebar();
+// Fonts/images settling in late change the item heights — re-center.
+window.addEventListener("load", centerActiveSidebar);
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(centerActiveSidebar);
+}
