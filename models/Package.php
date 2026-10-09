@@ -35,6 +35,57 @@ class Package
         return $result;
     }
 
+    /**
+     * Number of indirect-referral levels a package funds.
+     *
+     * Level 1 is always counted, even though every package stores 0 for it: a
+     * direct sponsor is paid by the direct-referral bonus rather than a
+     * level-1 indirect bonus, so that zero row is by design, not a gap in the
+     * ladder. Levels 2 and up count only when their bonus is above zero — rows
+     * for 1..10 always exist, so a plain COUNT(*) would report the ladder's
+     * shape rather than the benefit actually funded.
+     */
+    public static function indirectLevelCount(int $packageId): int
+    {
+        return self::countFundedLevels(self::getIndirectLevels($packageId));
+    }
+
+    /**
+     * Largest funded-level count across every package, for the admin overview
+     * card where no single package applies (admins carry no package_id).
+     *
+     * Loaded in one query and measured with the same rule as the per-package
+     * count, so the two figures can never disagree.
+     */
+    public static function maxIndirectLevelCount(): int
+    {
+        $byPackage = [];
+        $rows = db()->query('SELECT package_id, level, bonus FROM package_indirect_levels')->fetchAll();
+        foreach ($rows as $row) {
+            $byPackage[(int) $row['package_id']][(int) $row['level']] = (float) $row['bonus'];
+        }
+
+        $max = 0;
+        foreach ($byPackage as $levels) {
+            $max = max($max, self::countFundedLevels($levels));
+        }
+        return $max;
+    }
+
+    /**
+     * The funding rule for an indirect-referral ladder, applied to a
+     * level => bonus map. Single definition of the rule — both counters above
+     * route through it.
+     */
+    private static function countFundedLevels(array $levels): int
+    {
+        return count(array_filter(
+            $levels,
+            static fn ($bonus, $level) => (int) $level === 1 || (float) $bonus > 0,
+            ARRAY_FILTER_USE_BOTH
+        ));
+    }
+
     public static function withLevels(int $id): ?array
     {
         $pkg = self::find($id);

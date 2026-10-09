@@ -169,6 +169,21 @@
       if ($nonWithdrawable > 0) {
           $balanceSub = fmt_money($withdrawable) . ' withdrawable · ' . fmt_money($nonWithdrawable) . ' locked';
       }
+      /*
+       * Indirect-referral ladder depth, counting level 1 plus every level above
+       * it that is actually funded. A member's own package drives the figure;
+       * the admin overview card has no package of its own, so it reports the
+       * deepest ladder configured anywhere. Only a package with no level rows
+       * at all resolves to 0, which hides the claim rather than advertising
+       * "Up to 0 levels".
+       */
+      $indirectLevelCount = $allPlans
+          ? Package::maxIndirectLevelCount()
+          : Package::indirectLevelCount((int) ($user['package_id'] ?? 0));
+      $indirectSub = $indirectLevelCount > 0
+          ? 'Up to ' . $indirectLevelCount . ' ' . ($indirectLevelCount === 1 ? 'level' : 'levels')
+          : null;
+
       $cards = [
         [$wallet['ewallet_balance'], 'E-Wallet Balance',   '💰', 'primary', 'primary', $balanceSub, 'payout'],
         ...($isBinary ? [
@@ -176,7 +191,7 @@
         ] : []),
         [$summary['total_direct'],   'Direct Referral',  '👥', 'orange',  'warning', null, 'genealogy&view=referral'],
         ...(($allPlans || Package::hasIndirectReferral((int)$user['package_id'])) ? [
-          [$summary['total_indirect'], 'Indirect Referral', '🔗', 'purple',  'purple',  'Up to 10 levels', null],
+          [$summary['total_indirect'], 'Indirect Referral', '🔗', 'purple',  'purple',  $indirectSub, null],
         ] : []),
       ];
       foreach ($cards as [$val, $label, $icon, $accent, $color, $sub, $link]): ?>
