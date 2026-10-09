@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 class Cart
 {
     public static function getActive(int $memberId): ?array
@@ -24,7 +24,7 @@ class Cart
         $available = Product::availableStock($productId);
         $existing = self::getItem($cartId, $productId);
         $newQty = ($existing ? (int)$existing['quantity'] : 0) + $quantity;
-        if ($newQty > $available) throw new InvalidArgumentException('Insufficient stock.');
+        if ($newQty > $available) throw new InvalidArgumentException('Insufficient stock. Requested ' . $newQty . ', only ' . $available . ' available.');
         $pdo = db();
         $unitPrice = (float)$product['price'];
         if ($existing) {
@@ -39,7 +39,7 @@ class Cart
         if ($quantity < 0) throw new InvalidArgumentException('Quantity cannot be negative.');
         if ($quantity === 0) return self::removeItem($cartId, $productId);
         $available = Product::availableStock($productId);
-        if ($quantity > $available) throw new InvalidArgumentException('Insufficient stock.');
+        if ($quantity > $available) throw new InvalidArgumentException('Insufficient stock. Requested ' . $quantity . ', only ' . $available . ' available.');
         $product = Product::find($productId);
         if (!$product) throw new InvalidArgumentException('Product not found.');
         $pdo = db();
@@ -98,7 +98,7 @@ class Cart
         $item = $st->fetch();
         if (!$item) throw new InvalidArgumentException('Cart item not found.');
         $available = Product::availableStock((int)$item['product_id']);
-        if ($quantity > $available) throw new InvalidArgumentException('Insufficient stock.');
+        if ($quantity > $available) throw new InvalidArgumentException('Insufficient stock. Requested ' . $quantity . ', only ' . $available . ' available.');
         $st = db()->prepare("UPDATE cart_items SET quantity = ?, updated_at = NOW() WHERE id = ?");
         return $st->execute([$quantity, $itemId]);
     }

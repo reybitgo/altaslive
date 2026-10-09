@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 /**
  * @file   index.php
@@ -9,7 +9,7 @@
 <?php
 
 /**
- * MLM BINARY SYSTEM â€” Front Controller (v2)
+ * MLM BINARY SYSTEM — Front Controller (v2)
  * All HTTP requests route through here.
  */
 
@@ -59,7 +59,7 @@ if (setting('maintenance_mode') === '1' && !Auth::isAdmin()) {
 <head>
   <meta charset='UTF-8'>
   <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-  <title>We'll Be Right Back â€” {$name}</title>
+  <title>We'll Be Right Back — {$name}</title>
   <meta name='robots' content='noindex, nofollow'>
   <link rel='preconnect' href='https://fonts.googleapis.com'>
   <link href='https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=DM+Sans:wght@300;400;500;600;700&display=swap' rel='stylesheet'>
@@ -231,13 +231,13 @@ if (setting('maintenance_mode') === '1' && !Auth::isAdmin()) {
       <div class='eyebrow'><span class='pulse'></span> System Upgrade in Progress</div>
       <h1>Something Better Is<br><span>On the Way</span></h1>
       <p class='lead'>
-        We are rolling out improvements behind the scenes to make your {$name} experience faster, more secure, and more rewarding. The platform will be back online shortly. Thank you for your patience â€” great things are worth the wait.
+        We are rolling out improvements behind the scenes to make your {$name} experience faster, more secure, and more rewarding. The platform will be back online shortly. Thank you for your patience — great things are worth the wait.
       </p>
       <div class='features'>
-        <span class='feature-chip'>ðŸŒ± Enhanced Dashboard</span>
-        <span class='feature-chip'>âš¡ Faster Payouts</span>
-        <span class='feature-chip'>ðŸ”’ Stronger Security</span>
-        <span class='feature-chip'>ðŸ“Š Real-Time Tracking</span>
+        <span class='feature-chip'>🌱 Enhanced Dashboard</span>
+        <span class='feature-chip'>⚡ Faster Payouts</span>
+        <span class='feature-chip'>🔒 Stronger Security</span>
+        <span class='feature-chip'>📊 Real-Time Tracking</span>
       </div>
       <div class='contact-box'>
         <p>If you have an urgent concern about your account, commissions, or withdrawals, our support team is still available:</p>
@@ -250,26 +250,26 @@ if (setting('maintenance_mode') === '1' && !Auth::isAdmin()) {
 </html>");
 }
 
-// Seat limit â€” block registration routes entirely when full
+// Seat limit — block registration routes entirely when full
 $page = $_GET['page'] ?? '';
 if (in_array($page, ['register', 'do_register', 'validate_code'], true) && isSeatLimitReached()) {
     http_response_code(403);
     $name  = setting('site_name', APP_NAME);
     $limit = (int) setting('seat_limit', '1000');
-    die("<!doctype html><html><head><meta charset='UTF-8'><title>Registration Closed â€” {$name}</title>
+    die("<!doctype html><html><head><meta charset='UTF-8'><title>Registration Closed — {$name}</title>
     <style>body{font-family:'DM Sans',system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f4f6fb;}
     .box{text-align:center;padding:48px 40px;max-width:420px;background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.06);}
     .emoji{font-size:3.5rem;margin-bottom:.5rem;}h1{font-size:1.5rem;margin-bottom:.5rem;color:#1a1a2e;}p{color:#6b7a99;line-height:1.6;margin-bottom:1.75rem;}
     .btn{display:inline-block;padding:.7rem 1.6rem;border-radius:10px;text-decoration:none;font-weight:600;font-size:.9rem;background:#3b6ff0;color:#fff;}
-    </style></head><body><div class='box'><div class='emoji'>ðŸ”’</div><h1>Registration Closed</h1>
+    </style></head><body><div class='box'><div class='emoji'>🔒</div><h1>Registration Closed</h1>
     <p>The member seat limit of <strong>" . number_format($limit) . "</strong> has been reached. No new accounts can be created at this time.</p>
-    <a href='/?page=login' class='btn'>Sign In â†’</a></div></body></html>");
+    <a href='/?page=login' class='btn'>Sign In →</a></div></body></html>");
 }
 
 // Route table: page => [ControllerClass, method, role]
 // role: 'guest' | 'member' | 'admin' | 'any'
 $routes = [
-    // â”€â”€ Auth â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Auth ──────────────────────────────────────────
     'login'              => ['AuthController',   'showLogin',       'guest'],
     'do_login'           => ['AuthController',   'doLogin',         'guest'],
     'register'           => ['AuthController',   'showRegister',    'any'],
@@ -281,11 +281,11 @@ $routes = [
     'auto_select_upline' => ['AuthController',   'ajaxAutoSelectUpline', 'any'],
     'logout'             => ['AuthController',   'logout',          'any'],
 
-    // â”€â”€ Super-Login (superadmin â†’ any member) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Super-Login (superadmin → any member) ───────────────────
     'slogin'             => ['AuthController',   'showSlogin',      'super'],
     'do_slogin'          => ['AuthController',   'doSlogin',        'super'],
 
-    // â”€â”€ Member â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Member ────────────────────────────────────────
     'dashboard'          => ['MemberController', 'dashboard',       'member'],
     'profile'            => ['MemberController', 'profile',         'member'],
     'save_profile'       => ['MemberController', 'saveProfile',     'member'],
@@ -313,7 +313,7 @@ $routes = [
     'api_validate_upgrade_code' => ['MemberController', 'ajaxValidateUpgradeCode', 'member'],
     'api_binary_uplines' => ['MemberController', 'ajaxBinaryUplines', 'member'],
 
-    // â”€â”€ Admin â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Admin ─────────────────────────────────────────
     'admin'              => ['AdminController',  'dashboard',       'admin'],
     'admin_users'        => ['AdminController',  'users',           'admin'],
     'admin_user_view'    => ['AdminController',  'viewUser',        'admin'],
@@ -355,22 +355,32 @@ $routes = [
     'do_admin_ewallet_topup' => ['AdminController',  'doEwalletTopUp',      'admin'],
     'admin_ewallet_monitor'  => ['AdminController',  'ewalletMonitor',      'admin'],
     // ── Shop (physical storefront) ─────────────────────────────
-    'shop'                        => ['MemberController', 'shop',                        'member'],
-    'shop_orders'                 => ['MemberController', 'shopOrders',                  'member'],
-    'cart'                        => ['MemberController', 'cart',                        'member'],
-    'add_to_cart'                 => ['MemberController', 'addToCart',                   'member'],
-    'update_cart_item'            => ['MemberController', 'updateCartItem',              'member'],
-    'remove_cart_item'            => ['MemberController', 'removeCartItem',              'member'],
-    'checkout'                    => ['MemberController', 'checkout',                    'member'],
-    'place_order'                 => ['MemberController', 'placeOrder',                  'member'],
-    // Admin Shop
-    'admin_shop'                  => ['AdminController',  'shopProducts',                'admin'],
-    'admin_save_product'          => ['AdminController',  'saveShopProduct',             'admin'],
-    'admin_delete_product'        => ['AdminController',  'deleteShopProduct',           'admin'],
-    'admin_shop_orders'           => ['AdminController',  'shopOrders',                  'admin'],
-    'admin_mark_order_paid'       => ['AdminController',  'markOrderPaid',               'admin'],
-    'admin_approve_order'         => ['AdminController',  'approveOrder',                'admin'],
-    'admin_reject_order'          => ['AdminController',  'rejectOrder',                 'admin'],
+    'shop'                        => ['MemberController', 'shop',              'member'],
+    'shop_orders'                 => ['MemberController', 'shopOrders',        'member'],
+    'shop_order'                  => ['MemberController', 'shopOrder',         'member'],
+    'cart'                        => ['MemberController', 'cart',              'member'],
+    'add_to_cart'                 => ['MemberController', 'addToCart',         'member'],
+    'update_cart_item'            => ['MemberController', 'updateCartItem',    'member'],
+    'remove_cart_item'            => ['MemberController', 'removeCartItem',    'member'],
+    'checkout'                    => ['MemberController', 'checkout',          'member'],
+    'place_order'                 => ['MemberController', 'placeOrder',        'member'],
+    'shop_submit_proof'           => ['MemberController', 'submitShopProof',   'member'],
+    'shop_cancel_order'           => ['MemberController', 'cancelShopOrder',   'member'],
+    'shop_confirm_receipt'        => ['MemberController', 'confirmShopReceipt','member'],
+    // ── Admin Shop ─────────────────────────────────────────────
+    'admin_shop'                  => ['AdminController',  'shopProducts',      'admin'],
+    'admin_save_product'          => ['AdminController',  'saveShopProduct',   'admin'],
+    'admin_delete_product'        => ['AdminController',  'deleteShopProduct', 'admin'],
+    'admin_shop_orders'           => ['AdminController',  'shopOrders',        'admin'],
+    'admin_shop_order'            => ['AdminController',  'shopOrder',         'admin'],
+    'admin_order_transition'      => ['AdminController',  'orderTransition',   'admin'],
+    'admin_order_hold'            => ['AdminController',  'orderHold',         'admin'],
+    'admin_order_resume'          => ['AdminController',  'orderResume',       'admin'],
+    'admin_order_proof'           => ['AdminController',  'orderProofView',    'admin'],
+    'admin_order_shipment'        => ['AdminController',  'orderShipment',     'admin'],
+    'admin_order_reship'          => ['AdminController',  'orderReship',       'admin'],
+    'admin_order_refund'          => ['AdminController',  'orderRefund',       'admin'],
+    'admin_shop_expire'           => ['AdminController',  'shopExpire',        'admin'],
 ];
 
 $page = $_GET['page'] ?? 'login';

@@ -1,0 +1,314 @@
+    // ── Shop (physical storefront) ──────────────────────────────────────────
+    // Full implementation per tmp/shop/CART_AND_ADMIN_PRODUCTS_PLAN_REVISED.md §4.1.
+
+    /** Storefront master switch (settings.shop_enabled). */
+    private function guardShop(): void
+    {
+        if (setting('shop_enabled', '1') === '1') return;
+        flash('error', 'The shop is currently closed.');
+        redirect('/?page=dashboard');
+    }
+
+    /** Load an order for the member desk pages, or flash+redirect away. */
+    private function resolveOwnOrder(): ?array
+    {
+        $id = (int) ($_GET['id'] ?? 0);
+        if ($id <= 0) {
+            flash('error', 'Order not found.');
+            redirect('/?page=shop_orders');
+        }
+        $order = ShopOrder::findWithItems($id);
+        if (!$order || (int) $order['member_id'] !== Auth::id()) {
+            flash('error', 'Order not found.');
+            redirect('/?page=shop_orders');
+        }
+        return $order;
+    }
+
+    public function shop(): void
+    {
+        Auth::guard('member');
+        $this->guardShop();
+        $products = Product::active();
+        $cartId   = Cart::getActive(Auth::id())['id'] ?? null;
+        $cartCount = $cartId ? (int) Cart::getTotals((int) $cartId)['total_items'] : 0;
+        $pageTitle = 'Shop';
+        require 'views/member/shop.php';
+    }
+
+    public function shopOrders(): void
+    {
+        Auth::guard('member');
+        $orders = ShopOrder::forMember(Auth::id(), (int) ($_GET['pg'] ?? 1), per_page());
+        $pageTitle = 'My Orders';
+        require 'views/member/shop_orders.php';
+    }
+
+    public function shopOrder(): void
+    {
+        Auth::guard('member');
+        $order = $this->resolveOwnOrder();
+        $orderId = (int) $order['id'];
+        $events   = ShopOrderEvent::forOrder($orderId);
+        $shipments = ShopShipment::byOrder($orderId);
+        $activeShipment = ShopShipment::activeFor($orderId);
+        $proofs   = ShopPaymentProof::byOrder($orderId);
+        $refunds  = ShopRefund::forOrder($orderId);
+        $pageTitle = 'Order ' . e($order['order_no']);
+        require 'views/member/shop_order.php';
+    }
+
+    public function cart(): void
+    {
+        Auth::guard('member');
+        $this->guardShop();
+        $cart = Cart::getActive(Auth::id());
+        $cartId = $cart ? (int) $cart['id'] : null;
+        $items  = $cartId ? Cart::getItems($cartId) : [];
+        $totals = $cartId ? Cart::getTotals($cartId) : ['total_price' => 0, 'total_items' => 0];
+        $stockErrors = $cartId ? Cart::validateStock($cartId) : [];
+        $pageTitle = 'Cart';
+        require 'views/member/cart.php';
+    }
+
+    /** Shared target resolution for the cart AJAX verbs. */
+    private function cartTarget(): array
+    {
+        $cart = Cart::getOrCreate(Auth::id());
+        return [(int) $cart['id'], (int) ($_POST['product_id'] ?? ($_POST['item_id'] ?? 0))];
+    }
+
+    public function addToCart(): void
+    {
+        Auth::guard('member');
+        csrf_verify();
+        $this->guardShop();
+
+        [$cartId, $productId] = $this->cartTarget();
+        $qty = max(1, (int) ($_POST['quantity'] ?? 1));
+        try {
+            Cart::addItem($cartId, $productId, $qty);
+            $count = (int) Cart::getTotals($cartId)['total_items'];
+            if (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest') {
+                json_response(['ok' => true, 'count' => $count]);
+            }
+            flash('success', 'Added to cart.');
+        } catch (InvalidArgumentException $e) {
+            if (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest') {
+                json_response(['ok' => false, 'error' => $e->getMessage()], 400);
+            }
+            flash('error', $e->getMessage());
+        }
+        redirect('/?page=shop&cart=1');
+    }
+
+    public function updateCartItem(): void
+    {
+        Auth::guard('member');
+        csrf_verify();
+
+        $itemId = (int) ($_POST['item_id'] ?? 0);
+        $qty    = (int) ($_POST['quantity'] ?? 0);
+        $isAjax = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest');
+
+        try {
+            Cart::updateItemQuantity($itemId, $qty);
+            $cart = Cart::getActive(Auth::id());
+            $totals = $cart ? Cart::getTotals((int) $cart['id']) : ['total_price' => 0, 'total_items' => 0];
+            if ($isAjax) {
+                json_response(['ok' => true, 'subtotal' => number_format((float) $totals['total_price'], 2), 'count' => (int) $totals['total_items']]);
+            }
+        } catch (InvalidArgumentException $e) {
+            if ($isAjax) {
+                json_response(['ok' => false, 'error' => $e->getMessage()], 400);
+            }
+            flash('error', $e->getMessage());
+        }
+        redirect('/?page=cart');
+    }
+
+    public function removeCartItem(): void
+    {
+        Auth::guard('member');
+        csrf_verify();
+
+        $itemId = (int) ($_POST['item_id'] ?? 0);
+        $isAjax = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest');
+
+        try {
+            Cart::removeItemById($itemId);
+            if ($isAjax) {
+                $cart = Cart::getActive(Auth::id());
+                $totals = $cart ? Cart::getTotals((int) $cart['id']) : ['total_price' => 0, 'total_items' => 0];
+                json_response(['ok' => true, 'subtotal' => number_format((float) $totals['total_price'], 2), 'count' => (int) $totals['total_items']]);
+            }
+        } catch (InvalidArgumentException $e) {
+            if ($isAjax) {
+                json_response(['ok' => false, 'error' => $e->getMessage()], 400);
+            }
+            flash('error', $e->getMessage());
+        }
+        redirect('/?page=cart');
+    }
+
+    public function checkout(): void
+    {
+        Auth::guard('member');
+        $this->guardShop();
+
+        $cart = Cart::getActive(Auth::id());
+        if (!$cart) {
+            flash('info', 'Your cart is empty.');
+            redirect('/?page=shop');
+        }
+        $cartId = (int) $cart['id'];
+        Cart::refreshPrices($cartId);
+        $items = Cart::getItems($cartId);
+        if (!$items) {
+            flash('info', 'Your cart is empty.');
+            redirect('/?page=shop');
+        }
+        $stockErrors = Cart::validateStock($cartId);
+        if ($stockErrors) {
+            flash('error', $stockErrors[0]);
+            redirect('/?page=cart');
+        }
+        $totals = Cart::getTotals($cartId);
+        $paymentMethods = [
+            'ewallet'     => 'E-Wallet',
+            'gcash'       => 'GCash',
+            'maya'        => 'Maya',
+            'usdt_trc20'  => 'USDT (TRC20)',
+            'usdt_bep20'  => 'USDT (BEP20)',
+        ];
+        $pageTitle = 'Checkout';
+        require 'views/member/checkout.php';
+    }
+
+    public function placeOrder(): void
+    {
+        Auth::guard('member');
+        csrf_verify();
+        $this->guardShop();
+
+        $cart = Cart::getActive(Auth::id());
+        if (!$cart) {
+            flash('error', 'Your cart is empty.');
+            redirect('/?page=shop');
+        }
+
+        $method = (string) ($_POST['payment_method'] ?? '');
+        $addr = [
+            'billing_name'      => trim((string) ($_POST['billing_name'] ?? '')),
+            'billing_phone'     => trim((string) ($_POST['billing_phone'] ?? '')),
+            'shipping_name'     => trim((string) ($_POST['shipping_name'] ?? $addr['billing_name'] ?? '')),
+            'shipping_phone'    => trim((string) ($_POST['shipping_phone'] ?? '')),
+            'shipping_address'  => trim((string) ($_POST['shipping_address'] ?? '')),
+            'shipping_city'     => trim((string) ($_POST['shipping_city'] ?? '')),
+            'shipping_province' => trim((string) ($_POST['shipping_province'] ?? '')),
+            'shipping_postal'   => trim((string) ($_POST['shipping_postal'] ?? '')),
+            'notes_member'      => trim((string) ($_POST['notes_member'] ?? '')),
+        ];
+        if ($addr['billing_name'] === '' || $addr['shipping_name'] === '' || $addr['shipping_address'] === '') {
+            flash('error', 'Please fill in the recipient name and delivery address.');
+            redirect('/?page=checkout');
+        }
+        if (($_POST['terms'] ?? '') !== '1') {
+            flash('error', 'Please accept the terms to place your order.');
+            redirect('/?page=checkout');
+        }
+
+        $pdo = db();
+        try {
+            $pdo->beginTransaction();
+            $orderId = ShopOrder::createFromCart(
+                Auth::id(),
+                (int) $cart['id'],
+                $addr,
+                $method,
+                sha1(Auth::id() . '|' . $cart['id'] . '|' . ($_POST['idem'] ?? ''))
+            );
+
+            if ($method === 'ewallet') {
+                $order = ShopOrder::find($orderId);
+                $total = (float) $order['total_price'];
+                if (!Ewallet::debitInternal(Auth::id(), $total, $orderId, 'shop_order', "Shop order {$order['order_no']}")) {
+                    throw new RuntimeException('Insufficient e-wallet balance for ' . fmt_money($total) . '.');
+                }
+                $pdo->commit();
+
+                ShopOrder::markPaid($orderId, 'system', null);
+                Cart::clear((int) $cart['id']);
+                flash('success', 'Order placed and paid. Thank you!');
+                redirect('/?page=shop_order&id=' . $orderId);
+            }
+
+            $pdo->commit();
+            flash('success', 'Order placed. Upload your payment proof to continue.');
+            redirect('/?page=shop_order&id=' . $orderId);
+        } catch (InvalidArgumentException | RuntimeException $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            flash('error', $e->getMessage());
+            redirect('/?page=checkout');
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            flash('error', 'Could not place the order. Please try again.');
+            redirect('/?page=checkout');
+        }
+    }
+
+    public function submitShopProof(): void
+    {
+        Auth::guard('member');
+        csrf_verify();
+
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        $order = ShopOrder::find($orderId);
+        if (!$order || (int) $order['member_id'] !== Auth::id()) {
+            flash('error', 'Order not found.');
+            redirect('/?page=shop_orders');
+        }
+
+        $path = upload_image($_FILES['proof_image'] ?? [], 'shop_proofs', 'proof_' . Auth::id());
+        if (!$path) {
+            flash('error', 'Please attach a payment proof image.');
+            redirect('/?page=shop_order&id=' . $orderId);
+        }
+
+        $ok = ShopOrder::submitProof($orderId, Auth::id(), $path, [
+            'ref_no'        => trim((string) ($_POST['reference_no'] ?? '')),
+            'amount'        => (float) ($_POST['amount_sent'] ?? 0),
+            'transfer_date' => $_POST['transfer_date'] ?? null,
+        ]);
+        flash($ok ? 'success' : 'error', $ok
+            ? 'Proof submitted. We will verify your payment shortly.'
+            : 'Proof upload refused — the window may have closed or the attempt cap was reached.');
+        redirect('/?page=shop_order&id=' . $orderId);
+    }
+
+    public function cancelShopOrder(): void
+    {
+        Auth::guard('member');
+        csrf_verify();
+
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        $ok = ShopOrder::cancelByCustomer($orderId, Auth::id(), trim((string) ($_POST['note'] ?? '')));
+        flash($ok ? 'success' : 'error', $ok
+            ? 'Order cancelled.'
+            : 'This order can no longer be cancelled.');
+        redirect('/?page=shop_order&id=' . $orderId);
+    }
+
+    public function confirmShopReceipt(): void
+    {
+        Auth::guard('member');
+        csrf_verify();
+
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        $ok = ShopOrder::confirmReceipt($orderId, Auth::id());
+        flash($ok ? 'success' : 'error', $ok
+            ? 'Thank you! Your order is now complete.'
+            : 'Receipt could not be confirmed (an open refund may be blocking it).');
+        redirect('/?page=shop_order&id=' . $orderId);
+    }
+}

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 /**
  * @file   views/partials/footer.php

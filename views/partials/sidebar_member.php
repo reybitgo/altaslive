@@ -54,7 +54,13 @@ if ($canUpgrade) {
 $nav[] = ['page' => 'register&sponsor=' . $user['username'], 'icon' => '➕', 'label' => 'Register Member', 'pages' => ['register']];
 $nav[] = ['page' => 'ewallet_transfer', 'icon' => '💱', 'label' => 'Send Money', 'pages' => ['ewallet_transfer']];
 $nav[] = ['page' => 'payout',  'icon' => '💳', 'label' => 'Payouts',   'pages' => ['payout']];
-$nav[] = ['page' => 'profile', 'icon' => '⚙️', 'label' => 'Profile & Settings', 'pages' => ['profile']];
+
+// Shop section (plan §5.4) — visible to any logged-in session using this sidebar.
+$cartBadge = Cart::itemCountForMember((int) ($user['id'] ?? 0));
+$nav[] = 'SEPARATOR:Shop';
+$nav[] = ['page' => 'shop',        'icon' => '🛍️', 'label' => 'Shop',      'pages' => ['shop']];
+$nav[] = ['page' => 'shop_orders', 'icon' => '🧾', 'label' => 'My Orders', 'pages' => ['shop_orders', 'shop_order']];
+$nav[] = ['page' => 'cart',        'icon' => '🛒', 'label' => 'Cart',      'pages' => ['cart'], 'badge' => $cartBadge];
 
 // Add Admin View link if the logged-in user is an admin browsing as member
 if (Auth::isAdmin()) {
@@ -63,6 +69,7 @@ if (Auth::isAdmin()) {
 }
 
 $nav[] = 'SEPARATOR:Site';
+$nav[] = ['page' => 'profile', 'icon' => '⚙️', 'label' => 'Profile & Settings', 'pages' => ['profile']];
 $nav[] = ['page' => '__frontend__', 'icon' => '🌐', 'label' => 'View Frontend', 'pages' => []];
 
 function memberNavActive($item, $cp, $view)
@@ -100,6 +107,7 @@ function renderSidebarNav($nav, $cp, $user, $view, $initial, $name)
       <a href="<?= $href ?>" <?= $target ?> class="nav-item-link <?= $active ? 'active' : '' ?>">
         <span class="nav-icon"><?= $item['icon'] ?></span>
         <?= e($item['label']) ?>
+        <?php if (!empty($item['badge'])): ?><span class="nav-badge"><?= (int) $item['badge'] ?></span><?php endif; ?>
       </a>
     <?php endforeach; ?>
     <?php if (Auth::isSuperadmin()): ?>

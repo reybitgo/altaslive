@@ -13,6 +13,13 @@ $initial = strtoupper(substr($adminUser['username'] ?? 'A', 0, 1));
 $pendingPayouts = (int)db()->query("SELECT COUNT(*) FROM payout_requests WHERE status='pending'")->fetchColumn();
 $pendingMembers = (int)db()->query("SELECT COUNT(*) FROM users WHERE role='member' AND status='pending'")->fetchColumn();
 
+// Actionable shop queue (§5.5): the statuses staff must actually work,
+// not just payment_review — excludes self-reviewable staff orders is a
+// follow-up refinement; v1 counts everything actionable.
+$pendingShopOrders = (int)db()->query(
+    "SELECT COUNT(*) FROM shop_orders WHERE status IN ('payment_review','payment_failed','paid','packing','ready_to_ship','delivery_failed')"
+)->fetchColumn();
+
 function renderAdminNav($cp, $adminUser, $initial, $pendingPayouts, $pendingMembers)
 { ?>
   <div class="sidebar-brand">
@@ -59,6 +66,15 @@ function renderAdminNav($cp, $adminUser, $initial, $pendingPayouts, $pendingMemb
     </a>
     <a href="<?= APP_URL ?>/?page=admin_ewallet_monitor" class="nav-item-link <?= $cp === 'admin_ewallet_monitor' ? 'active' : '' ?>">
       <span class="nav-icon">📊</span> E-Wallet Monitor
+    </a>
+
+    <div class="nav-section-label">Shop</div>
+    <a href="<?= APP_URL ?>/?page=admin_shop" class="nav-item-link <?= in_array($cp, ['admin_shop']) ? 'active' : '' ?>">
+      <span class="nav-icon">🛍️</span> Products
+    </a>
+    <a href="<?= APP_URL ?>/?page=admin_shop_orders" class="nav-item-link <?= in_array($cp, ['admin_shop_orders', 'admin_shop_order']) ? 'active' : '' ?>">
+      <span class="nav-icon">📦</span> Orders
+      <?php if (!empty($pendingShopOrders)): ?><span class="nav-badge"><?= (int) $pendingShopOrders ?></span><?php endif; ?>
     </a>
 
     <div class="nav-section-label">Monitoring</div>

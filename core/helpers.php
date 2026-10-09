@@ -113,7 +113,7 @@ function redirect(string $path): never
         is_imp_session()
         && str_starts_with($path, '/')
         && !str_contains($path, 'imp=')
-        && !preg_match('#/?page=(slogin|logout)(&|$|#)#', $path)
+        && !preg_match('#/?page=(slogin|logout)(&|$)#', $path)
     ) {
         $path .= (str_contains($path, '?') ? '&' : '?') . 'imp=' . session_id();
     }
@@ -456,11 +456,75 @@ function _pagination_page_range(int $current, int $total): array
 }
 
 /** rows per page */
-function per_page(int $default = 10, int $min = 5): int { $val = (int)(['per_page'] ?? $default); return max($min, $val); }
+function per_page(int $default = 10, int $min = 5): int
+{
+    $val = (int) ($_GET['per_page'] ?? $default);
+    return max($min, $val);
+}
 
 /** upload */
 function upload_image(array $file, string $subDir, string $prefix, ?string $oldPath = null, int $maxBytes = 5242880): ?string { if (empty($file['tmp_name']) || (int)($file['error']??0)===UPLOAD_ERR_NO_FILE) return null; if ((int)$file['error']!==UPLOAD_ERR_OK) throw new RuntimeException('upload'); $mime=mime_content_type($file['tmp_name']); $allowed=['image/jpeg'=>'jpg','image/png'=>'png','image/gif'=>'gif','image/webp'=>'webp']; if (!isset($allowed[$mime])) throw new InvalidArgumentException('type'); if ((int)$file['size']>$maxBytes) throw new InvalidArgumentException('size'); $root=dirname(__DIR__).DIRECTORY_SEPARATOR.'uploads'.DIRECTORY_SEPARATOR; $dir=$root.str_replace(['/','\\\\'],DIRECTORY_SEPARATOR,$subDir).DIRECTORY_SEPARATOR; if(!is_dir($dir)) mkdir($dir,0755,true); $name=$prefix.'_'.time().'.'.$allowed[$mime]; if(!move_uploaded_file($file['tmp_name'], $dir.$name)) throw new RuntimeException('save'); if($oldPath) delete_uploaded_file($oldPath); return $subDir.'/'.$name; }
 
 /** delete */
 function delete_uploaded_file(?string $p): void { if(!$p)return; $root=dirname(__DIR__).DIRECTORY_SEPARATOR.'uploads'.DIRECTORY_SEPARATOR; $path=$root.str_replace(['/','\\\\'],DIRECTORY_SEPARATOR,$p); if(file_exists($path)) @unlink($path); }
+
+// ── Shop status helpers (plan §3.1 Phase 5.7) ────────────────────────────────
+
+/** The 14 statuses → human label. Single source for member + admin badges. */
+function shop_status_label(string $status): string
+{
+    return match ($status) {
+        'pending'            => 'Pending payment',
+        'payment_review'     => 'Payment under review',
+        'payment_failed'     => 'Payment rejected',
+        'paid'               => 'Paid',
+        'packing'            => 'Packing',
+        'ready_to_ship'      => 'Ready to ship',
+        'shipped'            => 'Shipped',
+        'out_for_delivery'   => 'Out for delivery',
+        'delivery_failed'    => 'Delivery failed',
+        'returned_to_sender' => 'Returned to sender',
+        'delivered'          => 'Delivered',
+        'completed'          => 'Completed',
+        'cancelled'          => 'Cancelled',
+        'on_hold'            => 'On hold',
+        default              => 'Unknown',
+    };
+}
+
+/** The 14 statuses → Bootstrap tone, so member and admin badges always agree. */
+function shop_status_tone(string $status): string
+{
+    return match ($status) {
+        'pending'            => 'warning',
+        'payment_review'     => 'info',
+        'payment_failed'     => 'danger',
+        'paid', 'delivered'  => 'success',
+        'packing'            => 'secondary',
+        'ready_to_ship'      => 'primary',
+        'shipped'            => 'primary',
+        'out_for_delivery'   => 'primary',
+        'delivery_failed'    => 'danger',
+        'returned_to_sender' => 'dark',
+        'completed'          => 'success',
+        'cancelled'          => 'secondary',
+        'on_hold'            => 'dark',
+        default              => 'secondary',
+    };
+}
+
+/** Rendered status pill, optionally with a timestamp under it. */
+function shop_status_badge(string $status, ?string $stamp = null): string
+{
+    $label = e(shop_status_label($status));
+    $tone  = shop_status_tone($status);
+    $small = $stamp ? '<small class="text-muted d-block" style="font-size:.68rem;">' . e(fmt_datetime($stamp)) . '</small>' : '';
+    return '<span class="badge bg-' . $tone . '">' . $label . '</span>' . $small;
+}
+
+/** Public order number: AL + yymmdd + zero-padded id (plan §2.3 note). */
+function shop_public_order_no(int $id, string $createdAt): string
+{
+    return 'AL' . date('ymd', strtotime($createdAt)) . str_pad((string) $id, 5, '0', STR_PAD_LEFT);
+}
 

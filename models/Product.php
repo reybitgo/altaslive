@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 class Product {
     public static function find(int $id): ?array {
         $st = db()->prepare("SELECT * FROM products WHERE id = ?");
@@ -31,13 +31,14 @@ class Product {
     }
     public static function save(array $data, ?int $id = null): int {
         $pdo = db();
+        // Explicit field list (plan §0.2): the two inert PV columns are never
+        // read, written, or rendered by PHP, so a POSTed PV key is silently
+        // dropped here by design. Do not add them to this list.
         $fields = [
             'sku' => trim($data['sku'] ?? ''),
             'name' => trim($data['name'] ?? ''),
             'product_type' => 'physical',
             'price' => (float)($data['price'] ?? 0),
-            'product_pv' => 0.00,
-            'pv_value' => 0.00,
             'stock' => (int)($data['stock'] ?? 0),
             'image_url' => $data['image_url'] ?? null,
             'short_description' => trim($data['short_description'] ?? ''),

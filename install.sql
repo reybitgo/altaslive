@@ -4,8 +4,8 @@
 --  Run once: mysql -u root -p DATABASE < install.sql
 -- ============================================================
 
-CREATE DATABASE IF NOT EXISTS u938213108_altas_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE u938213108_altas_db;
+CREATE DATABASE IF NOT EXISTS u938213108_altas6_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE u938213108_altas6_db;
 
 -- ─── PACKAGES ────────────────────────────────────────────────
 CREATE TABLE packages (
@@ -37,6 +37,27 @@ CREATE TABLE package_indirect_levels (
   bonus      DECIMAL(12,2)    NOT NULL DEFAULT 0.00,
   FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE,
   UNIQUE KEY uq_pkg_level (package_id, level)
+) ENGINE=InnoDB;
+
+-- ─── SHOP CATALOG (Phase 1.2 — plan §2.3) ─────────────────────
+CREATE TABLE products (
+  id                INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  sku               VARCHAR(64)  NULL,  -- optional; unique when set
+  name              VARCHAR(160) NOT NULL,
+  product_type      ENUM('physical') NOT NULL DEFAULT 'physical',
+  price             DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  product_pv        DECIMAL(12,2) NOT NULL DEFAULT 0.00,  -- inert (§0.2): never read/written by PHP
+  pv_value          DECIMAL(12,2) NOT NULL DEFAULT 0.00,  -- inert (§0.2): never read/written by PHP
+  stock             INT UNSIGNED  NOT NULL DEFAULT 0,
+  image_url         VARCHAR(255)  NULL,
+  short_description VARCHAR(255)  NULL,
+  description       TEXT          NULL,
+  status            ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  created_at        TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY sku (sku),
+  INDEX idx_products_status (status),
+  INDEX idx_products_name (name)
 ) ENGINE=InnoDB;
 
 -- ─── USERS ────────────────────────────────────────────────────
@@ -120,6 +141,232 @@ CREATE TABLE reg_codes (
 -- Tie reg_codes FKs back to users (added after users table)
 ALTER TABLE users ADD FOREIGN KEY (reg_code_id) REFERENCES reg_codes(id) ON DELETE SET NULL;
 
+-- ─── SHOP: CARTS + ORDERS (Phase 1.2 — §2.3 order) ───────────
+CREATE TABLE carts (
+  id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  member_id  INT UNSIGNED NOT NULL,
+  status     ENUM('active','abandoned','converted') NOT NULL DEFAULT 'active',
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_carts_member_status (member_id, status),
+  FOREIGN KEY (member_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE shop_orders (
+  id                  INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_no            VARCHAR(20) NOT NULL,
+  member_id           INT UNSIGNED NOT NULL,
+  total_price         DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  total_pv            DECIMAL(12,2) NOT NULL DEFAULT 0.00,  -- inert (§0.2)
+  payment_method      ENUM('ewallet','gcash','maya','usdt_trc20','usdt_bep20') NOT NULL DEFAULT 'ewallet',
+  payment_reference   VARCHAR(40) NULL,
+  idempotency_key     VARCHAR(64) NULL,
+  status              ENUM('pending','payment_review','payment_failed','paid','packing','ready_to_ship','shipped','out_for_delivery','delivery_failed','returned_to_sender','delivered','completed','cancelled','on_hold') NOT NULL DEFAULT 'pending',
+  previous_status     ENUM('pending','payment_review','payment_failed','paid','packing','ready_to_ship','shipped','out_for_delivery','delivery_failed','returned_to_sender','delivered','completed','cancelled') NULL,
+  payment_deadline    DATETIME NULL,
+  correction_deadline DATETIME NULL,
+  completion_due_at   DATETIME NULL,
+  hold_deadline       DATETIME NULL,
+  hold_owner_id       INT UNSIGNED NULL,
+  hold_reason         VARCHAR(160) NULL,
+  billing_name        VARCHAR(120) NOT NULL,
+  billing_phone       VARCHAR(40) NULL,
+  billing_email       VARCHAR(120) NULL,
+  shipping_name       VARCHAR(120) NOT NULL,
+  shipping_phone      VARCHAR(40) NULL,
+  shipping_address    VARCHAR(255) NOT NULL,
+  shipping_city       VARCHAR(80) NULL,
+  shipping_province   VARCHAR(80) NULL,
+  shipping_postcode   VARCHAR(20) NULL,  -- rev-4 legacy name (unused)
+  shipping_postal     VARCHAR(20) NULL,  -- plan §2.3 name
+  shipping_country    VARCHAR(2) NULL DEFAULT 'PH',
+  notes_member        VARCHAR(500) NULL,
+  notes_admin         VARCHAR(500) NULL,
+  terms_version       VARCHAR(16) NULL,
+  terms_accepted_at   DATETIME NULL,
+  paid_by             INT UNSIGNED NULL,
+  paid_at             DATETIME NULL,
+  approved_by         INT UNSIGNED NULL,
+  approved_at         DATETIME NULL,
+  packed_by           INT UNSIGNED NULL,
+  packed_at           DATETIME NULL,
+  shipped_by          INT UNSIGNED NULL,
+  shipped_at          DATETIME NULL,
+  delivered_by        INT UNSIGNED NULL,
+  delivered_at        DATETIME NULL,
+  completed_by        INT UNSIGNED NULL,
+  completed_at        DATETIME NULL,
+  cancelled_by        INT UNSIGNED NULL,
+  cancelled_at        DATETIME NULL,
+  cancelled_reason    VARCHAR(160) NULL,
+  version             INT UNSIGNED NOT NULL DEFAULT 1,
+  created_at          TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at          TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY order_no (order_no),
+  UNIQUE KEY idempotency_key (idempotency_key),
+  INDEX paid_by (paid_by),
+  INDEX approved_by (approved_by),
+  INDEX packed_by (packed_by),
+  INDEX shipped_by (shipped_by),
+  INDEX delivered_by (delivered_by),
+  INDEX completed_by (completed_by),
+  INDEX cancelled_by (cancelled_by),
+  INDEX hold_owner_id (hold_owner_id),
+  INDEX idx_shop_orders_member_status (member_id, status, created_at),
+  INDEX idx_shop_orders_status_deadlines (status, payment_deadline, correction_deadline, completion_due_at),
+  INDEX idx_shop_orders_idem (idempotency_key),
+  FOREIGN KEY (member_id)     REFERENCES users(id) ON DELETE RESTRICT,
+  FOREIGN KEY (paid_by)       REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (approved_by)   REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (packed_by)     REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (shipped_by)    REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (delivered_by)  REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (completed_by)  REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (cancelled_by)  REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (hold_owner_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE shop_order_items (
+  id                INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id          INT UNSIGNED NOT NULL,
+  product_id        INT UNSIGNED NOT NULL,
+  product_name      VARCHAR(160) NOT NULL,
+  product_sku       VARCHAR(64) NULL,
+  quantity          INT UNSIGNED NOT NULL DEFAULT 1,
+  unit_price        DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  unit_pv           DECIMAL(12,2) NOT NULL DEFAULT 0.00,  -- inert (§0.2)
+  total_price       DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  total_pv          DECIMAL(12,2) NOT NULL DEFAULT 0.00,  -- inert (§0.2)
+  reservation_state ENUM('reserved','committed','deducted','released','written_off') NOT NULL DEFAULT 'reserved',
+  deducted_at       DATETIME NULL,
+  released_at       DATETIME NULL,
+  INDEX idx_shop_order_items_order (order_id),
+  INDEX idx_shop_order_items_product (product_id),
+  FOREIGN KEY (order_id)   REFERENCES shop_orders(id) ON DELETE CASCADE,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+CREATE TABLE shop_order_events (
+  id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id    INT UNSIGNED NOT NULL,
+  from_status VARCHAR(20) NULL,
+  to_status   VARCHAR(20) NOT NULL,
+  actor_type  ENUM('customer','admin','system') NOT NULL DEFAULT 'system',
+  actor_id    INT UNSIGNED NULL,
+  source      ENUM('ui','api','timer','carrier','system') NOT NULL DEFAULT 'ui',
+  reason_code VARCHAR(40) NULL,
+  note        VARCHAR(500) NULL,
+  meta_json   JSON NULL,
+  ip          VARCHAR(45) NULL,
+  ua          VARCHAR(255) NULL,
+  created_at  TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX actor_id (actor_id),
+  INDEX idx_shop_order_events_order_created (order_id, created_at),
+  FOREIGN KEY (order_id) REFERENCES shop_orders(id) ON DELETE CASCADE,
+  FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE shop_shipments (
+  id                  INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id            INT UNSIGNED NOT NULL,
+  reship_of           INT UNSIGNED NULL,
+  seq                 TINYINT UNSIGNED NOT NULL DEFAULT 1,
+  state               ENUM('draft','active','closed','void') NOT NULL DEFAULT 'active',
+  courier             VARCHAR(40) NULL,
+  tracking_number     VARCHAR(80) NULL,
+  courier_link        VARCHAR(255) NULL,
+  handoff_at          DATETIME NULL,
+  expected_delivery_at DATETIME NULL,
+  out_for_delivery_at DATETIME NULL,
+  delivered_at        DATETIME NULL,
+  pod_receiver        VARCHAR(120) NULL,
+  pod_image           VARCHAR(255) NULL,
+  report_window_end   DATETIME NULL,
+  rts_at              DATETIME NULL,
+  attempts            TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  fault               ENUM('customer','carrier','shop') NULL,
+  fail_reason         VARCHAR(160) NULL,
+  response_deadline   DATETIME NULL,
+  closed_at           DATETIME NULL,
+  closed_reason       VARCHAR(80) NULL,
+  created_at          TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at          TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX reship_of (reship_of),
+  INDEX idx_shop_shipments_order_seq (order_id, seq),
+  INDEX idx_tracking (tracking_number),
+  FOREIGN KEY (order_id)  REFERENCES shop_orders(id) ON DELETE CASCADE,
+  FOREIGN KEY (reship_of) REFERENCES shop_shipments(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE shop_payment_proofs (
+  id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id         INT UNSIGNED NOT NULL,
+  attempt_no       TINYINT UNSIGNED NOT NULL DEFAULT 1,
+  proof_image      VARCHAR(255) NOT NULL,
+  mime             VARCHAR(40) NULL,
+  size_bytes       INT UNSIGNED NULL,
+  submitted_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reviewed_by      INT UNSIGNED NULL,
+  reviewed_at      DATETIME NULL,
+  status           ENUM('pending','verified','rejected') NOT NULL DEFAULT 'pending',
+  reject_reason    VARCHAR(160) NULL,
+  amount_received  DECIMAL(12,2) NULL,
+  reference_no     VARCHAR(40) NULL,
+  amount_sent      DECIMAL(12,2) NULL,
+  transfer_date    DATE NULL,
+  uploaded_by      INT UNSIGNED NULL,
+  ip               VARCHAR(45) NULL,
+  INDEX reviewed_by (reviewed_by),
+  INDEX idx_shop_payment_proofs_order_attempt (order_id, attempt_no),
+  FOREIGN KEY (order_id)    REFERENCES shop_orders(id) ON DELETE CASCADE,
+  FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE shop_refunds (
+  id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id      INT UNSIGNED NOT NULL,
+  amount        DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  cause         ENUM('admin_cancel','delivery_failure','customer_dispute','other') NOT NULL DEFAULT 'admin_cancel',
+  destination   VARCHAR(120) NULL,
+  method        ENUM('ewallet','cash','bank','manual') NOT NULL DEFAULT 'ewallet',
+  status        ENUM('open','approved','processed','denied','closed') NOT NULL DEFAULT 'open',
+  receipt_ref   VARCHAR(80) NULL,
+  promised_at   DATETIME NULL,
+  requested_by  INT UNSIGNED NULL,
+  approved_by   INT UNSIGNED NULL,
+  approved_at   DATETIME NULL,
+  processed_by  INT UNSIGNED NULL,
+  processed_at  DATETIME NULL,
+  note          VARCHAR(500) NULL,
+  ledger_ref_id INT UNSIGNED NULL,
+  created_at    TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX requested_by (requested_by),
+  INDEX approved_by (approved_by),
+  INDEX processed_by (processed_by),
+  INDEX idx_shop_refunds_order_status (order_id, status),
+  FOREIGN KEY (order_id)     REFERENCES shop_orders(id) ON DELETE RESTRICT,
+  FOREIGN KEY (requested_by) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (approved_by)  REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (processed_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE cart_items (
+  id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  cart_id    INT UNSIGNED NOT NULL,
+  product_id INT UNSIGNED NOT NULL,
+  quantity   INT UNSIGNED NOT NULL DEFAULT 1,
+  unit_price DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  unit_pv    DECIMAL(12,2) NOT NULL DEFAULT 0.00,  -- inert (§0.2)
+  added_at   TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_cart_product (cart_id, product_id),
+  INDEX product_id (product_id),
+  INDEX idx_cart_items_cart (cart_id),
+  FOREIGN KEY (cart_id)    REFERENCES carts(id) ON DELETE CASCADE,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
 -- ─── COMMISSIONS ──────────────────────────────────────────────
 CREATE TABLE commissions (
   id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -144,7 +391,7 @@ CREATE TABLE ewallet_ledger (
   type          ENUM('credit','debit') NOT NULL,
   amount        DECIMAL(12,2) NOT NULL,
   reference_id  INT UNSIGNED  NULL,
-  ref_type      ENUM('commission','payout','reactivation','transfer','topup', 'registration') NULL,  -- v2: added 'reactivation', 'transfer', 'topup', 'registration'
+  ref_type      ENUM('commission','payout','reactivation','transfer','topup', 'registration', 'shop_order') NULL,  -- v2: added 'reactivation', 'transfer', 'topup', 'registration'; Phase 1.2: added 'shop_order'
   balance_after DECIMAL(14,2) NOT NULL,
   note          VARCHAR(255)  NULL,
   created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -260,7 +507,7 @@ CREATE TABLE user_cd_status (
 CREATE TABLE cd_ledger (
   id                   INT AUTO_INCREMENT PRIMARY KEY,
   user_id              INT UNSIGNED  NOT NULL,
-  cd_status_id         INT UNSIGNED  NOT NULL,
+  cd_status_id         INT           NOT NULL,  -- signed: must match user_cd_status.id (MySQL 8 FK type check)
   commission_id        INT UNSIGNED  NULL,
   type                 ENUM('pairing','direct_referral','indirect_referral') NOT NULL,
   gross_amount         DECIMAL(12,2) NOT NULL,
@@ -395,7 +642,13 @@ INSERT INTO settings (key_name, value) VALUES
   ('ewallet_transfer_daily_limit',  '5000.00'),
   ('ewallet_transfer_weekly_limit', '20000.00'),
   ('free_registration_enabled',   '1'),
-  ('seat_limit',                  '0');
+  ('seat_limit',                  '0'),
+  ('shop_enabled',                '1'),
+  ('shop_payment_deadline_hours', '24'),
+  ('shop_correction_window_hours','24'),
+  ('shop_max_proof_attempts',     '3'),
+  ('shop_report_window_days',     '5'),
+  ('shop_max_delivery_attempts',  '3');
 
 -- Demo registration code (package 1, price 10500)
 INSERT INTO reg_codes (code, package_id, price, created_by)

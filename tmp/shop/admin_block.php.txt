@@ -1,0 +1,413 @@
+    // ── Shop (physical storefront) ──────────────────────────────────────────
+    // Full implementation per tmp/shop/CART_AND_ADMIN_PRODUCTS_PLAN_REVISED.md §4.2/§4.3.
+
+    public function shopProducts(): void
+    {
+        Auth::guard('admin');
+        $editProduct = null;
+        if (($_GET['edit'] ?? '') !== '') {
+            $editProduct = Product::find((int) $_GET['edit']);
+        }
+        $products = Product::allPaginated((int) ($_GET['pg'] ?? 1), per_page());
+        $pageTitle = 'Shop Products';
+        require 'views/admin/shop_products.php';
+    }
+
+    public function saveShopProduct(): void
+    {
+        Auth::guard('admin');
+        csrf_verify();
+
+        $id    = (int) ($_POST['product_id'] ?? 0);
+        $name  = trim((string) ($_POST['name'] ?? ''));
+        $price = (float) ($_POST['price'] ?? 0);
+        if ($name === '' || $price <= 0) {
+            flash('error', 'Product name and a price above zero are required.');
+            redirect('/?page=admin_shop');
+        }
+
+        $data = [
+            'sku'               => trim((string) ($_POST['sku'] ?? '')),
+            'name'              => $name,
+            'price'             => $price,
+            'stock'             => max(0, (int) ($_POST['stock'] ?? 0)),
+            'short_description' => trim((string) ($_POST['short_description'] ?? '')),
+            'description'       => trim((string) ($_POST['description'] ?? '')),
+            'status'            => ($_POST['status'] ?? 'active') === 'inactive' ? 'inactive' : 'active',
+        ];
+
+        try {
+            // Replace image when a new file arrives or the remove box is ticked.
+            $newImage = null;
+            if (($_FILES['image']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                $newImage = upload_image($_FILES['image'], 'products', 'product_' . ($id ?: 'new'), null);
+            }
+            $old = $id ? Product::find($id) : null;
+            $removeImage = ($id && ($_POST['remove_image'] ?? '') === '1');
+            $data['image_url'] = $old['image_url'] ?? null;
+            if ($newImage) {
+                if ($old && !empty($old['image_url'])) delete_uploaded_file($old['image_url']);
+                $data['image_url'] = $newImage;
+            } elseif ($removeImage) {
+                if ($old && !empty($old['image_url'])) delete_uploaded_file($old['image_url']);
+                $data['image_url'] = null;
+            }
+
+            Product::save($data, $id ?: null);
+            flash('success', $id ? 'Product updated.' : 'Product created.');
+        } catch (InvalidArgumentException $e) {
+            flash('error', $e->getMessage() === 'type'
+                ? 'Image must be a JPG, PNG, GIF, or WebP file.'
+                : ($e->getMessage() === 'size' ? 'Image is too large (max 5 MB).' : 'Invalid image.'));
+        } catch (RuntimeException $e) {
+            flash('error', 'Could not save the product. Please try again.');
+        }
+        redirect('/?page=admin_shop');
+    }
+
+    public function deleteShopProduct(): void
+    {
+        Auth::guard('admin');
+        csrf_verify();
+
+        $id = (int) ($_POST['product_id'] ?? 0);
+        $ok = Product::delete($id);
+        flash($ok ? 'success' : 'error', $ok
+            ? 'Product deleted.'
+            : 'Cannot delete product: it has existing shop orders.');
+        redirect('/?page=admin_shop');
+    }
+
+    public function shopOrders(): void
+    {
+        Auth::guard('admin');
+        $status = (string) ($_GET['status'] ?? 'payment_review');
+        $orders = ShopOrder::byStatus($status, (int) ($_GET['pg'] ?? 1), per_page());
+        $counts = ShopOrder::statusCounts();
+        $counts['all'] = array_sum($counts);
+        $actionable = (int) db()->query(
+            "SELECT COUNT(*) FROM shop_orders WHERE status IN ('payment_review','payment_failed','paid','packing','ready_to_ship','delivery_failed')"
+        )->fetchColumn();
+        $pageTitle = 'Shop Orders';
+        require 'views/admin/shop_orders.php';
+    }
+
+    public function shopOrder(): void
+    {
+        Auth::guard('admin');
+        $id = (int) ($_GET['id'] ?? 0);
+        $order = $id ? ShopOrder::findWithItems($id) : null;
+        if (!$order) {
+            flash('error', 'Order not found.');
+            redirect('/?page=admin_shop_orders');
+        }
+        $orderId       = (int) $order['id'];
+        $buyer         = User::find((int) $order['member_id']);
+        $events        = ShopOrderEvent::forOrder($orderId);
+        $proofs        = ShopPaymentProof::byOrder($orderId);
+        $shipments     = ShopShipment::byOrder($orderId);
+        $activeShipment = ShopShipment::activeFor($orderId);
+        $refunds       = ShopRefund::forOrder($orderId);
+        $counts        = ShopOrder::statusCounts();
+        $pageTitle     = 'Order ' . e($order['order_no']);
+        require 'views/admin/shop_order.php';
+    }
+
+    /**
+     * The single transition endpoint (§5.3). Every admin status move is one
+     * POST here carrying `to`. A false return means another actor won the
+     * race — flash "just changed", never retry silently.
+     */
+    public function orderTransition(): void
+    {
+        Auth::guard('admin');
+        csrf_verify();
+
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        $to      = (string) ($_POST['to'] ?? '');
+        $order   = ShopOrder::find($orderId);
+        $back    = '/?page=admin_shop_order&id=' . $orderId;
+
+        if (!$order) {
+            flash('error', 'Order not found.');
+            redirect('/?page=admin_shop_orders');
+        }
+
+        try {
+            ShopOrder::assertNotSelfReview($order);
+        } catch (RuntimeException $e) {
+            flash('error', $e->getMessage());
+            redirect($back);
+        }
+
+        $ok = false;
+        try {
+            switch ($to) {
+                case 'paid':
+                    $ok = ShopOrder::markPaid($orderId, 'admin', Auth::id(),
+                        isset($_POST['amount_sent']) ? (float) $_POST['amount_sent'] : null,
+                        trim((string) ($_POST['payment_reference'] ?? '')) ?: null);
+                    break;
+
+                case 'payment_review':          // paid-revert
+                    $ok = ShopOrder::revertPaidToReview($orderId, Auth::id(), trim((string) ($_POST['note'] ?? '')));
+                    break;
+
+                case 'payment_failed':
+                    $ok = ShopOrder::rejectProof($orderId, Auth::id(),
+                        trim((string) ($_POST['reason_code'] ?? 'unclear_proof')),
+                        isset($_POST['amount_received']) ? (float) $_POST['amount_received'] : null);
+                    break;
+
+                case 'packing':
+                    $ok = ShopOrder::startPacking($orderId, Auth::id());
+                    break;
+
+                case 'ready_to_ship':
+                    $ok = ShopOrder::finishPacking($orderId, Auth::id());
+                    break;
+
+                case 'shipped':
+                    $ok = ShopOrder::ship($orderId, Auth::id(),
+                        trim((string) ($_POST['courier'] ?? '')),
+                        trim((string) ($_POST['tracking_number'] ?? '')),
+                        $_POST['expected_delivery_at'] ?? null);
+                    break;
+
+                case 'out_for_delivery':
+                    $ok = ShopOrder::markOutForDelivery($orderId, 'admin', Auth::id());
+                    break;
+
+                case 'delivery_failed':
+                    $ok = ShopOrder::markDeliveryFailed($orderId, Auth::id(),
+                        (string) ($_POST['fault'] ?? ''), trim((string) ($_POST['fail_reason'] ?? '')));
+                    break;
+
+                case 'returned_to_sender':
+                    $ok = ShopOrder::returnToSender($orderId, 'admin', Auth::id(), trim((string) ($_POST['note'] ?? '')));
+                    break;
+
+                case 'delivered':
+                    $podImage = null;
+                    if (($_FILES['pod_image']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                        try {
+                            $podImage = upload_image($_FILES['pod_image'], 'shipments', 'pod_' . $orderId);
+                        } catch (Throwable $e) {
+                            flash('error', 'POD image upload failed.');
+                            redirect($back);
+                        }
+                    }
+                    $ok = ShopOrder::markDelivered($orderId, Auth::id(),
+                        trim((string) ($_POST['pod_receiver'] ?? '')) ?: null, $podImage);
+                    break;
+
+                case 'cancelled':
+                    $reason = trim((string) ($_POST['reason_code'] ?? 'admin_cancel'));
+                    $note   = trim((string) ($_POST['note'] ?? ''));
+                    $ok = ShopOrder::cancel($orderId, 'admin', Auth::id(), $reason, $note);
+                    if ($ok && in_array($order['status'], ['paid', 'packing', 'ready_to_ship', 'on_hold', 'returned_to_sender'], true)) {
+                        ShopRefund::create($orderId, (float) $order['total_price'], 'admin_cancel', null, null, Auth::id());
+                    }
+                    break;
+
+                case 'on_hold':
+                    $ok = ShopOrder::onHold($orderId, Auth::id(),
+                        trim((string) ($_POST['hold_reason'] ?? '')),
+                        (int) ($_POST['hold_owner_id'] ?? 0),
+                        (string) ($_POST['hold_deadline'] ?? ''));
+                    break;
+
+                case 'completed':
+                    // Admin may close on the buyer's behalf after the window;
+                    // the guard lives in the matrix (from delivered only).
+                    $ok = ShopOrder::transition($orderId, 'completed', 'admin', Auth::id(), [
+                        'reason_code' => 'admin_closed',
+                    ]);
+                    break;
+
+                default:
+                    flash('error', 'Unknown transition target.');
+                    redirect($back);
+            }
+        } catch (InvalidArgumentException $e) {
+            flash('error', $e->getMessage());
+            redirect($back);
+        }
+
+        if ($ok) {
+            flash('success', 'Order moved to ' . shop_status_label($to) . '.');
+        } else {
+            flash('error', 'This order just changed. Reload and try again.');
+        }
+        redirect($back);
+    }
+
+    public function orderHold(): void
+    {
+        Auth::guard('admin');
+        csrf_verify();
+
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        $ok = ShopOrder::onHold($orderId, Auth::id(),
+            trim((string) ($_POST['hold_reason'] ?? '')),
+            (int) ($_POST['hold_owner_id'] ?? 0),
+            (string) ($_POST['hold_deadline'] ?? ''));
+        flash($ok ? 'success' : 'error', $ok
+            ? 'Order placed on hold.'
+            : 'Hold refused — reason, owner, and deadline are all required.');
+        redirect('/?page=admin_shop_order&id=' . $orderId);
+    }
+
+    public function orderResume(): void
+    {
+        Auth::guard('admin');
+        csrf_verify();
+
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        $ok = ShopOrder::resume($orderId, Auth::id());
+        flash($ok ? 'success' : 'error', $ok
+            ? 'Hold released.'
+            : 'Resume refused — the previous status is no longer reachable.');
+        redirect('/?page=admin_shop_order&id=' . $orderId);
+    }
+
+    /** Streams one payment-proof image through an authenticated handler (§5.11). */
+    public function orderProofView(): void
+    {
+        Auth::guard('admin');
+
+        $proofId  = (int) ($_GET['proof_id'] ?? 0);
+        $orderId  = (int) ($_GET['id'] ?? 0);
+        $proof    = $proofId ? ShopPaymentProof::findForOrder($proofId, $orderId) : null;
+        if (!$proof) {
+            http_response_code(404);
+            exit('Proof not found');
+        }
+
+        ShopOrderEvent::log($orderId, null, ShopOrder::find($orderId)['status'], 'admin', Auth::id(), [
+            'reason_code' => 'proof_viewed',
+            'note'        => 'Proof #' . $proofId . ' viewed',
+            'source'      => 'ui',
+        ]);
+
+        $path = dirname(__DIR__) . '/uploads/' . ltrim((string) $proof['proof_image'], '/\\');
+        if (!is_file($path)) {
+            http_response_code(404);
+            exit('Proof file missing');
+        }
+        $mime = mime_content_type($path) ?: 'application/octet-stream';
+        header('Content-Type: ' . $mime);
+        header('Content-Length: ' . (string) filesize($path));
+        readfile($path);
+        exit;
+    }
+
+    /** Manual shipment facts edit — writes the ACTIVE shipment only (§4.2). */
+    public function orderShipment(): void
+    {
+        Auth::guard('admin');
+        csrf_verify();
+
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        $back    = '/?page=admin_shop_order&id=' . $orderId;
+        $s = ShopShipment::activeFor($orderId);
+        if (!$s) {
+            flash('error', 'No active shipment to edit. Tracking is set at handoff.');
+            redirect($back);
+        }
+
+        $data = [];
+        foreach (['courier', 'tracking_number', 'expected_delivery_at'] as $k) {
+            if (isset($_POST[$k])) $data[$k] = trim((string) $_POST[$k]) ?: null;
+        }
+        if (($_FILES['pod_image']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            try {
+                $data['pod_image'] = upload_image($_FILES['pod_image'], 'shipments', 'pod_' . $orderId);
+            } catch (Throwable $e) {
+                flash('error', 'POD image upload failed.');
+                redirect($back);
+            }
+        }
+        ShopShipment::touch((int) $s['id'], $data);
+        flash('success', 'Shipment updated.');
+        redirect($back);
+    }
+
+    public function orderReship(): void
+    {
+        Auth::guard('admin');
+        csrf_verify();
+
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        $ok = ShopOrder::reship($orderId, Auth::id());
+        flash($ok ? 'success' : 'error', $ok
+            ? 'Reshipment opened — the shop absorbs the cost, no fee charged.'
+            : 'Reship refused — the order must be returned_to_sender with no more than one prior reship.');
+        redirect('/?page=admin_shop_order&id=' . $orderId);
+    }
+
+    public function orderRefund(): void
+    {
+        Auth::guard('admin');
+        csrf_verify();
+
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        $back    = '/?page=admin_shop_order&id=' . $orderId;
+        $action  = (string) ($_POST['refund_action'] ?? '');
+
+        try {
+            switch ($action) {
+                case 'create':
+                    $amount = (float) ($_POST['amount'] ?? 0);
+                    if ($amount <= 0) {
+                        flash('error', 'Refund amount must be above zero.');
+                        redirect($back);
+                    }
+                    ShopRefund::create($orderId, $amount,
+                        (string) ($_POST['cause'] ?? 'customer_request'),
+                        trim((string) ($_POST['destination'] ?? '')) ?: null,
+                        ($_POST['promised_at'] ?? '') ?: null,
+                        Auth::id());
+                    flash('success', 'Refund task opened.');
+                    break;
+
+                case 'approve':
+                    ShopRefund::approve((int) ($_POST['refund_id'] ?? 0), Auth::id())
+                        ? flash('success', 'Refund approved.')
+                        : flash('error', 'Refund could not be approved.');
+                    break;
+
+                case 'mark_paid':
+                    ShopRefund::markPaid((int) ($_POST['refund_id'] ?? 0), Auth::id(),
+                        trim((string) ($_POST['receipt_ref'] ?? '')))
+                        ? flash('success', 'Refund marked paid.')
+                        : flash('error', 'Refund must be approved before it can be marked paid.');
+                    break;
+
+                case 'deny':
+                    ShopRefund::deny((int) ($_POST['refund_id'] ?? 0), Auth::id(), trim((string) ($_POST['note'] ?? '')))
+                        ? flash('success', 'Refund denied.')
+                        : flash('error', 'Refund could not be denied.');
+                    break;
+
+                default:
+                    flash('error', 'Unknown refund action.');
+            }
+        } catch (InvalidArgumentException $e) {
+            flash('error', $e->getMessage());
+        }
+        redirect($back);
+    }
+
+    /** Mirrors admin_manual_reset: cron runs on schedule, but there is a button. */
+    public function shopExpire(): void
+    {
+        Auth::guard('admin');
+        csrf_verify();
+
+        $expired  = ShopOrder::expireOverdue(200);
+        $finished = ShopOrder::autoComplete(200);
+        flash('success', "Expiry run: {$expired} order(s) cancelled, {$finished} auto-completed.");
+        redirect('/?page=admin_shop_orders');
+    }
+}

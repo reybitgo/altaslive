@@ -57,10 +57,47 @@
                                 <label class="form-label">Contact Email</label>
                                 <input type="email" name="contact_email" class="form-control" value="<?= e(setting('contact_email')) ?>">
                             </div>
-                            <div class="mb-0">
+                            <div class="mb-3">
                                 <label class="form-label">Minimum Payout (₱)</label>
                                 <input type="number" name="min_payout" class="form-control" min="0" step="0.01" value="<?= e(setting('min_payout', '500')) ?>">
                                 <div class="form-text">Members cannot request below this amount</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="shop_enabled" id="shopEnabled" value="1" <?= setting('shop_enabled', '1') === '1' ? 'checked' : '' ?>>
+                                    <label class="form-check-label fw-semibold" for="shopEnabled">🛍️ Enable Shop</label>
+                                </div>
+                                <div class="form-text">Members and staff can browse the catalog and place orders</div>
+                            </div>
+
+                            <label class="form-label fw-semibold" style="font-size:.8rem;">Shop lifecycle rules</label>
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <label class="form-label" style="font-size:.72rem;">Payment deadline (hours)</label>
+                                    <input type="number" name="shop_payment_deadline_hours" class="form-control form-control-sm" min="1" value="<?= e(setting('shop_payment_deadline_hours', '24')) ?>">
+                                    <div class="form-text" style="font-size:.7rem;">T7: pending orders expire after this</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" style="font-size:.72rem;">Correction window (hours)</label>
+                                    <input type="number" name="shop_correction_window_hours" class="form-control form-control-sm" min="1" value="<?= e(setting('shop_correction_window_hours', '24')) ?>">
+                                    <div class="form-text" style="font-size:.7rem;">T3: re-upload window after a rejected proof</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" style="font-size:.72rem;">Max proof attempts</label>
+                                    <input type="number" name="shop_max_proof_attempts" class="form-control form-control-sm" min="1" value="<?= e(setting('shop_max_proof_attempts', '3')) ?>">
+                                    <div class="form-text" style="font-size:.7rem;">T2: uploads before the order goes on hold</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" style="font-size:.72rem;">Report window (days)</label>
+                                    <input type="number" name="shop_report_window_days" class="form-control form-control-sm" min="1" value="<?= e(setting('shop_report_window_days', '5')) ?>">
+                                    <div class="form-text" style="font-size:.7rem;">T24: delivered orders auto-complete after this</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" style="font-size:.72rem;">Max delivery attempts</label>
+                                    <input type="number" name="shop_max_delivery_attempts" class="form-control form-control-sm" min="1" value="<?= e(setting('shop_max_delivery_attempts', '3')) ?>">
+                                    <div class="form-text" style="font-size:.7rem;">T16: courier attempts before return opens</div>
+                                </div>
                             </div>
                         </div>
                         <div class="card-footer border-top-0 pt-0">

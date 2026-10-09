@@ -24,6 +24,12 @@ if (isset($_GET['page']) && $_GET['page'] === 'admin_user_view' && !empty($_GET[
 $topbarBalance = fmt_money($walletUser['ewallet_balance'] ?? 0);
 $initials      = strtoupper(substr($topbarUser['username'] ?? 'U', 0, 1));
 $isMember      = ($topbarUser['role'] ?? '') === 'member';
+// Cart badge — any logged-in session can shop (§5.8); one cheap GROUP BY-free count.
+$topbarCartCount = 0;
+if (Auth::check()) {
+    $topbarCart = Cart::getActive(Auth::id());
+    $topbarCartCount = $topbarCart ? (int) Cart::getTotals((int) $topbarCart['id'])['total_items'] : 0;
+}
 ?>
 <div class="topbar-wrapper no-print">
     <!-- Hamburger (mobile only — triggers offcanvas) -->
@@ -50,6 +56,14 @@ $isMember      = ($topbarUser['role'] ?? '') === 'member';
                     <span class="bal-amount" style="color:#d97706;font-size:.8rem;">⏳ Active</span>
                 </div>
             <?php endif; ?>
+        <?php endif; ?>
+
+        <?php if (Auth::check()): ?>
+        <a href="<?= link_to('cart') ?>" class="btn btn-sm btn-light position-relative border-0 topbar-cart-btn"
+           title="Cart" style="font-size:1.05rem;line-height:1;padding:.3rem .55rem;">
+            🛒
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary topbar-cart-badge"><?= $topbarCartCount ?></span>
+        </a>
         <?php endif; ?>
 
         <div class="dropdown">

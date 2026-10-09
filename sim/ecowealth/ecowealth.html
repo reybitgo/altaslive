@@ -1565,7 +1565,7 @@ ${page("apl", myAutoLog)
         const cb = (k, f, l) =>
           `<label style="display:inline-flex;align-items:center;margin-right:16px"><input type="checkbox" data-f="${f}" style="width:auto;margin-right:6px"${on[k] ? " checked" : ""} onchange="S.on.${k}=this.checked?1:0;save();render()">${l}</label>`;
 
-        return `<div class="top"><div><h1>Harvest Simulator: General + Team + Royalty</h1><span class="mut">Admin view, logged in as <b>${me.name}</b>. Simulation only.</span></div>
+        return `<div class="top"><div><h1>EcoWealth Simulator: Indirect Referral + General Harvest + Team Harvest + Royalty + Unilevel</h1><span class="mut">Admin view, logged in as <b>${me.name}</b>. Simulation only.</span></div>
 <div class="row"><button class="sec" onclick="S.me=null;save();render()">Log out</button><button class="sec" onclick="reset()">Reset</button></div></div>
 ${m ? `<p class="err">${m}</p>` : ""}${warn ? '<p class="mut">Browser storage is unavailable here, so data resets when this tab closes.</p>' : ""}
 <div class="stats"><div><b>${N}</b>members registered</div><div><b>${NQ}</b>Harvest-qualified</div><div><b>${tierCounts[1]}</b>Leaders</div><div><b>${tierCounts[2]}</b>Supervisors</div><div><b>${tierCounts[3]}</b>Managers</div><div><b>${tierCounts[4]}</b>Directors</div><div><b>${peso(tg)}</b>General credited</div><div><b>${peso(tt)}</b>Team credited</div><div><b>${peso(tr)}</b>Royalty credited</div><div><b>${peso(tu)}</b>Unilevel credited</div><div><b>${peso(ti)}</b>Indirect credited</div><div><b>${peso(sum(tg, tt, tr, tu, ti))}</b>total credited</div><div><b>${activeNow}</b>Unilevel active members</div><div><b>${depth()} / ${NQ && dep(top) ? "Level " + dep(top) : "none"}</b>deepest level (General / Team)</div></div>
@@ -1616,7 +1616,7 @@ ${pager("members", rows.length)}<p class="mut">Click a member's name to log in a
       // assumption that wording changes to what players actually see need a deliberate decision, not a
       // documentation pass - worth updating to match the <title> tag, which already lists all five.
       function authView(m) {
-        return `<h1>Harvest Simulator: General + Team + Royalty</h1>
+        return `<h1>EcoWealth Simulator: Indirect Referral + General Harvest + Team Harvest + Royalty + Unilevel</h1>
 <p class="mut">Register for free, sponsor members, and grow three income streams at once: the shared General Harvest matrix, your own Team Harvest matrix, and the Royalty rank ladder. Nothing here is real money. Data stays in this browser.</p>
 ${m ? `<p class="err">${m}</p>` : ""}${warn ? '<p class="mut">Browser storage is unavailable here, so data resets when this tab closes.</p>' : ""}
 <div class="g2"><form class="pan" onsubmit="return doReg(this)"><h2>Register</h2><label>Username<input name="n" data-f="rn" autocomplete="off"></label><label>Sponsor<input name="s" data-f="rs" list="ul" value="company" autocomplete="off"></label><button>Register and log in</button></form>

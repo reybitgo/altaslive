@@ -1,4 +1,4 @@
-﻿<form method="get" action="<?php echo APP_URL; ?>/">
+<form method="get" action="<?php echo APP_URL; ?>/">
   <?php foreach ($_GET as $k => $v): if (is_scalar($v) && $k !== 'per_page' && $k !== 'pg'): ?>
     <input type="hidden" name="<?php echo e($k); ?>" value="<?php echo e($v); ?>">
   <?php endif; endforeach; ?>
