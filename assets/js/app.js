@@ -8,6 +8,33 @@
  * Replaces all native alert() / confirm() with Bootstrap 5 modals/toasts
  */
 
+// ── Escaping ───────────────────────────────────────────────
+
+/**
+ * Escape text for interpolation into an HTML string that will be injected
+ * with innerHTML / insertAdjacentHTML.
+ *
+ * USE THIS whenever a server value ends up inside a template literal that is
+ * then written to innerHTML. Server-side encoding (e(), js(), jsstr())
+ * protects the ATTRIBUTE; it does not protect the DOM sink the value reaches
+ * after JavaScript has decoded it. A member-set field such as a GCash or USDT
+ * address reached the admin's browser exactly this way (defect C5b,
+ * tmp/shop/remedy.md).
+ *
+ *   modalDesc.innerHTML = `Send to <strong>${escHtml(account)}</strong>`;
+ *
+ * Static markup around the value stays markup; the value itself becomes text.
+ * For a value that needs NO markup at all, prefer textContent outright.
+ */
+function escHtml(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // ── Toast ────────────────────────────────────────────────────
 function showToast(message, type = "success") {
   // 'error' is the common typo callers make; map it to Bootstrap's real 'danger'
@@ -67,7 +94,7 @@ function showConfirm(opts) {
           <div class="modal-body" style="font-size:.9rem;line-height:1.65;">${message}</div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="button" class="btn ${confirmClass}" id="${id}_confirm">${confirmText}</button>
+            <button type="button" class="btn ${escHtml(confirmClass)}" id="${escHtml(id)}_confirm">${escHtml(confirmText)}</button>
           </div>
         </div>
       </div>

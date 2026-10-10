@@ -123,7 +123,7 @@ $jsHints['usdt_bep20'] = 'USDT will be sent to this BEP20 wallet address (Binanc
                         title="<?= $saved ? '' : 'No account saved for this method — set it in Profile first' ?>">
                         <input type="radio" name="payout_method" value="<?= $val ?>"
                           <?= $val === $defaultMethod ? 'checked' : '' ?>
-                          onchange="switchMethod('<?= $val ?>','<?= e($saved) ?>')">
+                          onchange="switchMethod(<?= js($val) ?>,<?= js($saved) ?>)">
                         <span><?= $label ?></span>
                         <?php if ($saved): ?><small class="font-mono"><?= e(mask_account($saved)) ?></small><?php endif; ?>
                       </label>

@@ -30,14 +30,21 @@ require_once __DIR__ . '/bootstrap.php';
 
 T::group('Template lint');
 
-/** Files where the pattern is known and tracked as C5b, with the reason. */
-const KNOWN_C5B = [
-    'views/admin/codes.php'        => 'admin-generated code, single copyText arg',
-    'views/admin/payouts.php'      => "user-supplied gcash/usdt account is the real risk here",
-    'views/admin/reactivations.php' => 'user-supplied account number',
-    'views/admin/user_view.php'    => 'username is regex-locked, but infix inside showConfirm()',
-    'views/member/payout.php'      => 'saved payout method label',
-];
+/**
+ * The C5b backlog. EMPTY as of 2026-10-10 — every one of the 20 sites was
+ * fixed rather than excepted. Keep the array (and the staleness check below)
+ * so a future exemption has to be a deliberate, justified act.
+ *
+ * Each entry would need: the file, and the reason it is acceptable.
+ */
+const KNOWN_C5B = [];
+
+/**
+ * Values interpolated into a template literal that is then assigned to
+ * innerHTML must be escaped at the sink. Server-side encoding protects the
+ * attribute only; it does not survive JavaScript decoding.
+ */
+const HTML_SINK_KEYWORDS = ['innerHTML', 'insertAdjacentHTML', 'outerHTML'];
 
 $viewFiles = [];
 $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(REPO_ROOT . '/views'));
@@ -163,6 +170,77 @@ foreach (array_merge(glob(REPO_ROOT . '/models/*.php') ?: [], glob(REPO_ROOT . '
 }
 T::ok($engineCalls === [], 'RULE-4: no shop model calls the commission engine', implode(', ', $engineCalls));
 T::ok($pvRefs === [], 'RULE-4: no shop model references the inert PV columns', implode(', ', $pvRefs));
+
+// ── RULE-5 ──────────────────────────────────────────────────────────────────
+// A `${...}` interpolation inside a template literal that reaches innerHTML is
+// an injection sink unless the value is escHtml()'d (or comes from escHtml()).
+// The static markup around it is developer-authored and is fine.
+//
+// This is the sink that actually made C5b exploitable: fixing only the
+// onclick attribute would not have helped, because the member-supplied GCash
+// address flowed straight into modalDesc.innerHTML.
+
+$unEscapedSinks = [];
+$phpFiles = array_merge(
+    glob(REPO_ROOT . '/views/*/*.php') ?: [],
+    glob(REPO_ROOT . '/assets/js/*.js') ?: []
+);
+foreach ($phpFiles as $file) {
+    $rel = str_replace('\\', '/', ltrim(str_replace(REPO_ROOT . '/', '', $file), '/'));
+    $src = (string) file_get_contents($file);
+
+    // Find `${ident}` or `${ident.prop}` interpolations that are NOT wrapped.
+    if (!preg_match_all('/\$\{([A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*)\}/', $src, $m, PREG_OFFSET_CAPTURE)) {
+        continue;
+    }
+
+    // Only care about ones near an HTML sink: within the same template literal
+    // that is later assigned to innerHTML, or inside a string handed to
+    // showConfirm() (which itself injects).
+    $sinkLines = [];
+    foreach (preg_split('/\R/', $src) as $n => $line) {
+        foreach (HTML_SINK_KEYWORDS as $kw) {
+            if (stripos($line, $kw) !== false) {
+                $sinkLines[$n + 1] = true;
+            }
+        }
+        if (preg_match('/showConfirm\s*\(/', $line)) {
+            $sinkLines[$n + 1] = true;
+        }
+    }
+    if (!$sinkLines) {
+        continue;
+    }
+
+    foreach ($m[0] as $hit) {
+        $expr  = $hit[0];
+        $ident = $m[1][array_search($hit, $m[0], true)][0];
+        $lineNo = substr_count(substr($src, 0, $hit[1]), "\n") + 1;
+
+        // Inside a window of +/-6 lines from a sink?
+        $near = false;
+        for ($l = $lineNo - 6; $l <= $lineNo + 6; $l++) {
+            if (isset($sinkLines[$l])) { $near = true; break; }
+        }
+        if (!$near) {
+            continue;
+        }
+        // Already escaped somewhere in the window?
+        $window = substr($src, max(0, $hit[1] - 400), 800);
+        if (stripos($window, 'escHtml(' . $ident) !== false
+            || stripos($window, 'escHtml(' . ltrim($ident, '$') . ')') !== false
+            || stripos($window, 'textContent') !== false
+        ) {
+            continue;
+        }
+        $unEscapedSinks[] = $rel . ':' . $lineNo . ' ' . $expr;
+    }
+}
+T::ok(
+    $unEscapedSinks === [],
+    'RULE-5: values reaching an innerHTML sink are escHtml()-escaped',
+    implode(' | ', array_slice($unEscapedSinks, 0, 8))
+);
 
 echo "\n";
 echo "  C5b backlog (tracked, exempt): " . count($known) . " site(s)\n";

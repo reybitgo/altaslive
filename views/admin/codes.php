@@ -176,7 +176,7 @@
                       <span class="reg-code"><?= e($c['code']) ?></span>
                       <button type="button"
                         class="btn btn-sm btn-link p-0 text-muted"
-                        onclick="copyText('<?= e($c['code']) ?>')"
+                        onclick="copyText(<?= js($c['code']) ?>)"
                         title="Copy code"
                         style="font-size:.85rem;line-height:1;text-decoration:none;">
                         📋
@@ -271,11 +271,14 @@
     }
 
     const codeType = document.getElementById('genCodeType').value;
-    const typeLabel = codeType === 'cd' ? '<span class=\'text-warning\'>CD</span>'
-      : codeType === 'upgrade' ? '<span class=\'text-info\'>Upgrade</span>' : 'Registration';
-    document.getElementById('genSummary').innerHTML =
-      `Generate <strong>${qty}</strong> <strong>${typeLabel}</strong> code(s) for package <strong>${pkgName}</strong> at <strong>₱${parseFloat(price).toLocaleString('en-PH',{minimumFractionDigits:2})}</strong> each.<br>
-     <span class="text-muted" style="font-size:.8rem;">Total value: ₱${(qty * parseFloat(price)).toLocaleString('en-PH',{minimumFractionDigits:2})}</span>`;
+const typeLabel = codeType === 'cd' ? 'CD' : codeType === 'upgrade' ? 'Upgrade' : 'Registration';
+      // Only the LABEL text and a class name are carried here; the markup lives
+      // in the template. A variable holding ready-made HTML cannot be escaped at
+      // the sink without destroying it, which is how these sinks go wrong.
+      const typeClass = codeType === 'cd' ? 'text-warning' : codeType === 'upgrade' ? 'text-info' : '';
+      document.getElementById('genSummary').innerHTML =
+        `Generate <strong>${escHtml(qty)}</strong> <strong class="${escHtml(typeClass)}">${escHtml(typeLabel)}</strong> code(s) for package <strong>${escHtml(pkgName)}</strong> at <strong>₱${escHtml(parseFloat(price).toLocaleString('en-PH',{minimumFractionDigits:2}))}</strong> each.<br>
+       <span class="text-muted" style="font-size:.8rem;">Total value: ₱${escHtml((qty * parseFloat(price)).toLocaleString('en-PH',{minimumFractionDigits:2}))}</span>`;
 
     const modal = new bootstrap.Modal(document.getElementById('genConfirmModal'));
     document.getElementById('genConfirmBtn').onclick = () => {

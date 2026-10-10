@@ -29,12 +29,12 @@
         <input type="hidden" name="bypass" value="<?= $user['capping_bypass'] ? '0' : '1' ?>">
         <?php if ($user['capping_bypass']): ?>
           <button type="button" class="btn btn-sm btn-warning"
-            onclick="showConfirm({title:'Remove VIP Privilege',message:'Remove VIP status from <strong>@<?= e($user['username']) ?></strong>? Capping will apply normally.',confirmText:'Remove VIP',confirmClass:'btn-warning',onConfirm:()=>this.closest('form').submit()})">
+            onclick="showConfirm({title:'Remove VIP Privilege',message:'Remove VIP status from <strong>@<?= jsstr($user['username']) ?></strong>? Capping will apply normally.',confirmText:'Remove VIP',confirmClass:'btn-warning',onConfirm:()=>this.closest('form').submit()})">
             🏆 VIP
           </button>
         <?php elseif ($user['cap_status'] === 'active'): ?>
           <button type="button" class="btn btn-sm btn-outline-warning"
-            onclick="showConfirm({title:'Grant VIP Privilege',message:'Grant <strong>@<?= e($user['username']) ?></strong> unlimited lifetime earnings (bypass cap)?',confirmText:'Grant VIP',confirmClass:'btn-warning',onConfirm:()=>this.closest('form').submit()})">
+            onclick="showConfirm({title:'Grant VIP Privilege',message:'Grant <strong>@<?= jsstr($user['username']) ?></strong> unlimited lifetime earnings (bypass cap)?',confirmText:'Grant VIP',confirmClass:'btn-warning',onConfirm:()=>this.closest('form').submit()})">
             ⭐ Grant VIP
           </button>
         <?php else: ?>
@@ -51,12 +51,12 @@
         <input type="hidden" name="bypass" value="<?= $user['daily_cap_bypass'] ? '0' : '1' ?>">
         <?php if ($user['daily_cap_bypass']): ?>
           <button type="button" class="btn btn-sm btn-info"
-            onclick="showConfirm({title:'Disable Daily Cap Bypass',message:'Re-enable daily pair cap for <strong>@<?= e($user['username']) ?></strong>?',confirmText:'Disable',confirmClass:'btn-info',onConfirm:()=>this.closest('form').submit()})">
+            onclick="showConfirm({title:'Disable Daily Cap Bypass',message:'Re-enable daily pair cap for <strong>@<?= jsstr($user['username']) ?></strong>?',confirmText:'Disable',confirmClass:'btn-info',onConfirm:()=>this.closest('form').submit()})">
             ⚡ Daily Cap Off
           </button>
         <?php else: ?>
           <button type="button" class="btn btn-sm btn-outline-info"
-            onclick="showConfirm({title:'Enable Daily Cap Bypass',message:'Allow <strong>@<?= e($user['username']) ?></strong> unlimited daily pairs?',confirmText:'Enable',confirmClass:'btn-info',onConfirm:()=>this.closest('form').submit()})">
+            onclick="showConfirm({title:'Enable Daily Cap Bypass',message:'Allow <strong>@<?= jsstr($user['username']) ?></strong> unlimited daily pairs?',confirmText:'Enable',confirmClass:'btn-info',onConfirm:()=>this.closest('form').submit()})">
             ⚡ Daily Cap On
           </button>
         <?php endif; ?>
@@ -68,7 +68,7 @@
         <?= csrf_field() ?><input type="hidden" name="id" value="<?= $user['id'] ?>">
         <?php $isSuspend = $user['status'] === 'active'; ?>
         <button type="button" class="btn btn-sm <?= $isSuspend ? 'btn-outline-danger' : 'btn-outline-success' ?>"
-          onclick="showConfirm({title:'<?= $isSuspend ? 'Suspend' : 'Unsuspend' ?> Member',message:'<?= $isSuspend ? 'Suspend' : 'Unsuspend' ?> <strong>@<?= e($user['username']) ?></strong>?',confirmText:'<?= $isSuspend ? 'Suspend' : 'Unsuspend' ?>',confirmClass:'<?= $isSuspend ? 'btn-danger' : 'btn-success' ?>',onConfirm:()=>this.closest('form').submit()})">
+          onclick="showConfirm({title:'<?= $isSuspend ? 'Suspend' : 'Unsuspend' ?> Member',message:'<?= $isSuspend ? 'Suspend' : 'Unsuspend' ?> <strong>@<?= jsstr($user['username']) ?></strong>?',confirmText:'<?= $isSuspend ? 'Suspend' : 'Unsuspend' ?>',confirmClass:'<?= $isSuspend ? 'btn-danger' : 'btn-success' ?>',onConfirm:()=>this.closest('form').submit()})">
           <?= $isSuspend ? '🔒 Suspend' : '🔓 Unsuspend' ?>
         </button>
       </form>
@@ -78,7 +78,7 @@
       <form method="POST" action="<?= APP_URL ?>/?page=admin_deactivate_user" class="m-0">
         <?= csrf_field() ?><input type="hidden" name="id" value="<?= $user['id'] ?>">
         <button type="button" class="btn btn-sm <?= $isDeactivated ? 'btn-outline-success' : 'btn-outline-dark' ?>"
-          onclick="showConfirm({title:'<?= $isDeactivated ? 'Activate' : 'Deactivate' ?> Member',message:'<?= $isDeactivated ? 'Activate' : 'Deactivate' ?> <strong>@<?= e($user['username']) ?></strong>?<?= $isDeactivated ? '' : ' All earnings will be shut down and ancestors will stop earning from this member.' ?>',confirmText:'<?= $isDeactivated ? 'Activate' : 'Deactivate' ?>',confirmClass:'<?= $isDeactivated ? 'btn-success' : 'btn-dark' ?>',onConfirm:()=>this.closest('form').submit()})">
+          onclick="showConfirm({title:'<?= $isDeactivated ? 'Activate' : 'Deactivate' ?> Member',message:'<?= $isDeactivated ? 'Activate' : 'Deactivate' ?> <strong>@<?= jsstr($user['username']) ?></strong>?<?= $isDeactivated ? '' : ' All earnings will be shut down and ancestors will stop earning from this member.' ?>',confirmText:'<?= $isDeactivated ? 'Activate' : 'Deactivate' ?>',confirmClass:'<?= $isDeactivated ? 'btn-success' : 'btn-dark' ?>',onConfirm:()=>this.closest('form').submit()})">
           <?= $isDeactivated ? '✅ Activate' : '⛔ Deactivate' ?>
         </button>
       </form>
@@ -137,14 +137,14 @@
               <form method="POST" action="<?= APP_URL ?>/?page=admin_complete_cd" class="m-0">
                 <?= csrf_field() ?><input type="hidden" name="user_id" value="<?= $user['id'] ?>">
                 <button type="button" class="btn btn-sm btn-success"
-                  onclick="showConfirm({title:'Complete CD',message:'Mark CD as fully completed for <strong>@<?= e($user['username']) ?></strong>?',confirmText:'Complete',confirmClass:'btn-success',onConfirm:()=>this.closest('form').submit()})">
+                  onclick="showConfirm({title:'Complete CD',message:'Mark CD as fully completed for <strong>@<?= jsstr($user['username']) ?></strong>?',confirmText:'Complete',confirmClass:'btn-success',onConfirm:()=>this.closest('form').submit()})">
                   ✓ Mark Complete
                 </button>
               </form>
               <form method="POST" action="<?= APP_URL ?>/?page=admin_cancel_cd" class="m-0">
                 <?= csrf_field() ?><input type="hidden" name="user_id" value="<?= $user['id'] ?>">
                 <button type="button" class="btn btn-sm btn-outline-danger"
-                  onclick="showConfirm({title:'Cancel CD',message:'Cancel CD for <strong>@<?= e($user['username']) ?></strong>? Filled amount will be forfeited.',confirmText:'Cancel CD',confirmClass:'btn-danger',onConfirm:()=>this.closest('form').submit()})">
+                  onclick="showConfirm({title:'Cancel CD',message:'Cancel CD for <strong>@<?= jsstr($user['username']) ?></strong>? Filled amount will be forfeited.',confirmText:'Cancel CD',confirmClass:'btn-danger',onConfirm:()=>this.closest('form').submit()})">
                   ✕ Cancel
                 </button>
               </form>
@@ -797,13 +797,18 @@ function confirmPwChange(btn) {
     return;
   }
 
-  showConfirm({
-    title: 'Change Password',
-    message: 'Change password for <strong>@<?= e($user['username']) ?></strong>? This action is irreversible.',
-    confirmText: 'Change Password',
-    confirmClass: 'btn-primary',
-    onConfirm: () => form.submit()
-  });
+// The username is interpolated into a message that showConfirm() writes
+    // with insertAdjacentHTML, so it must be escaped AT THE SINK. js() protects
+    // the JavaScript literal; escHtml() protects the DOM. The <strong> around it
+    // is developer-authored markup and stays live. Defect C5b.
+    const cdUser = <?= js($user['username']) ?>;
+    showConfirm({
+      title: 'Change Password',
+      message: 'Change password for <strong>@' + escHtml(cdUser) + '</strong>? This action is irreversible.',
+      confirmText: 'Change Password',
+      confirmClass: 'btn-primary',
+      onConfirm: () => form.submit()
+    });
 }
 </script>
 

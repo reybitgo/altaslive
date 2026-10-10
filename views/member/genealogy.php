@@ -475,7 +475,7 @@
         loader.style.display = 'none';
         initD3Tree(data, wrapper);
       } catch (e) {
-        loader.innerHTML = `<span style="color:#e03434;">⚠ Could not load tree. ${e.message}</span>`;
+        loader.innerHTML = `<span style="color:#e03434;">⚠ Could not load tree. ${escHtml(e.message)}</span>`;
       }
     }
 

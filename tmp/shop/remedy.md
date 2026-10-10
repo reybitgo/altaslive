@@ -596,6 +596,74 @@ The view's `$isSelf` hiding is kept, but it is now purely a UX affordance.
 
 The single remaining failure is **H3** (the expiry timer ignores `correction_deadline`), which is Phase 5 scope.
 
+### Addendum — C5b closed 2026-10-10
+
+Taken as a separate pass after Phase 3 committed, because it is the live-exploitable item.
+
+#### The attribute was only half the bug
+
+Fixing `onclick="…'<?= e($account) ?>'…"` alone would **not** have closed this. Both files funnel their values into a
+DOM sink:
+
+```js
+document.getElementById('payoutModalDesc').innerHTML = cfg.desc;
+// cfg.desc = `… Send funds via <strong>${method}</strong> to <code>${account}</code> …`
+```
+
+A member sets their own GCash number to `<img src=x onerror=…>`; an admin opens the payouts page and clicks
+Approve, and the payload executes **in the admin's session**. Server-side escaping protects the *attribute*; it
+does not survive JavaScript decoding into `innerHTML`. Two distinct layers had to be fixed.
+
+#### Layers applied
+
+| Layer | Where | Helper |
+|---|---|---|
+| HTML attribute | `payouts.php`, `reactivations.php`, `codes.php`, `user_view.php`, `member/payout.php` | `js()` / `jsargs()` / `jsstr()` |
+| DOM sink (`innerHTML`) | the inline `<script>` blocks, plus `showConfirm()` in `app.js` | new `escHtml()` in `app.js` |
+
+New helpers in `core/helpers.php`, each with one clear contract:
+
+- **`js($v)`** — a complete JS literal, attribute-safe. For a whole argument.
+- **`jsargs([...])`** — several values as a JS argument list. Composes `js()`, so the rules stay in one place.
+- **`jsstr($v)`** — escaped *content* for embedding inside an already-quoted JS string, keeping markup live. Only
+  for templates that build a larger string around the value.
+- **`escHtml($v)`** (JS) — escape at the `innerHTML` boundary. Static markup around it stays markup.
+
+#### Markup-carrying variables had to be restructured
+
+`codes.php` held ready-made HTML in a variable:
+
+```js
+const typeLabel = codeType === 'cd' ? '<span class="text-warning">CD</span>' : …;
+`… <strong>${typeLabel}</strong> …`
+```
+
+That cannot be escaped at the sink without destroying it — which is precisely how these sinks go wrong. Split into
+a label (text) and a class name, with the markup moved into the template:
+
+```js
+const typeLabel = codeType === 'cd' ? 'CD' : …;
+const typeClass = codeType === 'cd' ? 'text-warning' : …;
+`… <strong class="${escHtml(typeClass)}">${escHtml(typeLabel)}</strong> …`
+```
+
+The colour is preserved and the rule is satisfiable honestly.
+
+#### Also swept
+
+RULE-5 flagged two further sinks found while fixing the above: `genealogy.php` echoing a caught `e.message`
+(which can contain a URL built from user input) into `innerHTML`, and `showConfirm()` interpolating
+`confirmClass` / `confirmText` / `id` unescaped. Both are defence-in-depth — no current caller passes
+attacker-controlled data — and both are now escaped.
+
+#### Allow-list emptied
+
+`KNOWN_C5B` is now `[]`. The array and its staleness check are retained deliberately: a future exemption has to be
+a justified act, and a file that no longer matches fails the suite rather than sitting there silently.
+
+**Verification:** 0 remaining `e()` inside an event handler · 0 `jsstr()` outside a handler · 16 `escHtml()` call
+sites · RULE-1 and RULE-5 both green.
+
 ---
 
 ## Phase 4 — Rendering & UI Correctness
@@ -905,7 +973,7 @@ strictly sequential.
 | **C3** | ✅ **FIXED 2026-10-10.** IDOR: cart `item_id` was never scoped to the caller, so any authenticated session could rewrite or delete any member's cart line by walking the shared AUTO_INCREMENT. | **Fix:** both mutators now require `$cartId` and carry `AND cart_id = ?`; controller resolves the caller's cart via `requireOwnCart()`; two dead unscoped helpers deleted. | `MemberController.php:1227,1232,1252,1256` → `Cart.php:92-109` (`WHERE id = ?` only). Correctly-scoped siblings `updateQuantity`/`removeItem` are dead code |
 | **C4** | `$order` undefined in `order_status_badge.php` → every order row renders "Unknown" | `order_status_badge.php:8` reads `$order`; `member/shop_orders.php:43-50` loops `$o`; `admin/shop_orders.php:96` sets `$tmp` (never referenced anywhere) |
 | **C5** | ✅ **FIXED 2026-10-10.** Stored XSS via `payment_reference`: `e()` HTML-decodes back to a quote before the JS parser runs. | **Fix:** new `js()` helper (JSON_HEX_* + htmlspecialchars); `admin/shop_order.php:46` now `copyText(<?= js($x) ?>)`. |
-| **C5b** | ✅ **NEW 2026-10-10.** 20 further `e()`-inside-`on*=` sites in `payouts.php`, `reactivations.php`, `user_view.php`, `codes.php`, `payout.php`. `payouts.php` and `reactivations.php` carry the user-set GCash/USDT account and **are exploitable**. Not fixed here — they embed mid-expression, so `js()` would double-quote them; needs a per-view refactor. Tracked in `tests/TemplateLintTest.php` KNOWN_C5B. | `admin/shop_order.php:46` — `e()` (HTML escaper) inside a JS string literal in an `onclick` attribute. `payment_reference` has no server-side cap |
+| **C5b** | ✅ **FIXED 2026-10-10.** 20 further `e()`-inside-`on*=` sites in `payouts.php`, `reactivations.php`, `user_view.php`, `codes.php`, `payout.php`. `payouts.php` and `reactivations.php` carry the user-set GCash/USDT account and **were exploitable**. | See the Phase 3 addendum below — the attribute was only half the problem; there was also an `innerHTML` sink. All 20 fixed; `tests/TemplateLintTest.php` KNOWN_C5B is now **empty**. | `admin/shop_order.php:46` — `e()` (HTML escaper) inside a JS string literal in an `onclick` attribute. `payment_reference` has no server-side cap |
 | **C6** | Admin "Complete" button can never succeed | `ShopOrder.php:71` actors `['customer','system']`; `AdminController.php:1177` passes `'admin'` → always `false` → misleading "This order just changed" flash |
 | **C7** | ✅ **FIXED 2026-10-10.** `Ewallet::credit()` accepted `ref_type='upgrade'`, which the ledger ENUM rejected → **every e-wallet package upgrade failed** with `ERROR 1265`, rolling back the whole upgrade. | `models/User.php:434` credited with `'upgrade'`; the ENUM omitted it. **Fix:** `migrate_ewallet_ref_types.sql` adds the value; `install.sql` updated; `Ewallet::VALID_REF_TYPES` (D2) is now the single allow-list behind both `credit()` and `debit()` |
 

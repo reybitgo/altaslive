@@ -45,7 +45,43 @@ function e(mixed $val): string
 }
 
 /**
- * Encode a value for use as a JavaScript literal inside an HTML attribute.
+ * Encode several values as a JavaScript argument list, safe inside an
+ * attribute. Use when a handler takes more than one argument:
+ *     onclick="payoutAction(<?= jsargs(['approve', $id, $user, $amount]) ?>)"
+ *
+ * Composes js() per element, so the escaping rules stay in one place.
+ */
+function jsargs(array $args): string
+{
+    return implode(',', array_map('js', $args));
+}
+
+/**
+ * Escape a value for embedding INSIDE an already-quoted JavaScript string
+ * that sits in an HTML attribute, while KEEPING markup live.
+ *
+ * Use js() when the value is a whole argument. Use jsstr() only when the
+ * surrounding literal is already in the template and the value is part of a
+ * larger string that intentionally carries HTML — e.g. showConfirm() messages,
+ * which reach the DOM through insertAdjacentHTML.
+ *
+ * Order matters: JS-escape first (a backslash escape cannot itself be
+ * re-escaped), then HTML-escape the result for the attribute.
+ */
+function jsstr(mixed $val): string
+{
+    $s = (string) $val;
+    $s = str_replace(
+        ['\\', "'", "\n", "\r", '<', '>', '&'],
+        ['\\\\', "\\'", '\\n', '\\r', '\\u003C', '\\u003E', '\\u0026'],
+        $s
+    );
+return htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+/**
+ * Encode a value as a complete JavaScript literal, safe inside an HTML
+ * attribute.
  *
  * WHY NOT e(): e() is an HTML escaper. The browser HTML-decodes an attribute
  * value BEFORE handing it to the JS parser, so e()'s &#039; becomes ' again

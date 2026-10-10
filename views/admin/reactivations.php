@@ -177,11 +177,11 @@
                       };
                       ?>
                       <button class="btn btn-sm btn-success"
-                        onclick="reactivationAction('confirm',<?= $row['id'] ?>,'<?= e($row['username']) ?>','<?= fmt_money($row['amount_paid']) ?>','<?= $methodLabel ?>','<?= $acct ?>')">
+                        onclick="reactivationAction(<?= jsargs(['confirm', (int) $row['id'], $row['username'], fmt_money($row['amount_paid']), $methodLabel, $acct]) ?>)">
                         ✓ Confirm
                       </button>
                       <button class="btn btn-sm btn-danger"
-                        onclick="reactivationAction('reject',<?= $row['id'] ?>,'<?= e($row['username']) ?>','<?= fmt_money($row['amount_paid']) ?>','<?= $methodLabel ?>','<?= $acct ?>')">
+                        onclick="reactivationAction(<?= jsargs(['reject', (int) $row['id'], $row['username'], fmt_money($row['amount_paid']), $methodLabel, $acct]) ?>)">
                         ✕ Reject
                       </button>
                     </div>
@@ -237,18 +237,25 @@
 
 <script>
   function reactivationAction(action, id, user, amount, method, account) {
-    const accountLine = account ? `<br><span style="color:#6b7a99;font-size:.82rem;">Admin account: <strong>${account}</strong></span>` : '';
+    // Member-supplied values that land in innerHTML below — escape at the sink,
+    // not just in the attribute. Defect C5b.
+    const U = escHtml(user);
+    const A = escHtml(amount);
+    const M = escHtml(method);
+    const accountLine = account
+      ? `<br><span style="color:#6b7a99;font-size:.82rem;">Admin account: <strong>${escHtml(account)}</strong></span>`
+      : '';
     const configs = {
       confirm: {
         title: '✓ Confirm Reactivation',
-        desc: `Confirm you've received <strong>${amount}</strong> from <strong>@${user}</strong> via <strong>${method}</strong>.${accountLine}<br>This will reset the member's cap state to active.`,
+        desc: `Confirm you've received <strong>${A}</strong> from <strong>@${U}</strong> via <strong>${M}</strong>.${accountLine}<br>This will reset the member's cap state to active.`,
         btnClass: 'btn-success',
         btnText: '✓ Confirm',
         noteLabel: 'Note (optional)',
       },
       reject: {
         title: '✕ Reject Reactivation',
-        desc: `Reject <strong>${amount}</strong> reactivation for <strong>@${user}</strong>?<br>The member will remain capped and must submit a new request.`,
+        desc: `Reject <strong>${A}</strong> reactivation for <strong>@${U}</strong>?<br>The member will remain capped and must submit a new request.`,
         btnClass: 'btn-danger',
         btnText: '✕ Reject',
         noteLabel: 'Rejection reason (shown to member)',

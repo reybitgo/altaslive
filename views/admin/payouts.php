@@ -146,7 +146,7 @@
                     <span class="font-mono fw-bold text-primary" style="font-size:.8rem;"><?= $account ? e($account) : '<span class="text-muted fst-italic">—</span>' ?></span>
                     <?php if ($account): ?>
                       <button class="btn btn-sm btn-link p-0 ms-1"
-                        onclick="copyText('<?= e($account) ?>')" title="Copy">📋</button>
+                        onclick="copyText(<?= js($account) ?>)" title="Copy">📋</button>
                     <?php endif; ?>
                   </td>
                   <td class="td-muted" style="font-size:.75rem;"><?= fmt_datetime($pr['requested_at']) ?></td>
@@ -176,11 +176,11 @@
                     <?php if ($pr['status'] === 'pending'): ?>
                       <div class="d-flex gap-1 flex-wrap">
                         <button class="btn btn-sm btn-success"
-                          onclick="payoutAction('approve',<?= $pr['id'] ?>,'<?= e($pr['username']) ?>','<?= fmt_money($pr['amount']) ?>','<?= e($account) ?>','<?= $methodLabel ?>')">
+                          onclick="payoutAction(<?= jsargs(['approve', (int) $pr['id'], $pr['username'], fmt_money($pr['amount']), $account, $methodLabel]) ?>)">
                           ✓ Approve
                         </button>
                         <button class="btn btn-sm btn-danger"
-                          onclick="payoutAction('reject',<?= $pr['id'] ?>,'<?= e($pr['username']) ?>','<?= fmt_money($pr['amount']) ?>','<?= e($account) ?>','<?= $methodLabel ?>')">
+                          onclick="payoutAction(<?= jsargs(['reject', (int) $pr['id'], $pr['username'], fmt_money($pr['amount']), $account, $methodLabel]) ?>)">
                           ✕ Reject
                         </button>
                       </div>
@@ -203,7 +203,7 @@
                         <?php endif; ?>
                       </div>
                       <button class="btn btn-sm btn-primary w-100"
-                        onclick="payoutAction('complete',<?= $pr['id'] ?>,'<?= e($pr['username']) ?>','<?= e($sendAmount) ?>','<?= e($account) ?>','<?= $methodLabel ?>')">
+                        onclick="payoutAction(<?= jsargs(['complete', (int) $pr['id'], $pr['username'], $sendAmount, $account, $methodLabel]) ?>)">
                         ✅ Mark Complete
                       </button>
                     <?php else: ?>
@@ -259,26 +259,34 @@
 
 <script>
   function payoutAction(action, id, user, amount, account, method) {
+    // These values are member-supplied (the GCash/USDT account especially) and
+    // land in innerHTML below, so they must be escaped AT THE SINK. The
+    // server-side jsargs() above only protects the attribute; it does not
+    // protect the DOM once JavaScript has decoded it. Defect C5b.
+    const U = escHtml(user);
+    const A = escHtml(amount);
+    const M = escHtml(method);
+    const C = escHtml(account);
     const configs = {
       approve: {
         title: '✓ Approve Payout',
-        desc: `Approve <strong>${amount}</strong> for <strong>@${user}</strong>?<br>
-                  Send funds via <strong>${method}</strong> to <code>${account}</code> before marking complete.`,
+        desc: `Approve <strong>${A}</strong> for <strong>@${U}</strong>?<br>
+                  Send funds via <strong>${M}</strong> to <code>${C}</code> before marking complete.`,
         btnClass: 'btn-success',
         btnText: '✓ Approve',
         noteLabel: 'Note (optional)',
       },
       reject: {
         title: '✕ Reject Payout',
-        desc: `Reject <strong>${amount}</strong> for <strong>@${user}</strong>? Balance will NOT be deducted.`,
+        desc: `Reject <strong>${A}</strong> for <strong>@${U}</strong>? Balance will NOT be deducted.`,
         btnClass: 'btn-danger',
         btnText: '✕ Reject',
         noteLabel: 'Rejection reason (shown to member)',
       },
       complete: {
         title: '✅ Mark as Completed',
-        desc: `Confirm you've sent <strong>${amount}</strong> to <strong>@${user}</strong>
-                  via <strong>${method}</strong>:<br><code>${account}</code><br>
+        desc: `Confirm you've sent <strong>${A}</strong> to <strong>@${U}</strong>
+                  via <strong>${M}</strong>:<br><code>${C}</code><br>
                   This will deduct the member's e-wallet.`,
         btnClass: 'btn-primary',
         btnText: '✅ Mark Complete',
