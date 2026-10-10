@@ -400,7 +400,47 @@ otherwise be reasoning about a schema that does not exist.
 
 ### Done when
 
-Every refund transition is reachable, and the two install paths agree.
+Every refund transition is reachable, and the two install paths agree. ✅ **Met 2026-10-10** — see below.
+
+### Execution record — 2026-10-10
+
+| # | Defect | Change | Verified |
+|---|---|---|---|
+| 1 | **C1** refund status | `ShopRefund::markPaid()` now writes `status = 'processed'` (D1). Added `ShopRefund::STATUSES` const. Admin badge ternary at `views/admin/shop_order.php:349` updated to match. | Refund lifecycle suite went green end to end: open → approved → processed, wallet credited exactly once. |
+| 2 | **C2** e-wallet ref_type | Resolved as a consequence of C1 + the C7 commit. No further change. | The refund path no longer reaches the ref_type guard. |
+| 3 | **H4** refund cause | `ShopRefund::CAUSES` const + whitelist in `create()`, so an unknown cause throws `InvalidArgumentException` instead of reaching MySQL. `AdminController` default `'customer_request'` → `'admin_cancel'` (the old value was never in the ENUM). `orderRefund()` gained a `Throwable` backstop so no constraint violation can 500. | Drift test asserts the const and the controller fallback are both legal. |
+| 4 | **M5** shipment state | Deleted the dead `ShopShipment::flagLost()` — no callers, and it wrote a `state` value the ENUM does not accept. | Drift test now derives state writes from source rather than hardcoding `'lost'`. |
+| 5 | **M16** refund FK | **New** `migrate_shop_refunds_cascade.sql`: `shop_refunds.order_id` RESTRICT → CASCADE, matching the other four shop children. The constraint name is resolved from `information_schema` because MySQL auto-generates it, and the replacement is left unnamed so MySQL can pick a free one (it refuses to reuse a name inside the same ALTER). | Migration applied and re-run twice — idempotent. Deleted a real order that had an open refund: succeeded. All five shop children now CASCADE. |
+| 6 | — `install.sql` schema name | Removed the hardcoded `CREATE DATABASE` / `USE`. The header now documents the caller-supplied-schema usage. | Drift test asserts no hardcoded `CREATE DATABASE`/`USE` remains. `tests/run.php` already relied on this. |
+
+**Suite movement — 12 failures → 4 failures:**
+
+| Suite | Before | After |
+|---|---|---|
+| `SchemaDriftTest.php` | 5 of 16 failed | **0 of 25 — GREEN** |
+| `ShopStateMachineTest.php` | 7 of 106 failed | **4 of 106 failed** |
+
+The four remaining failures are all later-phase scope: **C3** ×2 and **H6** → Phase 3; **H3** → Phase 5.
+
+#### The drift test had to be rewritten, not just re-run
+
+Three of its assertions hardcoded the *old broken values* (`'paid'`, `'customer_request'`, `'lost'`). Fixing the
+code made those assertions report failures for values the code no longer uses — a test that only proves the old
+bug still exists. They are now **derived from the source**: the test reads `ShopRefund::STATUSES`,
+`ShopRefund::CAUSES`, and the state literals `ShopShipment` actually writes, then compares each against the live
+DDL in both directions. That stays meaningful after the fix instead of expiring with it.
+
+Assertion count also rose 16 → 25, from two new sections:
+
+- **Cause fallback** — the controller's default cause must itself be a legal enum value.
+- **Migration chain vs. install.sql** — parses `migrate_shop.sql` → `migrate_shop_fixups.sql` →
+  `migrate_ewallet_ref_types.sql` and asserts every ENUM value a migration declares also exists in
+  `install.sql`. A migration may lag `install.sql` (a later one fills the gap) but must never introduce a value
+  a fresh install cannot produce — the C1 direction.
+
+This section caught a real trap while being written: `migrate_shop.sql` sets `ref_type` *without* `'upgrade'`, so
+a deployment that ran the shop migrations but not `migrate_ewallet_ref_types.sql` would have reintroduced C7. The
+test now pins `'upgrade'` on both paths.
 
 ### Execution record — C7 folded in early (2026-10-10)
 
@@ -777,8 +817,8 @@ strictly sequential.
 
 | ID | Defect | Evidence |
 |---|---|---|
-| **C1** | `shop_refunds.status = 'paid'` is not in the ENUM → MySQL 1265 → refunds can never be closed | `install.sql:332` ENUM `('open','approved','processed','denied','closed')` vs `ShopRefund.php:80` writes `'paid'` |
-| **C2** | `Ewallet::credit()` rejects `ref_type = 'shop_order'` → e-wallet refunds impossible | `Ewallet.php:22` whitelist lacks `'shop_order'`; `ShopRefund.php:74` passes it. DB enum *was* extended — the PHP side was not |
+| **C1** | ✅ **FIXED 2026-10-10.** `ShopRefund::markPaid()` wrote `status='paid'`, outside the ENUM → `ERROR 1265` → refunds could never be closed. | Was: `install.sql` ENUM `('open','approved','processed','denied','closed')` vs `ShopRefund.php:80` writing `'paid'`. **Fix (D1):** writes `'processed'`; `ShopRefund::STATUSES` const added; admin badge updated. |
+| **C2** | ✅ **FIXED 2026-10-10** (with C7). `Ewallet::credit()` rejected `ref_type='shop_order'` → e-wallet refunds were impossible. | `Ewallet.php:22` whitelist lacks `'shop_order'`; `ShopRefund.php:74` passes it. DB enum *was* extended — the PHP side was not |
 | **C3** | IDOR: cart `item_id` never scoped to the caller | `MemberController.php:1227,1232,1252,1256` → `Cart.php:92-109` (`WHERE id = ?` only). Correctly-scoped siblings `updateQuantity`/`removeItem` are dead code |
 | **C4** | `$order` undefined in `order_status_badge.php` → every order row renders "Unknown" | `order_status_badge.php:8` reads `$order`; `member/shop_orders.php:43-50` loops `$o`; `admin/shop_orders.php:96` sets `$tmp` (never referenced anywhere) |
 | **C5** | Stored XSS via `payment_reference` | `admin/shop_order.php:46` — `e()` (HTML escaper) inside a JS string literal in an `onclick` attribute. `payment_reference` has no server-side cap |
@@ -792,7 +832,7 @@ strictly sequential.
 | **H1** | POD photo upload is dead | `admin/shop_order.php:157` form has no `enctype="multipart/form-data"` (compare `:324`, which does) |
 | **H2** | `returned_to_sender` is UI-unreachable | `AdminController.php:1140` implements it; no form anywhere posts `to=returned_to_sender` |
 | **H3** | `expireOverdue` never consults `correction_deadline` | `ShopOrder.php:1093` `COALESCE(payment_deadline, correction_deadline)` — `payment_deadline` is always non-null, so `COALESCE` always returns it |
-| **H4** | `shop_refunds.cause` default is outside the ENUM | `AdminController.php:1321` defaults `'customer_request'`; ENUM is `('admin_cancel','delivery_failure','customer_dispute','other')`. Uncaught `PDOException` → 500 |
+| **H4** | ✅ **FIXED 2026-10-10.** The `shop_refunds.cause` default was outside the ENUM, so a forged or omitted value produced an uncaught `PDOException` (500). | `AdminController.php:1321` defaulted `'customer_request'`; ENUM is `('admin_cancel','delivery_failure','customer_dispute','other')`. Uncaught `PDOException` → 500 |
 | **H5** | `per_page()` unbounded | `core/helpers.php:459-463` — `max($min, (int)$_GET['per_page'])`, no ceiling |
 | **H6** | Segregation of duties is view-only on 5 of 6 admin endpoints | `assertNotSelfReview` called only at `AdminController.php:1091`. `orderRefund`, `orderHold`, `orderResume`, `orderReship`, `orderShipment` have no server-side check |
 
@@ -804,7 +844,7 @@ strictly sequential.
 | **M2** | Rejected proof releases stock; re-upload re-reserves with no availability check | `ShopOrder.php:96`, `:302-309` |
 | **M3** | An **approved** refund does not block completion (plan requires `open` or `approved`) | `ShopRefund.php:21`, `ShopOrder.php:1128` |
 | **M4** | POD written to `shop_shipments` after the transition commits | `ShopOrder.php:983-997` |
-| **M5** | `ShopShipment::flagLost()` writes `state='lost'`, not in the ENUM (dead code) | `ShopShipment.php:78` |
+| **M5** | ✅ **FIXED 2026-10-10.** `ShopShipment::flagLost()` wrote `state='lost'`, not in the ENUM. Dead code with no callers. | **Fix:** deleted. Drift test now derives state writes from source. |
 | **M6** | `shop_refunds.method` column unused; e-wallet decision is a `str_contains` substring match on free text | `ShopRefund.php:68-69` |
 | **M7** | N+1: `Product::availableStock()` = 2 queries, called per catalog row (~201 queries for 100 products) | `shop.php:47`, `Product.php:27-31` |
 | **M8** | Place-order double-submit guard is a placebo (no `preventDefault`, no `disabled`) | `checkout.php:130-133` |
@@ -815,7 +855,7 @@ strictly sequential.
 | **M13** | `showToast()` interpolates `${message}` into `innerHTML` unescaped — latent XSS sink | `app.js:39`, `Cart.php:126` |
 | **M14** | Function declared at file scope inside a view; `$actionable` and `$needConfirm` unused | `admin/shop_orders.php:13`, `admin/shop_order.php:21` |
 | **M15** | `payment_failed` renders a bordered but empty Actions card | `admin/shop_order.php:64-198` |
-| **M16** | `shop_refunds.order_id` is `ON DELETE RESTRICT`, so `shop_orders` deletes fail once a refund exists | `install.sql` |
+| **M16** | ✅ **FIXED 2026-10-10.** `shop_refunds.order_id` was `ON DELETE RESTRICT` while all four sibling shop children cascaded, so orders could never be deleted once a refund existed. | **Fix:** `migrate_shop_refunds_cascade.sql` → CASCADE; `install.sql` updated. |
 
 ---
 

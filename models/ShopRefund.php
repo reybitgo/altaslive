@@ -1,7 +1,24 @@
 <?php
 class ShopRefund
 {
-    /** Refund task lifecycle: open → approved → paid (closed only by receipt). */
+    /**
+     * Refund task lifecycle: open → approved → processed (closed only by a
+     * receipt). denied covers both "denied" and a buyer's own cancellation.
+     *
+     * These five values are the DDL vocabulary (install.sql, shop_refunds.status).
+     * The model previously wrote 'paid', which the ENUM does not accept —
+     * MySQL rejected it with ERROR 1265 and the whole settlement failed
+     * (defect C1, tmp/shop/remedy.md). Do not reintroduce a sixth value without
+     * a migration; tests/SchemaDriftTest.php enforces the agreement.
+     */
+    public const STATUSES = ['open', 'approved', 'processed', 'denied', 'closed'];
+
+    /**
+     * shop_refunds.cause values. Kept in step with the ENUM in install.sql;
+     * tests/SchemaDriftTest.php asserts the agreement.
+     */
+    public const CAUSES = ['admin_cancel', 'delivery_failure', 'customer_dispute', 'other'];
+
     public static function forOrder(int $orderId): array
     {
         $st = db()->prepare("SELECT * FROM shop_refunds WHERE order_id = ? ORDER BY created_at ASC, id ASC");
@@ -31,6 +48,13 @@ class ShopRefund
         ?string $promisedAt = null,
         ?int $requestedBy = null
     ): int {
+        // Without this guard an unrecognised cause reaches MySQL and dies with
+        // ERROR 1265 "Data truncated for column 'cause'", which surfaced as an
+        // uncaught PDOException (a 500) because the controller only caught
+        // InvalidArgumentException (defect H4).
+        if (!in_array($cause, self::CAUSES, true)) {
+            throw new InvalidArgumentException('Unknown refund cause: ' . $cause);
+        }
         $st = db()->prepare(
             "INSERT INTO shop_refunds (order_id, amount, cause, destination, promised_at, requested_by, status)
              VALUES (?, ?, ?, ?, ?, ?, 'open')"
@@ -77,7 +101,7 @@ class ShopRefund
             }
 
             $st = $pdo->prepare(
-                "UPDATE shop_refunds SET status = 'paid', processed_by = ?, processed_at = NOW(), receipt_ref = ? WHERE id = ? AND status = 'approved'"
+                "UPDATE shop_refunds SET status = 'processed', processed_by = ?, processed_at = NOW(), receipt_ref = ? WHERE id = ? AND status = 'approved'"
             );
             $st->execute([$adminId, mb_substr($receiptRef, 0, 80), $id]);
             if ($st->rowCount() !== 1) {

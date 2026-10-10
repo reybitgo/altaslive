@@ -346,7 +346,7 @@ $needConfirm = ['cancelled', 'returned_to_sender', 'payment_failed', 'on_hold'];
               <div class="border-bottom pb-2 mb-2">
                 <div class="d-flex justify-content-between">
                   <span class="font-mono"><?= fmt_money((float) $rf['amount']) ?></span>
-                  <span class="badge bg-<?= $rf['status'] === 'paid' ? 'success' : ($rf['status'] === 'denied' ? 'danger' : 'secondary') ?>"><?= e((string) $rf['status']) ?></span>
+                  <span class="badge bg-<?= $rf['status'] === 'processed' ? 'success' : ($rf['status'] === 'denied' ? 'danger' : 'secondary') ?>"><?= e((string) $rf['status']) ?></span>
                 </div>
                 <div class="text-muted" style="font-size:.72rem;"><?= e(str_replace('_', ' ', (string) $rf['cause'])) ?>
                   <?php if (!empty($rf['receipt_ref'])): ?> · receipt <?= e((string) $rf['receipt_ref']) ?><?php endif; ?>

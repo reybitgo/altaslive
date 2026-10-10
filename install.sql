@@ -1,11 +1,20 @@
--- Active: 1761477309529@@127.0.0.1@3306@u938213108_altas6_db
 -- ============================================================
 --  MLM BINARY SYSTEM — FULL SCHEMA + SEED DATA (v2)
---  Run once: mysql -u root -p DATABASE < install.sql
+--
+--  Usage:
+--    mysql -u root -p DATABASE < install.sql
+--
+--  The target schema is supplied by the caller and is NOT named in this file.
+--  A previous revision hardcoded a schema name here, which meant the same file
+--  silently installed into the wrong database on any machine that did not
+--  happen to share it (defect: install.sql hardcoded CREATE DATABASE/USE,
+--  tmp/shop/remedy.md Phase 2). tests/run.php relies on this: it creates the
+--  test schema itself and then loads this file into it.
+--
+--  If you need a one-liner that also creates the database, do it at the shell:
+--    mysql -u root -p -e "CREATE DATABASE mydb CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+--    mysql -u root -p mydb < install.sql
 -- ============================================================
-
-CREATE DATABASE IF NOT EXISTS u938213108_altas6_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE u938213108_altas6_db;
 
 -- ─── PACKAGES ────────────────────────────────────────────────
 CREATE TABLE packages (
@@ -345,7 +354,7 @@ CREATE TABLE shop_refunds (
   INDEX approved_by (approved_by),
   INDEX processed_by (processed_by),
   INDEX idx_shop_refunds_order_status (order_id, status),
-  FOREIGN KEY (order_id)     REFERENCES shop_orders(id) ON DELETE RESTRICT,
+  FOREIGN KEY (order_id)     REFERENCES shop_orders(id) ON DELETE CASCADE,  -- M16: was RESTRICT; matches the other four shop children (migrate_shop_refunds_cascade.sql)
   FOREIGN KEY (requested_by) REFERENCES users(id) ON DELETE SET NULL,
   FOREIGN KEY (approved_by)  REFERENCES users(id) ON DELETE SET NULL,
   FOREIGN KEY (processed_by) REFERENCES users(id) ON DELETE SET NULL

@@ -1318,7 +1318,7 @@ class AdminController
                         redirect($back);
                     }
                     ShopRefund::create($orderId, $amount,
-                        (string) ($_POST['cause'] ?? 'customer_request'),
+                        (string) ($_POST['cause'] ?? 'admin_cancel'),
                         trim((string) ($_POST['destination'] ?? '')) ?: null,
                         ($_POST['promised_at'] ?? '') ?: null,
                         Auth::id());
@@ -1349,6 +1349,11 @@ class AdminController
             }
         } catch (InvalidArgumentException $e) {
             flash('error', $e->getMessage());
+        } catch (Throwable $e) {
+            // Backstop. A schema or constraint violation must never surface as
+            // a 500 from this endpoint.
+            error_log('[shop] orderRefund failed: ' . $e->getMessage());
+            flash('error', 'The refund task could not be saved. Please try again.');
         }
         redirect($back);
     }

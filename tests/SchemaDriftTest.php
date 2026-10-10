@@ -27,11 +27,14 @@ T::group('Schema drift — PHP literals vs. live DDL');
 /** Parse a MySQL enum() COLUMN_TYPE into an array of values. */
 function enum_values(string $columnType): array
 {
-    if (!preg_match("/^enum\((.*)\)$/i", $columnType, $m)) {
+    if (!preg_match("/^enum\((.*)\)$/is", $columnType, $m)) {
         return [];
     }
-    $parts = str_getcsv(trim($m[1]), ',', "'");
-    return array_map(static fn($v) => trim(trim($v), "'"), $parts);
+    // Migration files build their ALTER inside a PREPARE'd string literal, so
+    // every quote arrives doubled: ENUM(''a'',''b''). Normalise before parsing.
+    $inner = str_replace("''", "'", $m[1]);
+    $parts = str_getcsv(trim($inner), ',', "'");
+    return array_map(static fn($v) => trim(trim($v), "' "), $parts);
 }
 
 /** Read a column's declared type from the schema under test. */
@@ -48,27 +51,56 @@ $src = static function(string $file): string {
     return (string) file_get_contents(REPO_ROOT . '/' . $file);
 };
 
-// ── 1. Enum coverage: every column the shop models write to must accept it ───
+// ── 1. Enum coverage, derived from the source ──────────────────────────────
+// These assertions read the values the model actually declares or writes, not
+// a hand-picked list of past bug values. A test that hardcodes "'paid'" only
+// proves the old bug still exists; it goes useless the moment you fix it.
 
-/**
- * Each case: [table, column, value the PHP writes, defect id]
- */
-$enumCases = [
-    ['shop_refunds',     'status',      'paid',             'C1'],
-    ['ewallet_ledger',   'ref_type',    'shop_order',       'C2'],
-    ['shop_refunds',     'cause',       'customer_request', 'H4'],
-    ['shop_shipments',   'state',       'lost',             'M5'],
-];
-
-foreach ($enumCases as [$table, $column, $value, $id]) {
-    $type = column_type($table, $column);
-    if ($type === '') {
-        T::ok(false, "{$id}: {$table}.{$column} exists", 'column not found in schema');
-        continue;
+/** Pull a PHP class const array of single-quoted strings out of a file. */
+function const_values(string $file, string $const): array
+{
+    $src = (string) file_get_contents(REPO_ROOT . '/' . $file);
+    if (!preg_match('/const\s+' . preg_quote($const, '/') . '\s*=\s*\[(.*?)\];/s', $src, $m)) {
+        return [];
     }
-    $values = enum_values($type);
-    T::inSet($value, $values, "{$id}: {$table}.{$column} accepts '{$value}'");
+    preg_match_all("/'([a-z_0-9]+)'/", $m[1], $v);
+    return $v[1];
 }
+
+// 1a. ShopRefund::STATUSES must all be accepted by shop_refunds.status (C1).
+$refundStatuses = const_values('models/ShopRefund.php', 'STATUSES');
+T::ok($refundStatuses !== [], 'ShopRefund::STATUSES is parseable');
+$ddlRefundStatus = enum_values(column_type('shop_refunds', 'status'));
+$bad = array_values(array_diff($refundStatuses, $ddlRefundStatus));
+T::ok($bad === [], 'C1: every ShopRefund::STATUSES value is accepted by shop_refunds.status', implode(',', $bad));
+$bad = array_values(array_diff($ddlRefundStatus, $refundStatuses));
+T::ok($bad === [], 'C1: shop_refunds.status has no value the model cannot reach', implode(',', $bad));
+
+// 1b. ShopRefund::CAUSES must all be accepted by shop_refunds.cause (H4).
+$refundCauses = const_values('models/ShopRefund.php', 'CAUSES');
+T::ok($refundCauses !== [], 'ShopRefund::CAUSES is parseable');
+$ddlCauses = enum_values(column_type('shop_refunds', 'cause'));
+$bad = array_values(array_diff($refundCauses, $ddlCauses));
+T::ok($bad === [], 'H4: every ShopRefund::CAUSES value is accepted by shop_refunds.cause', implode(',', $bad));
+
+// 1c. The controller's fallback cause must itself be legal.
+$adminCtrl = (string) file_get_contents(REPO_ROOT . '/controllers/AdminController.php');
+if (preg_match("/\\\$_POST\['cause'\]\s*\?\?\s*'([a-z_]+)'/", $adminCtrl, $cm2)) {
+    T::inSet($cm2[1], $ddlCauses, 'H4: AdminController cause fallback is a legal enum value');
+} else {
+    T::ok(true, 'H4: AdminController cause fallback not statically readable (skipped)');
+}
+
+// 1d. Any literal state the shipment model writes must be accepted (M5).
+$shipSrc = (string) file_get_contents(REPO_ROOT . '/models/ShopShipment.php');
+preg_match_all("/SET state = '([a-z_]+)'/", $shipSrc, $sm2);
+$ddlShipState = enum_values(column_type('shop_shipments', 'state'));
+$bad = array_values(array_diff(array_unique($sm2[1]), $ddlShipState));
+T::ok($bad === [], 'M5: every state ShopShipment writes is accepted by the column', implode(',', $bad));
+T::ok(
+    strpos($shipSrc, 'flagLost') === false,
+    'M5: the dead flagLost() writer (which used an undeclared state) is gone'
+);
 
 // ── 2. Every value the shop models WRITE must exist in the enum ──────────────
 // Derived from the source rather than hand-listed, so a future status added to
@@ -206,5 +238,107 @@ T::ok(
     strpos($orderSrc, 'shipping_postcode') === false,
     'ShopOrder does not still write shipping_postcode'
 );
+
+// ── 6. Migration chain vs. install.sql ─────────────────────────────────────
+// A fresh install (install.sql) and a migrated database must agree, or the two
+// deployment paths diverge silently. A full parity test needs a pre-shop
+// baseline that does not exist as a file, so this asserts the direction that
+// actually bites: every ENUM value a migration declares must also exist in
+// install.sql. A migration may lag install.sql (a later migration adds it) but
+// must never introduce a value install.sql cannot produce.
+//
+// Migrations run in order:
+//   migrate_shop.sql -> migrate_shop_fixups.sql -> migrate_ewallet_ref_types.sql
+
+$migrationFiles = [
+    'migrate_shop.sql',
+    'migrate_shop_fixups.sql',
+    'migrate_ewallet_ref_types.sql',
+];
+
+// Every enum column in install.sql, as table.column => values.
+$installEnums = [];
+if (preg_match_all('/CREATE TABLE\s+(\w+)\s*\((.*?)\)\s*ENGINE/is', $install, $tables, PREG_SET_ORDER)) {
+    foreach ($tables as $t) {
+        if (preg_match_all('/(\w+)\s+enum\s*\(([^)]*)\)/i', $t[2], $cols, PREG_SET_ORDER)) {
+            foreach ($cols as $c) {
+                $installEnums[$t[1] . '.' . $c[1]] = enum_values('enum(' . $c[2] . ')');
+            }
+        }
+    }
+}
+T::ok(count($installEnums) >= 12, 'install.sql yields a plausible enum map', count($installEnums) . ' columns');
+
+// Every enum column any migration declares, merged in chain order (later wins).
+$migrationEnums = [];
+foreach ($migrationFiles as $file) {
+    if (!is_readable(REPO_ROOT . '/' . $file)) {
+        T::ok(false, "migration readable: {$file}");
+        continue;
+    }
+    $m = (string) file_get_contents(REPO_ROOT . '/' . $file);
+
+    // CREATE TABLE [IF NOT EXISTS] <t> ( ... )
+    if (preg_match_all('/CREATE TABLE\s+(?:IF NOT EXISTS\s+)?(\w+)\s*\((.*?)\)\s*ENGINE/is', $m, $mtabs, PREG_SET_ORDER)) {
+        foreach ($mtabs as $t) {
+            if (preg_match_all('/(\w+)\s+enum\s*\(([^)]*)\)/i', $t[2], $cols, PREG_SET_ORDER)) {
+                foreach ($cols as $c) {
+                    $migrationEnums[$t[1] . '.' . $c[1]] = enum_values('enum(' . $c[2] . ')');
+                }
+            }
+        }
+    }
+
+    // ALTER TABLE <t> MODIFY COLUMN <c> ENUM(...)  /  ADD COLUMN <c> ENUM(...)
+    if (preg_match_all(
+        '/ALTER TABLE\s+(\w+)\s+(?:MODIFY|ADD)\s+(?:COLUMN\s+)?(\w+)\s+ENUM\s*\(([^)]*)\)/is',
+        $m,
+        $alters,
+        PREG_SET_ORDER
+    )) {
+        foreach ($alters as $a) {
+            $migrationEnums[$a[1] . '.' . $a[2]] = enum_values('enum(' . $a[3] . ')');
+        }
+    }
+    // ALTER TABLE <t> CHANGE COLUMN <old> <new> ENUM(...)
+    if (preg_match_all(
+        '/ALTER TABLE\s+(\w+)\s+CHANGE\s+COLUMN\s+\w+\s+(\w+)\s+ENUM\s*\(([^)]*)\)/is',
+        $m,
+        $changes,
+        PREG_SET_ORDER
+    )) {
+        foreach ($changes as $c) {
+            $migrationEnums[$c[1] . '.' . $c[2]] = enum_values('enum(' . $c[3] . ')');
+        }
+    }
+}
+T::ok(count($migrationEnums) >= 12, 'migrations yield a plausible enum map', count($migrationEnums) . ' columns');
+
+// The assertion: nothing in the migration chain is absent from install.sql.
+$orphans = [];
+foreach ($migrationEnums as $col => $values) {
+    if (!isset($installEnums[$col])) {
+        $orphans[] = "{$col} (not in install.sql)";
+        continue;
+    }
+    $missing = array_values(array_diff($values, $installEnums[$col]));
+    if ($missing) {
+        $orphans[] = "{$col}: " . implode(',', $missing);
+    }
+}
+T::ok(
+    $orphans === [],
+    'every ENUM value the migration chain declares exists in install.sql',
+    implode(' | ', $orphans)
+);
+
+// And the specific trap this suite was built for: ref_type must keep 'upgrade'
+// in both paths, or C7 returns on any migrated database.
+if (isset($installEnums['ewallet_ledger.ref_type'])) {
+    T::inSet('upgrade', $installEnums['ewallet_ledger.ref_type'], 'C7: install.sql ref_type keeps upgrade');
+}
+if (isset($migrationEnums['ewallet_ledger.ref_type'])) {
+    T::inSet('upgrade', $migrationEnums['ewallet_ledger.ref_type'], 'C7: migration chain ref_type ends with upgrade');
+}
 
 exit(T::summary());

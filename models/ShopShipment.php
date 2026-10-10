@@ -72,12 +72,6 @@ class ShopShipment
             ->execute([$state, $id]);
     }
 
-    /** Lost-parcel flag: unlocks admin cancel and reship paths. */
-    public static function flagLost(int $id, int $adminId): void
-    {
-        db()->prepare("UPDATE shop_shipments SET state = 'lost', closed_at = NOW() WHERE id = ?")->execute([$id]);
-    }
-
     /**
      * Open-or-update the active shipment's tracking. Idempotent by
      * order+seq: re-saving the same courier/tracking updates the row, a
