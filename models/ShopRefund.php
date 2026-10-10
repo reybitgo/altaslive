@@ -40,6 +40,35 @@ class ShopRefund
         return (int) $st->fetchColumn();
     }
 
+    /**
+     * Segregation of duties: an admin may buy but may never refund their own
+     * order. Lives in the model so every entry point gets it — the UI, a future
+     * API, or a cron. Defect H6: the guard previously existed only inside
+     * AdminController::orderTransition, leaving four sibling endpoints with the
+     * view's hidden button as their only protection.
+     *
+     * Takes a memberId rather than a row so callers do not have to remember to
+     * select the right join.
+     */
+    private static function assertNotSelfReview(int $memberId): void
+    {
+        // CLI and cron have no session, so there is no human to segregate from.
+        if (!class_exists('Auth')) {
+            return;
+        }
+        if (Auth::isAdmin() && $memberId > 0 && $memberId === Auth::id()) {
+            throw new RuntimeException('Self-review refused: admins cannot refund their own orders.');
+        }
+    }
+
+    /** The buyer behind an order, or 0 when the order does not exist. */
+    private static function buyerOf(int $orderId): int
+    {
+        $st = db()->prepare("SELECT member_id FROM shop_orders WHERE id = ?");
+        $st->execute([$orderId]);
+        return (int) ($st->fetchColumn() ?: 0);
+    }
+
     public static function create(
         int $orderId,
         float $amount,
@@ -48,6 +77,7 @@ class ShopRefund
         ?string $promisedAt = null,
         ?int $requestedBy = null
     ): int {
+        self::assertNotSelfReview(self::buyerOf($orderId));
         // Without this guard an unrecognised cause reaches MySQL and dies with
         // ERROR 1265 "Data truncated for column 'cause'", which surfaced as an
         // uncaught PDOException (a 500) because the controller only caught
@@ -65,6 +95,9 @@ class ShopRefund
 
     public static function approve(int $id, int $adminId): bool
     {
+        $refund = self::find($id);
+        if (!$refund) return false;
+        self::assertNotSelfReview((int) $refund['member_id']);
         $st = db()->prepare("UPDATE shop_refunds SET status = 'approved', approved_by = ?, approved_at = NOW() WHERE id = ? AND status = 'open'");
         $st->execute([$adminId, $id]);
         return $st->rowCount() === 1;
@@ -85,6 +118,7 @@ class ShopRefund
         if (!$refund || $refund['status'] !== 'approved') {
             return false;
         }
+        self::assertNotSelfReview((int) $refund['member_id']);
 
         $pdo = db();
         $pdo->beginTransaction();
@@ -120,6 +154,9 @@ class ShopRefund
     /** Deny / cancel an open or approved refund task. */
     public static function deny(int $id, int $adminId, string $note = ''): bool
     {
+        $refund = self::find($id);
+        if (!$refund) return false;
+        self::assertNotSelfReview((int) $refund['member_id']);
         $st = db()->prepare("UPDATE shop_refunds SET status = 'denied', processed_by = ?, processed_at = NOW(), note = ? WHERE id = ? AND status IN ('open','approved')");
         $st->execute([$adminId, mb_substr($note, 0, 500), $id]);
         return $st->rowCount() === 1;

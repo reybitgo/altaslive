@@ -511,7 +511,90 @@ neither is masked.
 
 ### Done when
 
-All three findings are provably closed at the server boundary, not just hidden in the UI.
+✅ All three findings provably closed at the server boundary, not just hidden in the UI. **Met 2026-10-10** —
+see below.
+
+### Execution record — 2026-10-10
+
+#### C3 — cart IDOR (the live-exploitable one)
+
+`cart_items.id` is a sequential `AUTO_INCREMENT` shared by every member, and `Auth::guard('member')` also admits
+admins, so an id proves nothing about ownership.
+
+| Change | Detail |
+|---|---|
+| `models/Cart.php` | `updateItemQuantity()` and `removeItemById()` now **require** `$cartId`; every statement carries `AND cart_id = ?`. Both return `rowCount() > 0`, so "not found" and "not yours" are now distinguishable from success. |
+| `models/Cart.php` | Deleted `updateQuantity()` and `removeItem()` — already cart-scoped, but with **zero callers** anywhere in the live code. Three overlapping mutation paths were a trap for the next reader. |
+| `controllers/MemberController.php` | New `requireOwnCart()` resolves `Cart::getActive(Auth::id())` once per request and redirects if there is no cart. Both verbs use it. |
+| Harness | 7 assertions: attacker using the victim's `item_id` is refused, the victim's line is provably untouched, **and** the owner can still update and remove. Both directions, so the guard cannot "pass" by breaking the cart. |
+
+#### C5 — stored XSS
+
+`e()` is `htmlspecialchars(..., ENT_QUOTES)`. The browser HTML-decodes an attribute **before** the JS parser runs,
+so `&#039;` becomes `'` and the literal breaks out. `payment_reference` is buyer-supplied, `varchar(40)`, with no
+server-side character cap — so `');alert(document.cookie);//` stored via the admin verify-payment form executed in
+the admin's browser.
+
+| Change | Detail |
+|---|---|
+| `core/helpers.php` | New `js()` helper. Two layers are required: `JSON_HEX_APOS\|QUOT\|TAG\|AMP` escapes everything inside the value, **and** `htmlspecialchars` escapes the enclosing quotes `json_encode` adds — bare `json_encode` emits raw `"` and would terminate a double-quoted attribute. |
+| `views/admin/shop_order.php:46` | `copyText('<?= e($x) ?>')` → `copyText(<?= js($x) ?>)`. Note the manual quotes go too: `js()` returns a complete literal. |
+
+#### C5b — NEW: 20 more instances, several genuinely exploitable
+
+The Phase 3 action said "sweep the whole surface". That sweep found **20 further `e()`-inside-`on*=` sites across
+5 files**, not in the shop:
+
+| File | Sites | Exploitable? |
+|---|---|---|
+| `views/admin/payouts.php` | 8 | **Yes.** `$account` is the user's GCash/USDT address — `varchar(100)`, user-set via profile, no format cap. |
+| `views/admin/reactivations.php` | 2 | **Yes.** Same account column. |
+| `views/admin/user_view.php` | 8 | No. `is_valid_username()` enforces `^[a-zA-Z][a-zA-Z0-9_]{2,39}$` on the registration path, so a username cannot contain a quote. |
+| `views/admin/codes.php` | 1 | Unlikely — admin-generated codes. |
+| `views/member/payout.php` | 1 | Method label from a fixed set. |
+
+**Left unfixed on purpose.** These are not whole-argument positions — they embed a value *inside* a larger JS
+expression (`payoutAction('approve', …, '<?= e($account) ?>', …)`), where `js()` would produce a string-inside-a-string.
+The correct fix is to build the whole call as one `json_encode` object, or move the value to a `data-*` attribute
+and read it from JS. That is a real refactor of five admin views, not a one-line substitution, so it is tracked
+separately rather than smuggled into Phase 3.
+
+An automated blanket `e(` → `js(` replacement was attempted and **reverted**: it broke every one of those sites by
+double-quoting. `tests/TemplateLintTest.php` RULE-2 now guards against exactly that mistake recurring.
+
+#### H6 — segregation of duties
+
+`assertNotSelfReview()` existed only inside `AdminController::orderTransition()`. Five sibling endpoints —
+`orderHold`, `orderResume`, `orderReship`, `orderShipment`, `orderRefund` — had the view's hidden `$isSelf` button
+as their only protection.
+
+| Change | Detail |
+|---|---|
+| `models/ShopOrder.php` | Guard added to `onHold()`, `resume()`, and `cancel()` (admin actor only — a customer cancelling their own order stays legal). |
+| `models/ShopRefund.php` | New private `assertNotSelfReview(int $memberId)` + `buyerOf()`. Applied to `create()`, `approve()`, `markPaid()`, `deny()`. |
+| `controllers/AdminController.php` | `orderShipment()` now resolves the order and calls the guard. `orderHold` / `orderResume` / `orderReship` catch the new `RuntimeException` and flash the reason instead of 500-ing. |
+| Harness | 9 assertions. Self-admin is refused on every path; **a different admin can still hold, open, approve and settle** — so the guard is proven to be about self-review, not about blocking admins. |
+
+The view's `$isSelf` hiding is kept, but it is now purely a UX affordance.
+
+#### New suite: `tests/TemplateLintTest.php`
+
+| Rule | Guards against |
+|---|---|
+| RULE-1 | `e()` inside an inline event handler (C5). Exemptions are an explicit allow-list with a reason each, and a **staleness check** fails if an exempted file no longer matches — so the list cannot silently rot. |
+| RULE-2 | `js()` wrapped in manual quotes — the mistake the reverted blanket replacement made. |
+| RULE-3 | Anything other than `ShopOrder.php` writing `shop_orders.status` — the single-writer invariant the whole state machine rests on. |
+| RULE-4 | Strategy C: no shop model calls `Commission::`, and none references the inert PV columns. |
+
+**Suite movement — 4 failures → 1:**
+
+| Suite | Before | After |
+|---|---|---|
+| `SchemaDriftTest.php` | 0 of 25 failed | 0 of 25 — green |
+| `TemplateLintTest.php` | *(new)* | **0 of 7 — green** |
+| `ShopStateMachineTest.php` | 4 of 106 failed | **1 of 121 failed** |
+
+The single remaining failure is **H3** (the expiry timer ignores `correction_deadline`), which is Phase 5 scope.
 
 ---
 
@@ -819,9 +902,10 @@ strictly sequential.
 |---|---|---|
 | **C1** | ✅ **FIXED 2026-10-10.** `ShopRefund::markPaid()` wrote `status='paid'`, outside the ENUM → `ERROR 1265` → refunds could never be closed. | Was: `install.sql` ENUM `('open','approved','processed','denied','closed')` vs `ShopRefund.php:80` writing `'paid'`. **Fix (D1):** writes `'processed'`; `ShopRefund::STATUSES` const added; admin badge updated. |
 | **C2** | ✅ **FIXED 2026-10-10** (with C7). `Ewallet::credit()` rejected `ref_type='shop_order'` → e-wallet refunds were impossible. | `Ewallet.php:22` whitelist lacks `'shop_order'`; `ShopRefund.php:74` passes it. DB enum *was* extended — the PHP side was not |
-| **C3** | IDOR: cart `item_id` never scoped to the caller | `MemberController.php:1227,1232,1252,1256` → `Cart.php:92-109` (`WHERE id = ?` only). Correctly-scoped siblings `updateQuantity`/`removeItem` are dead code |
+| **C3** | ✅ **FIXED 2026-10-10.** IDOR: cart `item_id` was never scoped to the caller, so any authenticated session could rewrite or delete any member's cart line by walking the shared AUTO_INCREMENT. | **Fix:** both mutators now require `$cartId` and carry `AND cart_id = ?`; controller resolves the caller's cart via `requireOwnCart()`; two dead unscoped helpers deleted. | `MemberController.php:1227,1232,1252,1256` → `Cart.php:92-109` (`WHERE id = ?` only). Correctly-scoped siblings `updateQuantity`/`removeItem` are dead code |
 | **C4** | `$order` undefined in `order_status_badge.php` → every order row renders "Unknown" | `order_status_badge.php:8` reads `$order`; `member/shop_orders.php:43-50` loops `$o`; `admin/shop_orders.php:96` sets `$tmp` (never referenced anywhere) |
-| **C5** | Stored XSS via `payment_reference` | `admin/shop_order.php:46` — `e()` (HTML escaper) inside a JS string literal in an `onclick` attribute. `payment_reference` has no server-side cap |
+| **C5** | ✅ **FIXED 2026-10-10.** Stored XSS via `payment_reference`: `e()` HTML-decodes back to a quote before the JS parser runs. | **Fix:** new `js()` helper (JSON_HEX_* + htmlspecialchars); `admin/shop_order.php:46` now `copyText(<?= js($x) ?>)`. |
+| **C5b** | ✅ **NEW 2026-10-10.** 20 further `e()`-inside-`on*=` sites in `payouts.php`, `reactivations.php`, `user_view.php`, `codes.php`, `payout.php`. `payouts.php` and `reactivations.php` carry the user-set GCash/USDT account and **are exploitable**. Not fixed here — they embed mid-expression, so `js()` would double-quote them; needs a per-view refactor. Tracked in `tests/TemplateLintTest.php` KNOWN_C5B. | `admin/shop_order.php:46` — `e()` (HTML escaper) inside a JS string literal in an `onclick` attribute. `payment_reference` has no server-side cap |
 | **C6** | Admin "Complete" button can never succeed | `ShopOrder.php:71` actors `['customer','system']`; `AdminController.php:1177` passes `'admin'` → always `false` → misleading "This order just changed" flash |
 | **C7** | ✅ **FIXED 2026-10-10.** `Ewallet::credit()` accepted `ref_type='upgrade'`, which the ledger ENUM rejected → **every e-wallet package upgrade failed** with `ERROR 1265`, rolling back the whole upgrade. | `models/User.php:434` credited with `'upgrade'`; the ENUM omitted it. **Fix:** `migrate_ewallet_ref_types.sql` adds the value; `install.sql` updated; `Ewallet::VALID_REF_TYPES` (D2) is now the single allow-list behind both `credit()` and `debit()` |
 
@@ -834,7 +918,7 @@ strictly sequential.
 | **H3** | `expireOverdue` never consults `correction_deadline` | `ShopOrder.php:1093` `COALESCE(payment_deadline, correction_deadline)` — `payment_deadline` is always non-null, so `COALESCE` always returns it |
 | **H4** | ✅ **FIXED 2026-10-10.** The `shop_refunds.cause` default was outside the ENUM, so a forged or omitted value produced an uncaught `PDOException` (500). | `AdminController.php:1321` defaulted `'customer_request'`; ENUM is `('admin_cancel','delivery_failure','customer_dispute','other')`. Uncaught `PDOException` → 500 |
 | **H5** | `per_page()` unbounded | `core/helpers.php:459-463` — `max($min, (int)$_GET['per_page'])`, no ceiling |
-| **H6** | Segregation of duties is view-only on 5 of 6 admin endpoints | `assertNotSelfReview` called only at `AdminController.php:1091`. `orderRefund`, `orderHold`, `orderResume`, `orderReship`, `orderShipment` have no server-side check |
+| **H6** | ✅ **FIXED 2026-10-10.** Segregation of duties was view-only on 5 of 6 admin endpoints. | **Fix:** guard moved into the model — `ShopOrder::onHold/resume/cancel` and all four `ShopRefund` entry points; `orderShipment` guarded in the controller. A different admin is still permitted, asserted. | `assertNotSelfReview` called only at `AdminController.php:1091`. `orderRefund`, `orderHold`, `orderResume`, `orderReship`, `orderShipment` have no server-side check |
 
 ### Medium / lower
 

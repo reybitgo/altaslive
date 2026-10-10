@@ -45,6 +45,41 @@ function e(mixed $val): string
 }
 
 /**
+ * Encode a value for use as a JavaScript literal inside an HTML attribute.
+ *
+ * WHY NOT e(): e() is an HTML escaper. The browser HTML-decodes an attribute
+ * value BEFORE handing it to the JS parser, so e()'s &#039; becomes ' again
+ * and the string literal breaks out. A value like
+ *     ');alert(document.cookie);//
+ * stored in an admin-controlled column therefore executed in the admin's
+ * browser (defect C5, tmp/shop/remedy.md).
+ *
+ * WHY NOT BARE json_encode(): its output is wrapped in raw " characters, which
+ * would terminate a double-quoted attribute before the JS parser ever sees it.
+ *
+ * Two layers, both needed:
+ *   1. JSON_HEX_* turns every quote, apostrophe, angle bracket and ampersand
+ *      inside the VALUE into \uXXXX, so nothing in the payload can end the
+ *      literal or open a tag.
+ *   2. htmlspecialchars escapes the enclosing quotes json_encode adds, so the
+ *      whole expression is also safe to sit inside an HTML attribute. The
+ *      browser decodes &quot; back to " for the JS parser, which is exactly
+ *      what we want.
+ *
+ * Usage:  onclick="copyText(<?= js($value) ?>)"      (no manual quotes)
+ *         <a onclick="showConfirm(<?= js($title) ?>)">
+ */
+function js(mixed $val): string
+{
+    $json = json_encode(
+        $val,
+        JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP
+        | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE
+    );
+    return htmlspecialchars((string) $json, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+/**
  * Format a number as Philippine Peso.
  */
 function fmt_money(float $n, bool $showSign = false): string

@@ -34,23 +34,6 @@ class Cart
         $st = $pdo->prepare("INSERT INTO cart_items (cart_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)");
         return $st->execute([$cartId, $productId, $quantity, $unitPrice]);
     }
-    public static function updateQuantity(int $cartId, int $productId, int $quantity): bool
-    {
-        if ($quantity < 0) throw new InvalidArgumentException('Quantity cannot be negative.');
-        if ($quantity === 0) return self::removeItem($cartId, $productId);
-        $available = Product::availableStock($productId);
-        if ($quantity > $available) throw new InvalidArgumentException('Insufficient stock. Requested ' . $quantity . ', only ' . $available . ' available.');
-        $product = Product::find($productId);
-        if (!$product) throw new InvalidArgumentException('Product not found.');
-        $pdo = db();
-        $st = $pdo->prepare("UPDATE cart_items SET quantity = ?, unit_price = ?, updated_at = NOW() WHERE cart_id = ? AND product_id = ?");
-        return $st->execute([$quantity, (float)$product['price'], $cartId, $productId]);
-    }
-    public static function removeItem(int $cartId, int $productId): bool
-    {
-        $st = db()->prepare("DELETE FROM cart_items WHERE cart_id = ? AND product_id = ?");
-        return $st->execute([$cartId, $productId]);
-    }
     public static function getItem(int $cartId, int $productId): ?array
     {
         $st = db()->prepare("SELECT ci.*, p.name AS product_name, p.image_url, p.price AS current_price, p.stock, p.status AS product_status FROM cart_items ci JOIN products p ON p.id = ci.product_id WHERE ci.cart_id = ? AND ci.product_id = ? LIMIT 1");
@@ -89,23 +72,42 @@ class Cart
         $st = db()->prepare("DELETE FROM cart_items WHERE cart_id = ?");
         return $st->execute([$cartId]);
     }
-    public static function updateItemQuantity(int $itemId, int $quantity): bool
+    /**
+     * Set a line's quantity. Scoped to $cartId — see removeItemById().
+     *
+     * Returns false when nothing matched, meaning the item does not exist or
+     * belongs to a different cart. Callers treat both as "refused".
+     */
+    public static function updateItemQuantity(int $itemId, int $quantity, int $cartId): bool
     {
         if ($quantity < 0) throw new InvalidArgumentException('Quantity cannot be negative.');
-        if ($quantity === 0) return self::removeItemById($itemId);
-        $st = db()->prepare("SELECT ci.id, ci.cart_id, ci.product_id, p.stock FROM cart_items ci JOIN products p ON p.id = ci.product_id WHERE ci.id = ? LIMIT 1");
-        $st->execute([$itemId]);
+        if ($quantity === 0) return self::removeItemById($itemId, $cartId);
+        $st = db()->prepare("SELECT ci.id, ci.cart_id, ci.product_id, p.stock FROM cart_items ci JOIN products p ON p.id = ci.product_id WHERE ci.id = ? AND ci.cart_id = ? LIMIT 1");
+        $st->execute([$itemId, $cartId]);
         $item = $st->fetch();
         if (!$item) throw new InvalidArgumentException('Cart item not found.');
         $available = Product::availableStock((int)$item['product_id']);
         if ($quantity > $available) throw new InvalidArgumentException('Insufficient stock. Requested ' . $quantity . ', only ' . $available . ' available.');
-        $st = db()->prepare("UPDATE cart_items SET quantity = ?, updated_at = NOW() WHERE id = ?");
-        return $st->execute([$quantity, $itemId]);
+        $st = db()->prepare("UPDATE cart_items SET quantity = ?, updated_at = NOW() WHERE id = ? AND cart_id = ?");
+        $st->execute([$quantity, $itemId, $cartId]);
+        return $st->rowCount() > 0;
     }
-    public static function removeItemById(int $itemId): bool
+    /**
+     * Delete a line. SCOPED TO THE CALLER'S CART — $cartId is mandatory.
+     *
+     * This was `WHERE id = ?` with no cart filter, so any authenticated
+     * session could delete or rewrite ANY member's cart line by walking the
+     * primary key (defect C3, tmp/shop/remedy.md). The id alone proves
+     * nothing: cart_items.id is a sequential AUTO_INCREMENT shared by every
+     * member, and Auth::guard('member') also admits admins.
+     *
+     * Returns false when the id does not exist inside $cartId.
+     */
+    public static function removeItemById(int $itemId, int $cartId): bool
     {
-        $st = db()->prepare("DELETE FROM cart_items WHERE id = ?");
-        return $st->execute([$itemId]);
+        $st = db()->prepare("DELETE FROM cart_items WHERE id = ? AND cart_id = ?");
+        $st->execute([$itemId, $cartId]);
+        return $st->rowCount() > 0;
     }
     public static function itemCountForMember(int $memberId): int
     {

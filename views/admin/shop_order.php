@@ -43,7 +43,7 @@ $needConfirm = ['cancelled', 'returned_to_sender', 'payment_failed', 'on_hold'];
         <div class="text-muted" style="font-size:.74rem;"><?= e(strtoupper((string) $order['payment_method'])) ?>
           <?php if (!empty($order['payment_reference'])): ?>
             · ref <span class="font-mono"><?= e((string) $order['payment_reference']) ?></span>
-            <button class="btn btn-sm btn-link p-0" onclick="copyText('<?= e((string) $order['payment_reference']) ?>')">copy</button>
+            <button class="btn btn-sm btn-link p-0" onclick="copyText(<?= js((string) $order['payment_reference']) ?>)">copy</button>
           <?php endif; ?>
         </div>
       </div>

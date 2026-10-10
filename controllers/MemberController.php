@@ -1219,19 +1219,37 @@ class MemberController
         redirect('/?page=shop&cart=1');
     }
 
+    /**
+     * The caller's active cart id, or a redirect away.
+     *
+     * Ownership anchor for every cart mutation. The posted item_id identifies a
+     * row in cart_items, whose primary key is a sequential AUTO_INCREMENT shared
+     * by every member — it is not proof of ownership on its own, so each verb
+     * pairs it with this id (defect C3).
+     */
+    private function requireOwnCart(): int
+    {
+        $cart = Cart::getActive(Auth::id());
+        if (!$cart) {
+            flash('error', 'Your cart is empty.');
+            redirect('/?page=shop');
+        }
+        return (int) $cart['id'];
+    }
+
     public function updateCartItem(): void
     {
         Auth::guard('member');
         csrf_verify();
+        $cartId = $this->requireOwnCart();
 
         $itemId = (int) ($_POST['item_id'] ?? 0);
         $qty    = (int) ($_POST['quantity'] ?? 0);
         $isAjax = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest');
 
         try {
-            Cart::updateItemQuantity($itemId, $qty);
-            $cart = Cart::getActive(Auth::id());
-            $totals = $cart ? Cart::getTotals((int) $cart['id']) : ['total_price' => 0, 'total_items' => 0];
+            Cart::updateItemQuantity($itemId, $qty, $cartId);
+            $totals = Cart::getTotals($cartId);
             if ($isAjax) {
                 json_response(['ok' => true, 'subtotal' => number_format((float) $totals['total_price'], 2), 'count' => (int) $totals['total_items']]);
             }
@@ -1248,15 +1266,15 @@ class MemberController
     {
         Auth::guard('member');
         csrf_verify();
+        $cartId = $this->requireOwnCart();
 
         $itemId = (int) ($_POST['item_id'] ?? 0);
         $isAjax = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest');
 
         try {
-            Cart::removeItemById($itemId);
+            Cart::removeItemById($itemId, $cartId);
+            $totals = Cart::getTotals($cartId);
             if ($isAjax) {
-                $cart = Cart::getActive(Auth::id());
-                $totals = $cart ? Cart::getTotals((int) $cart['id']) : ['total_price' => 0, 'total_items' => 0];
                 json_response(['ok' => true, 'subtotal' => number_format((float) $totals['total_price'], 2), 'count' => (int) $totals['total_items']]);
             }
         } catch (InvalidArgumentException $e) {

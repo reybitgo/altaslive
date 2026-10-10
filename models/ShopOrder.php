@@ -390,6 +390,7 @@ class ShopOrder
         if (!$order) return false;
         if ($reason === '' || $ownerId <= 0 || $deadline === '') return false;
         if ($order['status'] === 'on_hold') return false; // already paused
+        self::assertNotSelfReview($order);
 
         return self::transition($orderId, 'on_hold', 'admin', $adminId, [
             'reason_code' => mb_substr($reason, 0, 64),
@@ -412,6 +413,7 @@ class ShopOrder
     {
         $order = self::find($orderId);
         if (!$order || $order['status'] !== 'on_hold') return false;
+        self::assertNotSelfReview($order);
         $target = (string) ($order['previous_status'] ?? '');
         if ($target === '' || !isset(self::TRANSITIONS[$target])) return false;
 
@@ -1069,6 +1071,12 @@ class ShopOrder
             if (!$order || (int) $order['member_id'] !== (int) $actorId) {
                 return false;
             }
+        } elseif ($actorType === 'admin') {
+            // An admin may cancel anyone's order EXCEPT their own: cancelling
+            // your own paid order is the first step of refunding yourself.
+            $order = self::find($orderId);
+            if (!$order) return false;
+            self::assertNotSelfReview($order);
         }
 
         return self::transition($orderId, 'cancelled', $actorType, $actorId, [

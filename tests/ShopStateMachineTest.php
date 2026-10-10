@@ -291,30 +291,52 @@ test('a member cannot touch another member\'s cart line', function (): void {
     $attackerCart = (int) Cart::getOrCreate($attacker)['id'];
     Cart::addItem($attackerCart, $pid, 1);
 
-    $victimItemId = (int) Fixtures::scalar("SELECT id FROM cart_items WHERE cart_id = ?", [$victimCart]);
+$victimItemId  = (int) Fixtures::scalar("SELECT id FROM cart_items WHERE cart_id = ?", [$victimCart]);
+    $attackerItemId = (int) Fixtures::scalar("SELECT id FROM cart_items WHERE cart_id = ?", [$attackerCart]);
+    T::ok(
+        $victimItemId > 0 && $attackerItemId > 0 && $victimItemId !== $attackerItemId,
+        'victim and attacker hold distinct cart lines',
+        "victim={$victimItemId} attacker={$attackerItemId}"
+    );
 
-    // The controller hands Cart::updateItemQuantity/removeItemById a bare
-    // item_id taken straight from POST. Reproduce exactly that call shape.
-    // Quantity is within stock so the assertion isolates OWNERSHIP rather than
-    // tripping the stock guard.
     $qtyBefore = (int) Fixtures::scalar("SELECT quantity FROM cart_items WHERE id = ?", [$victimItemId]);
     T::eq(2, $qtyBefore, 'victim cart starts at qty 2');
 
-    Cart::updateItemQuantity($victimItemId, 7);
-    $qtyAfter = (int) Fixtures::scalar("SELECT quantity FROM cart_items WHERE id = ?", [$victimItemId]);
+    // The attacker posts the victim's item_id but only ever has their own cart.
+    // Quantity is within stock so the assertion isolates OWNERSHIP rather than
+    // tripping the stock guard.
+    T::throws(
+        InvalidArgumentException::class,
+        static fn() => Cart::updateItemQuantity($victimItemId, 7, $attackerCart),
+        'C3: updateItemQuantity refuses an item outside the caller\'s cart'
+    );
     T::eq(
         $qtyBefore,
-        $qtyAfter,
-        'C3: updateItemQuantity scoped to the caller\'s cart leaves the victim\'s line untouched'
+        (int) Fixtures::scalar("SELECT quantity FROM cart_items WHERE id = ?", [$victimItemId]),
+        'C3: the victim\'s line quantity is unchanged'
     );
 
-    Cart::removeItemById($victimItemId);
-    $stillThere = (int) Fixtures::scalar("SELECT COUNT(*) FROM cart_items WHERE id = ?", [$victimItemId]);
     T::ok(
-        $stillThere > 0,
-        'C3: removeItemById scoped to the caller\'s cart leaves the victim\'s line in place',
-        "row count {$stillThere}"
+        Cart::removeItemById($victimItemId, $attackerCart) === false,
+        'C3: removeItemById reports refusal for an item outside the caller\'s cart'
     );
+    T::eq(
+        1,
+        (int) Fixtures::scalar("SELECT COUNT(*) FROM cart_items WHERE id = ?", [$victimItemId]),
+        'C3: the victim\'s cart line is still in place'
+    );
+
+    // And the owner can still do both, so the guard did not simply break the cart.
+    T::ok(
+        Cart::updateItemQuantity($victimItemId, 3, $victimCart),
+        'C3: the owner can still set their own quantity'
+    );
+    T::eq(3, (int) Fixtures::scalar("SELECT quantity FROM cart_items WHERE id = ?", [$victimItemId]), 'C3: owner quantity applied');
+    T::ok(
+        Cart::removeItemById($victimItemId, $victimCart),
+        'C3: the owner can still remove their own line'
+    );
+    T::eq(0, (int) Fixtures::scalar("SELECT COUNT(*) FROM cart_items WHERE id = ?", [$victimItemId]), 'C3: owner removal applied');
 });
 
 T::group('C1/C2 — refund lifecycle closes');
@@ -361,6 +383,7 @@ T::group('H6 — segregation of duties is model-enforced');
 
 test('an admin cannot act on their own order', function (): void {
     $adminId = Fixtures::admin();
+    $otherId = Fixtures::admin('t_other_admin');
     $pid     = Fixtures::product('__SELF__', 100.00, 5);
 
     // The admin buys with their own account...
@@ -380,13 +403,43 @@ test('an admin cannot act on their own order', function (): void {
             'H6: assertNotSelfReview refuses an admin acting on their own order'
         );
 
-        // Phase 3 extends this to every admin endpoint. Today only the
-        // transition path calls it, so onHold/reship/refund are unguarded.
-        $held = ShopOrder::onHold($orderId, $adminId, 'self_hold', $adminId, date('Y-m-d H:i:s', time() + 3600));
+        // Every admin endpoint that touches an order must be guarded in the
+        // MODEL, not only in the controller (defect H6).
+        T::throws(RuntimeException::class, static fn() => ShopOrder::onHold(
+            $orderId, $adminId, 'self_hold', $adminId, date('Y-m-d H:i:s', time() + 3600)
+        ), 'H6: onHold is model-guarded against self-review');
+
+        T::throws(RuntimeException::class, static fn() => ShopOrder::cancel(
+            $orderId, 'admin', $adminId, 'admin_cancel'
+        ), 'H6: admin cancel is model-guarded against self-review');
+
+        T::throws(RuntimeException::class, static fn() => ShopRefund::create(
+            $orderId, 100.00, 'admin_cancel', 'ewallet', null, $adminId
+        ), 'H6: refund creation is model-guarded against self-review');
+
+        // A DIFFERENT admin must still be able to act — the guard is about
+        // self-review, not about blocking admins generally. Open the refund as
+        // that other admin, then come back and prove the self-admin still
+        // cannot approve or deny it.
+        Fixtures::loginAs($otherId, 'admin');
+        $refundId = ShopRefund::create($orderId, 100.00, 'admin_cancel', 'ewallet', null, $otherId);
+        T::ok($refundId > 0, 'H6: a different admin can still open a refund');
+
+        Fixtures::loginAs($adminId, 'admin');
+        T::throws(RuntimeException::class, static fn() => ShopRefund::approve($refundId, $adminId), 'H6: refund approval is model-guarded');
+        T::throws(RuntimeException::class, static fn() => ShopRefund::deny($refundId, $adminId), 'H6: refund denial is model-guarded');
+
+        // Settlement can only be attempted once the refund is approved, so the
+        // other admin approves it first.
+        Fixtures::loginAs($otherId, 'admin');
+        T::ok(ShopRefund::approve($refundId, $otherId), 'H6: a different admin can still approve');
+        Fixtures::loginAs($adminId, 'admin');
+        T::throws(RuntimeException::class, static fn() => ShopRefund::markPaid($refundId, $adminId, 'RECEIPT-SELF'), 'H6: refund settlement is model-guarded');
+
+        Fixtures::loginAs($otherId, 'admin');
         T::ok(
-            $held === false,
-            'H6: onHold is model-guarded against self-review',
-            'onHold returned ' . var_export($held, true)
+            ShopOrder::onHold($orderId, $otherId, 'stock_shortage', $otherId, date('Y-m-d H:i:s', time() + 3600)),
+            'H6: a different admin can still hold the order'
         );
     } finally {
         Fixtures::logout();

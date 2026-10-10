@@ -1202,10 +1202,15 @@ class AdminController
         csrf_verify();
 
         $orderId = (int) ($_POST['order_id'] ?? 0);
-        $ok = ShopOrder::onHold($orderId, Auth::id(),
-            trim((string) ($_POST['hold_reason'] ?? '')),
-            (int) ($_POST['hold_owner_id'] ?? 0),
-            (string) ($_POST['hold_deadline'] ?? ''));
+        try {
+            $ok = ShopOrder::onHold($orderId, Auth::id(),
+                trim((string) ($_POST['hold_reason'] ?? '')),
+                (int) ($_POST['hold_owner_id'] ?? 0),
+                (string) ($_POST['hold_deadline'] ?? ''));
+        } catch (RuntimeException $e) {
+            flash('error', $e->getMessage());
+            redirect('/?page=admin_shop_order&id=' . $orderId);
+        }
         flash($ok ? 'success' : 'error', $ok
             ? 'Order placed on hold.'
             : 'Hold refused — reason, owner, and deadline are all required.');
@@ -1218,10 +1223,33 @@ class AdminController
         csrf_verify();
 
         $orderId = (int) ($_POST['order_id'] ?? 0);
-        $ok = ShopOrder::resume($orderId, Auth::id());
+        try {
+            $ok = ShopOrder::resume($orderId, Auth::id());
+        } catch (RuntimeException $e) {
+            flash('error', $e->getMessage());
+            redirect('/?page=admin_shop_order&id=' . $orderId);
+        }
         flash($ok ? 'success' : 'error', $ok
             ? 'Hold released.'
             : 'Resume refused — the previous status is no longer reachable.');
+        redirect('/?page=admin_shop_order&id=' . $orderId);
+    }
+
+    public function orderReship(): void
+    {
+        Auth::guard('admin');
+        csrf_verify();
+
+        $orderId = (int) ($_POST['order_id'] ?? 0);
+        try {
+            $ok = ShopOrder::reship($orderId, Auth::id());
+        } catch (RuntimeException $e) {
+            flash('error', $e->getMessage());
+            redirect('/?page=admin_shop_order&id=' . $orderId);
+        }
+        flash($ok ? 'success' : 'error', $ok
+            ? 'Reshipment opened — the shop absorbs the cost, no fee charged.'
+            : 'Reship refused — the order must be returned_to_sender with no more than one prior reship.');
         redirect('/?page=admin_shop_order&id=' . $orderId);
     }
 
@@ -1264,6 +1292,21 @@ class AdminController
 
         $orderId = (int) ($_POST['order_id'] ?? 0);
         $back    = '/?page=admin_shop_order&id=' . $orderId;
+
+        // Same segregation of duties as the other order endpoints: an admin may
+        // not edit the shipment on an order they placed themselves (defect H6).
+        $order = ShopOrder::find($orderId);
+        if (!$order) {
+            flash('error', 'Order not found.');
+            redirect('/?page=admin_shop_orders');
+        }
+        try {
+            ShopOrder::assertNotSelfReview($order);
+        } catch (RuntimeException $e) {
+            flash('error', $e->getMessage());
+            redirect($back);
+        }
+
         $s = ShopShipment::activeFor($orderId);
         if (!$s) {
             flash('error', 'No active shipment to edit. Tracking is set at handoff.');
@@ -1285,19 +1328,6 @@ class AdminController
         ShopShipment::touch((int) $s['id'], $data);
         flash('success', 'Shipment updated.');
         redirect($back);
-    }
-
-    public function orderReship(): void
-    {
-        Auth::guard('admin');
-        csrf_verify();
-
-        $orderId = (int) ($_POST['order_id'] ?? 0);
-        $ok = ShopOrder::reship($orderId, Auth::id());
-        flash($ok ? 'success' : 'error', $ok
-            ? 'Reshipment opened — the shop absorbs the cost, no fee charged.'
-            : 'Reship refused — the order must be returned_to_sender with no more than one prior reship.');
-        redirect('/?page=admin_shop_order&id=' . $orderId);
     }
 
     public function orderRefund(): void
