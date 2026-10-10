@@ -1039,9 +1039,9 @@ class AdminController
         $orders = ShopOrder::byStatus($status, (int) ($_GET['pg'] ?? 1), per_page());
         $counts = ShopOrder::statusCounts();
         $counts['all'] = array_sum($counts);
-        $actionable = (int) db()->query(
-            "SELECT COUNT(*) FROM shop_orders WHERE status IN ('payment_review','payment_failed','paid','packing','ready_to_ship','delivery_failed')"
-        )->fetchColumn();
+        // A previous revision also ran a second COUNT(*) here for an
+        // "actionable" badge that the view never rendered — an extra query on
+        // every page load for nothing (defect M14).
         $pageTitle = 'Shop Orders';
         require 'views/admin/shop_orders.php';
     }

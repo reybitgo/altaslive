@@ -593,6 +593,32 @@ function shop_status_badge(string $status, ?string $stamp = null): string
     return '<span class="badge bg-' . $tone . '">' . $label . '</span>' . $small;
 }
 
+/**
+ * Next-action hint for the admin fulfilment queue, derived from the matrix
+ * (§5.15). Lives here rather than in views/admin/shop_orders.php, where a
+ * function declaration at file scope means a second include anywhere is a
+ * fatal "Cannot redeclare" (defect M14).
+ *
+ * @return string|null null for statuses with no queued action (terminal ones).
+ */
+function shop_next_action(string $status): ?string
+{
+    return match ($status) {
+        'payment_review'     => 'Verify or reject the proof',
+        'payment_failed'     => 'Waiting for buyer re-upload',
+        'paid'               => 'Start packing',
+        'packing'            => 'Mark ready to ship',
+        'ready_to_ship'      => 'Hand off to the courier',
+        'shipped'            => 'Track until delivery',
+        'out_for_delivery'   => 'Awaiting POD',
+        'delivery_failed'    => 'Retry or return to sender',
+        'returned_to_sender' => 'Reship or resolve',
+        'delivered'          => 'Awaiting receipt / window',
+        'on_hold'            => 'Resolve the hold',
+        default              => null,
+    };
+}
+
 /** Public order number: AL + yymmdd + zero-padded id (plan §2.3 note). */
 function shop_public_order_no(int $id, string $createdAt): string
 {

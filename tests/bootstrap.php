@@ -96,6 +96,21 @@ spl_autoload_register(function (string $class): void {
 date_default_timezone_set('Asia/Manila');
 
 /**
+ * Open the session now, before this harness prints anything.
+ *
+ * helpers.php starts a session lazily inside flash(), guarded by
+ * session_status(). In a browser that is fine because index.php opens the
+ * session before any output. Under CLI, once the test reporter has echoed a
+ * line, PHP refuses to start a session and emits "Session cannot be started
+ * after headers have already been sent" - an artefact of rendering views
+ * in-process, not an application defect. Opening it here keeps the
+ * warning-free render assertions meaningful.
+ */
+if (session_status() === PHP_SESSION_NONE && PHP_SAPI !== 'cli-server') {
+    session_start();
+}
+
+/**
  * Test result collector. One process-wide instance so every helper file can
  * report without threading a return value back through the call stack.
  */
@@ -240,7 +255,7 @@ final class Fixtures
      * A shop order with items, straight to `pending`, bypassing checkout.
      * Used by tests about transitions rather than about order creation.
      */
-    public static function pendingOrder(int $memberId, int $productId, int $qty = 1, ?float $total = null): int
+public static function pendingOrder(int $memberId, int $productId, int $qty = 1, ?float $total = null): int
     {
         $prod = Product::find($productId);
         $total = $total ?? ((float) $prod['price'] * $qty);
@@ -248,9 +263,13 @@ final class Fixtures
             "INSERT INTO shop_orders
                (order_no, member_id, total_price, payment_method, status, payment_deadline,
                 billing_name, shipping_name, shipping_address)
-             VALUES (?, ?, ?, 'gcash', 'pending', DATE_ADD(NOW(), INTERVAL 24 HOUR), 'T', 'T', 'T')"
-        )->execute(['T' . bin2hex(random_bytes(8)), $memberId, $total]);
+             VALUES ('PLACEHOLDER', ?, ?, 'gcash', 'pending', DATE_ADD(NOW(), INTERVAL 24 HOUR), 'T', 'T', 'T')"
+        )->execute([$memberId, $total]);
         $orderId = (int) db()->lastInsertId();
+        // Give it a realistic public order number, exactly as createFromCart
+        // does, so tests that assert on the rendered AL… number are meaningful.
+        db()->prepare("UPDATE shop_orders SET order_no = ? WHERE id = ?")
+            ->execute([shop_public_order_no($orderId, date('Y-m-d H:i:s')), $orderId]);
         db()->prepare(
             "INSERT INTO shop_order_items (order_id, product_id, product_name, quantity, unit_price, total_price, reservation_state)
              VALUES (?, ?, ?, ?, ?, ?, 'reserved')"

@@ -40,14 +40,17 @@
                 <div class="mt-2">No orders yet.</div>
                 <a href="<?= link_to('shop') ?>" class="btn btn-primary btn-sm mt-2">Visit the Shop</a>
               </td></tr>
-            <?php else: foreach ($orders['data'] as $o):
-              $o['created_at'] = $o['created_at'] ?? null; ?>
+            <?php else: foreach ($orders['data'] as $o): ?>
               <tr>
-                <td style="padding-left:1.25rem;" class="fw-semibold"><?= e(shop_public_order_no((int) $o['id'], (string) $o['created_at'])) ?></td>
+                <td style="padding-left:1.25rem;" class="fw-semibold"><?= e($o['order_no']) ?></td>
                 <td class="text-muted" style="font-size:.8rem;"><?= e(fmt_datetime((string) $o['created_at'])) ?></td>
                 <td class="text-end font-mono"><?= fmt_money((float) $o['total_price']) ?></td>
                 <td class="text-muted" style="font-size:.8rem;"><?= e(strtoupper((string) $o['payment_method'])) ?></td>
-                <td><?php require __DIR__ . '/../partials/order_status_badge.php'; ?></td>
+                <td><?php
+                  $badgeStatus = (string) $o['status'];
+                  $badgeStamp  = $o['created_at'] ?? null;
+                  require __DIR__ . '/../partials/order_status_badge.php';
+                ?></td>
                 <td class="text-end" style="padding-right:1.25rem;">
                   <?php if (ShopOrder::canMemberAct($o, 'proof')): ?>
                     <a href="<?= link_to('shop_order', ['id' => $o['id']]) ?>" class="btn btn-sm btn-warning">Upload proof</a>

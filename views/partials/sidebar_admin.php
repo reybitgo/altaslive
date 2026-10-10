@@ -20,6 +20,10 @@ $pendingShopOrders = (int)db()->query(
     "SELECT COUNT(*) FROM shop_orders WHERE status IN ('payment_review','payment_failed','paid','packing','ready_to_ship','delivery_failed')"
 )->fetchColumn();
 
+// Declared in a view partial, so a second include of this file would be a
+// fatal "Cannot redeclare". The guard costs nothing: the body is only emitted
+// when the function is CALLED. (Defect M14, tmp/shop/remedy.md.)
+if (!function_exists('renderAdminNav')) {
 function renderAdminNav($cp, $adminUser, $initial, $pendingPayouts, $pendingMembers)
 { ?>
   <div class="sidebar-brand">
@@ -120,6 +124,7 @@ function renderAdminNav($cp, $adminUser, $initial, $pendingPayouts, $pendingMemb
     </div>
   </div>
 <?php } ?>
+<?php } // end if (!function_exists('renderAdminNav')) ?>
 
 <!-- Desktop sidebar -->
 <div class="sidebar d-none d-lg-flex flex-column">

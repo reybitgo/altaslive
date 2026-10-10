@@ -72,6 +72,10 @@ $nav[] = 'SEPARATOR:Site';
 $nav[] = ['page' => 'profile', 'icon' => '⚙️', 'label' => 'Profile & Settings', 'pages' => ['profile']];
 $nav[] = ['page' => '__frontend__', 'icon' => '🌐', 'label' => 'View Frontend', 'pages' => []];
 
+// Declared in a view partial, so a second include would be a fatal
+// "Cannot redeclare". The body is only emitted when the function is CALLED.
+// (Defect M14, tmp/shop/remedy.md.)
+if (!function_exists('memberNavActive')) {
 function memberNavActive($item, $cp, $view)
 {
   if (!isset($item['pages'])) return false;
@@ -79,7 +83,9 @@ function memberNavActive($item, $cp, $view)
   if (isset($item['view'])) return $view === $item['view'];
   return true;
 }
+} // end if (!function_exists('memberNavActive'))
 
+if (!function_exists('renderSidebarNav')) {
 function renderSidebarNav($nav, $cp, $user, $view, $initial, $name)
 { ?>
   <div class="sidebar-brand">
@@ -136,6 +142,7 @@ function renderSidebarNav($nav, $cp, $user, $view, $initial, $name)
     </div>
   </div>
 <?php } ?>
+<?php } // end if (!function_exists('renderSidebarNav')) ?>
 
 <!-- Desktop sidebar (hidden on <lg) -->
 <div class="sidebar d-none d-lg-flex flex-column">
