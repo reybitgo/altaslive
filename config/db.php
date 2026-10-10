@@ -8,15 +8,20 @@
 // ── Database Configuration ──────────────────────────────────────────────────
 // Copy this file and fill in your real credentials.
 // Never commit real credentials to version control.
+//
+// Each constant is defined only when not already present, so a harness (see
+// tests/bootstrap.php) can pre-define DB_NAME and friends to point the whole
+// application at a throwaway schema without this file being edited. In normal
+// operation nothing pre-defines them and the literals below are used as-is.
 
 // ── Timezone ──────────────────────────────────────────────────────────────
 date_default_timezone_set('Asia/Manila');
 
-define('DB_HOST', 'localhost');
-define('DB_PORT', '3306');
-define('DB_NAME', 'u938213108_altas6_db');
-define('DB_USER', 'u938213108_altas6_admin');
-define('DB_PASS', '2v$J#?M^&F:');
+defined('DB_HOST') || define('DB_HOST', 'localhost');
+defined('DB_PORT') || define('DB_PORT', '3306');
+defined('DB_NAME') || define('DB_NAME', 'u938213108_altas6_db');
+defined('DB_USER') || define('DB_USER', 'u938213108_altas6_admin');
+defined('DB_PASS') || define('DB_PASS', '2v$J#?M^&F:');
 
 // ── Application Configuration ───────────────────────────────────────────────
 define('APP_URL',  'http://localhost/altaslive');  // No trailing slash
