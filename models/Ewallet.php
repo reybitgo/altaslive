@@ -7,6 +7,38 @@
 class Ewallet
 {
     /**
+     * Every value ewallet_ledger.ref_type accepts.
+     *
+     * SINGLE SOURCE OF TRUTH. Both credit() and debit() validate against this,
+     * and it must stay identical to the ENUM in install.sql / the migrations.
+     *
+     * Two defects came from two hand-maintained lists drifting away from the
+     * column in opposite directions:
+     *   C2 — 'shop_order' was in the ENUM but missing from both lists, so a
+     *        shop refund could never be credited.
+     *   C7 — 'upgrade' was in credit()'s list but NOT in the ENUM, so
+     *        Ewallet::credit(…, 'upgrade', …) died with
+     *        "Data truncated for column 'ref_type'" and rolled back every
+     *        e-wallet package upgrade (models/User.php:434).
+     *
+     * tests/SchemaDriftTest.php asserts this constant and the live ENUM agree,
+     * in both directions. Adding a value here without the migration, or the
+     * reverse, fails the suite.
+     */
+    public const VALID_REF_TYPES = [
+        'commission', 'payout', 'reactivation', 'transfer', 'topup',
+        'registration', 'upgrade', 'shop_order',
+    ];
+
+    /** @throws InvalidArgumentException when $refType is not a ledger value. */
+    private static function assertRefType(string $refType): void
+    {
+        if (!in_array($refType, self::VALID_REF_TYPES, true)) {
+            throw new InvalidArgumentException("Invalid ref_type: {$refType}");
+        }
+    }
+
+    /**
      * Credit amount to user's e-wallet and log to ledger.
      *
      * @param bool $withdrawable If true, also increments withdrawable_balance.
@@ -19,10 +51,7 @@ class Ewallet
         string $note = '',
         bool $withdrawable = true
     ): void {
-        $valid = ['commission', 'payout', 'reactivation', 'transfer', 'topup', 'registration', 'upgrade'];
-        if (!in_array($refType, $valid, true)) {
-            throw new InvalidArgumentException("Invalid ref_type: {$refType}");
-        }
+        self::assertRefType($refType);
         $pdo = db();
 
         if ($withdrawable) {
@@ -57,10 +86,7 @@ class Ewallet
         string $note = '',
         bool $withdrawable = true
     ): bool {
-        $valid = ['commission', 'payout', 'reactivation', 'transfer', 'topup', 'registration'];
-        if (!in_array($refType, $valid, true)) {
-            throw new InvalidArgumentException("Invalid ref_type: {$refType}");
-        }
+        self::assertRefType($refType);
         $pdo = db();
 
         // Lock the row and check balance atomically

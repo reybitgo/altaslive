@@ -391,7 +391,7 @@ CREATE TABLE ewallet_ledger (
   type          ENUM('credit','debit') NOT NULL,
   amount        DECIMAL(12,2) NOT NULL,
   reference_id  INT UNSIGNED  NULL,
-  ref_type      ENUM('commission','payout','reactivation','transfer','topup', 'registration', 'shop_order') NULL,  -- v2: added 'reactivation', 'transfer', 'topup', 'registration'; Phase 1.2: added 'shop_order'
+  ref_type      ENUM('commission','payout','reactivation','transfer','topup','registration','upgrade','shop_order') NULL,  -- C7: added 'upgrade' (migrate_ewallet_ref_types.sql). Keep in sync with Ewallet::VALID_REF_TYPES
   balance_after DECIMAL(14,2) NOT NULL,
   note          VARCHAR(255)  NULL,
   created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

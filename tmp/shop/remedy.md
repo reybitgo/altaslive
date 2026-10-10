@@ -137,18 +137,22 @@ execution record below.
 | Database | `u938213108_altas6_db` — **reachable, a local dev copy**, not a remote production host |
 | Row counts | `users` 156 · `ewallet_ledger` 7,693 · `products` 1 · `carts` 2 · `settings` 35 · 24 tables |
 | Shop data | **All 6 shop tables are empty** (0 orders, 0 items, 0 events, 0 shipments, 0 proofs, 0 refunds) — the shop has never taken an order locally |
-| App DB user | `u938213108_altas6_admin` — **cannot `CREATE`/`DROP DATABASE`** (returns a misleading `ERROR 1045`). Schema-level work needs the local `root` account. |
+| App DB user | `u938213108_altas6_admin` — holds `SUPER … WITH GRANT OPTION` on `*.*` locally, so it can create/drop schemas and see all 45 local databases. Effectively root on this machine. **Not a finding** — sandbox, shared dev box. |
 | PHP | 8.3.16 (CLI) — all 22 shop files pass `php -l` |
 
-> **Implication for Phase 1:** the app user is scoped to its own schema and cannot create the dedicated test
-> database. Provisioning `altas6_test` must use the local `root` account, and the harness must connect with a
-> superuser-capable DSN — or `altas6_test` must be created once, by hand, by `root`.
+> **Correction (2026-10-10).** An earlier revision of this note claimed the app user *cannot* `CREATE`/`DROP
+> DATABASE`, based on a `ERROR 1045` seen during Phase 0. That was **wrong** — the error was caused by
+> PowerShell mangling the password in the my.cnf defaults file, not by a privilege limit. Re-tested in Phase 1:
+> the app user creates and drops schemas without complaint. Phase 1 therefore provisions `altas6_test` **without**
+> needing `root`, and the harness can run on the same credentials the app uses.
 
 #### Dump provenance
 
 The first dump attempt silently produced a **UTF-16LE** file (PowerShell's `>` operator re-encodes piped output),
-which MySQL then refused to restore. Two further failures: the app user cannot create scratch databases, and
-restoring from a redirect needs `--binary-mode=1` because `--hex-blob` emits NUL bytes. The working recipe is:
+which MySQL then refused to restore. Two further failures: the restore failed on NUL bytes emitted by
+`--hex-blob` (needs `--binary-mode=1`), and every attempt to authenticate failed because PowerShell expanded
+`$J` inside the here-string that built the my.cnf, silently corrupting the password. Generating the defaults file
+from PHP fixed the auth problem. The working recipe:
 
 ```powershell
 # credentials must NOT be interpolated by PowerShell — generate the defaults file from PHP
@@ -204,36 +208,154 @@ boundary the model-only tests never touched — so the harness must be rebuilt *
 
 ### Actions
 
-1. **Provision a dedicated test database** (e.g. `altas6_test`) seeded from `install.sql`. Point a
-   `config/db.php` override at it via an env var or a `config/db.test.php`; **never** let it default to the
-   live DSN.
-2. **Rewrite the harness as `tests/ShopStateMachineTest.php`:**
-   - Runs **inside a transaction per test case**, rolled back after each assertion group. No self-heal
-     `DELETE`s, no raw balance restoration, no hardcoded user IDs — create fixtures with `INSERT` and let
-     rollback clean up.
-   - Seeds its own admin / member / product fixtures.
-   - Retains the existing 85 model assertions verbatim (they are good) and adds boundary-layer coverage:
-     controller-level authorization, refund lifecycle end-to-end, cart ownership.
-3. **Add a schema-drift check** that diffs the live schema against `install.sql`. This is what would have caught
-   C1, C2, H4 and M5 at CI time. Emit the enum values actually present in `information_schema` and assert the PHP
-   literals are members.
-4. Delete the now-redundant `tmp/shop/*.php.txt` snapshots — see Phase 9 for why they are dangerous. (Deferred to
-   Phase 9 if you prefer to keep this phase minimal.)
+1. ~~**Provision a dedicated test database** (`altas6_test`).~~ ✅ Done. **Requires no superuser** — see the
+   execution record; the Phase 0 privilege note was wrong. Also `GRANT`ed to the app user so the harness runs on
+   the same credentials the app uses.
+2. ✅ **Rebuilt as `tests/`:**
+   - `bootstrap.php` — safety gate, config override, autoload, assertions, fixtures, isolation
+   - `SchemaDriftTest.php` — PHP literals vs. live DDL
+   - `ShopStateMachineTest.php` — 56 ported model regressions + 5 boundary suites
+   - `run.php` — schema rebuild, subprocess execution, aggregation, teardown
+3. **Isolation is by schema, not by transaction.** The original plan specified a transaction wrapper per test; that
+   is impossible here because the code under test opens its own transactions and PDO has no nesting. `run.php`
+   drops and rebuilds the schema from `install.sql` on every run, and `resetState()` truncates between cases.
+4. **Schema-drift check** — done first, per recommendation. Reads `information_schema` and asserts PHP literals
+   are members. Reports **9** failures, not the 4 predicted, and surfaced **C7** (see below).
+5. ✅ Deleted `tmp/shop/admin_block.php.txt` and `tmp/shop/member_block.php.txt`.
 
 ### Verification
 
-`php tests/ShopStateMachineTest.php` passes 85/85 on the **untouched** code — establishing that the harness
-reproduces current behaviour, not the intended behaviour. The drift check reports the four known enum mismatches
-as failures.
+- `php tests/run.php` → deterministic; model layer green, boundary layer red on the exact defects.
+- App schema byte-identical to the Phase 0 baseline after multiple runs.
+- `ALTAS_TEST_DB=<app schema> php tests/SchemaDriftTest.php` → refuses, exit 2, writes nothing.
 
 ### Risk
 
-The harness itself becoming wrong and giving false confidence. **Mitigation:** keep the original 85 assertions
-untouched as a regression floor; never weaken a test to make it pass.
+The harness itself becoming wrong and giving false confidence. **Mitigation:** the 56 original model assertions are
+ported verbatim as a regression floor; never weaken a test to make it pass.
 
 ### Done when
 
-The suite runs green against the pre-fix code, and the drift check reports the four known enum mismatches.
+✅ Suite runs green against the pre-fix code (model layer) and the drift check reports the known mismatches —
+plus three it discovered on its own. ✅ **Met
+2026-10-10** — see the execution record below. Note it reports **nine**, not four: it found more than expected.
+
+### Execution record — 2026-10-10
+
+#### What was built
+
+| File | Purpose |
+|---|---|
+| `tests/bootstrap.php` | Safety gate, config override, autoloading, `T` assertion collector, `Fixtures`, `resetState()`, `test()` |
+| `tests/SchemaDriftTest.php` | 16 assertions comparing PHP literals against live DDL |
+| `tests/ShopStateMachineTest.php` | 101 assertions: the 56 model regressions from the old smoke test, plus 5 boundary suites |
+| `tests/run.php` | Rebuilds the schema from `install.sql`, runs each suite in a subprocess, aggregates, tears down |
+
+**Current result — deterministic across consecutive runs:**
+
+```
+SchemaDriftTest.php        16 assertions,  9 failed
+ShopStateMachineTest.php  101 assertions,  7 failed
+                         ──────────────────────────────
+                         117 assertions, 16 failed
+```
+
+#### A NEW CRITICAL DEFECT, OUTSIDE THE SHOP (C7)
+
+Building the drift check first paid for itself immediately. It found a **live, fatal bug in the core MLM
+upgrade path** that has nothing to do with the shop:
+
+```
+models/User.php:434   Ewallet::credit($adminId, $diff, $userId, 'upgrade', …)
+models/Ewallet.php:22 $valid includes 'upgrade'
+DB                    ewallet_ledger.ref_type = enum(…,'registration','shop_order')   ← no 'upgrade'
+```
+
+MySQL rejects it:
+
+```
+ERROR 1265 (01000): Data truncated for column 'ref_type' at row 1
+```
+
+**Consequence:** every e-wallet-funded package upgrade (`?page=do_upgrade`) fails. `debitInternal()` at
+`User.php:421` succeeds first (it has no allow-list), then the admin credit at `:434` throws, and because the pair
+sits inside a transaction the whole upgrade rolls back. Corroborating evidence: `users` has 149 rows with a
+`package_id`, yet `SELECT ref_type, COUNT(*) FROM ewallet_ledger GROUP BY ref_type` returns **zero** `upgrade`
+rows — consistent with no e-wallet upgrade ever having completed.
+
+This is the same class as C2 (PHP literal drifted from the DDL) but in the opposite direction: C2 is a value the
+column accepts and PHP rejects; **C7 is a value PHP accepts and the column rejects.** The drift check now asserts
+the union of allow-lists *and* every call-site literal against the column, so both directions are covered.
+
+**Phase 2 gains an item:** add `'upgrade'` to the `ewallet_ledger.ref_type` ENUM, or stop crediting with that
+ref_type. This should be triaged ahead of the shop work — it blocks revenue, not just a storefront.
+
+#### Boundary coverage — the split that proves the point
+
+| Suite | Result | Meaning |
+|---|---|---|
+| Sections 1–10 model suite (ported verbatim) | **56 / 56 green** | the regression floor holds; the state machine is sound |
+| Real commerce flow (createFromCart → pay → fulfil) | **green** | order creation, e-wallet payment, fulfilment, POD, confirm receipt |
+| GCash proof lifecycle + S15/S16 | **green** | exact-amount and duplicate-reference guards work |
+| C3 cart ownership | **2 failed** | IDOR reproduces |
+| C1/C2 refund lifecycle | **3 failed** | refunds cannot close |
+| H6 self-review | **1 failed** | `onHold` is unguarded |
+| H3 correction window | **1 failed** | expired against the stale `payment_deadline` |
+
+The model layer is green and every boundary suite is red. That is precisely the gap the old suite had: it was
+model-only, which is how these defects shipped.
+
+#### Isolation: why not a transaction per test
+
+The plan originally specified a transaction wrapper per test. **That does not work**, and the harness uses schema
+isolation instead:
+
+- `ShopOrder::transition()`, `ShopOrder::createFromCart()`, `ShopRefund::markPaid()` and `Ewallet::debitInternal()`
+  each call `$pdo->beginTransaction()` themselves.
+- PDO has no nested transactions, so an outer wrapper makes every one of them throw
+  `There is already an active transaction`.
+- Savepoints do not help either — the inner `beginTransaction()` still fails.
+
+The code under test manages its own transactions, so isolation is by **schema ownership**: the schema is dropped
+and rebuilt from `install.sql` on each run, and `resetState()` truncates the shop/cart/ledger tables between
+cases. The intent of the original requirement — non-destructive — is satisfied more completely than a rollback
+would, because a crash mid-run leaves nothing behind at all.
+
+#### Safety properties — verified, not asserted
+
+| Check | Result |
+|---|---|
+| App schema after 3 harness runs | `users` 156 · `ewallet_ledger` 7,693 · `shop_orders` 0 · `carts` 2 · `products` 1 — **identical to the Phase 0 baseline** |
+| `ALTAS_TEST_DB=u938213108_altas6_db php tests/SchemaDriftTest.php` | **REFUSING TO RUN**, exit 2, nothing written |
+| Two consecutive `php tests/run.php` | identical results — deterministic |
+| `tests/run.php` teardown | drops `altas6_test`; `--keep` retains it |
+
+The gate is a hard `exit(2)` on a schema name that does not contain `_test`, evaluated before any connection is
+used for work. There is no flag that disables it.
+
+#### Environment corrections
+
+- **The app DB user CAN create/drop schemas.** It holds `SUPER … WITH GRANT OPTION` on `*.*` locally. The
+  Phase 0 note claiming otherwise was wrong — that `ERROR 1045` was PowerShell mangling the password in the my.cnf
+  file, not a privilege limit. Provisioning needed no superuser after all.
+- **`config/db.php` now honours pre-defined constants** (`defined('DB_NAME') || define(…)`). Without this the
+  harness cannot point the app at a test schema without editing the file. Runtime behaviour is unchanged.
+- **`install.sql` has 24 tables and converges exactly with the migrated schema** — all 15 shop ENUMs MATCH
+  between `altas6_test` and the live app schema. Phase 2's "converge the two install paths" item is therefore
+  largely already satisfied; what remains is removing the hardcoded schema name.
+
+#### Files changed outside `tests/`
+
+| File | Change | Why |
+|---|---|---|
+| `config/db.php` | `define()` → `defined() \|\| define()` for the five DB constants | Lets the harness retarget the app without editing this file. No behaviour change in normal operation. |
+| `tmp/shop/admin_block.php.txt` | **deleted** | Stale paste-target; still contained two bugs fixed after it was taken |
+| `tmp/shop/member_block.php.txt` | **deleted** | Same |
+
+#### Done when
+
+✅ Suite runs green against the pre-fix code (model layer) and the drift check reports the known mismatches —
+plus three it discovered on its own.
 
 ---
 
@@ -247,10 +369,11 @@ otherwise be reasoning about a schema that does not exist.
 
 ### Actions
 
-1. **C1 — refund status.** Apply D1: `ShopRefund::markPaid()` writes `status = 'processed'` instead of `'paid'`.
+1. ✅ **C7 — `ewallet_ledger.ref_type` accepts `'upgrade'`** (folded in early, 2026-10-10, ahead of the shop work).
+2. **C1 — refund status.** Apply D1: `ShopRefund::markPaid()` writes `status = 'processed'` instead of `'paid'`.
    Add a migration if the DB is already in the intermediate broken state. Update the badge ternary in
    `views/admin/shop_order.php:349`.
-2. **C2 — e-wallet ref_type.** Apply D2. Introduce the shared const and use it in `Ewallet::credit()` and
+3. **C2 — e-wallet ref_type.** Apply D2. Introduce the shared const and use it in `Ewallet::credit()` and
    `Ewallet::debit()`. Verify `ewallet_ledger.ref_type` in the DB already contains `'shop_order'` (it does, via
    `install.sql` and `migrate_shop.sql` step 10 — the failure is PHP-side only).
 3. **H4 — refund cause.** Change the controller default from `'customer_request'` to `'admin_cancel'`
@@ -278,6 +401,41 @@ otherwise be reasoning about a schema that does not exist.
 ### Done when
 
 Every refund transition is reachable, and the two install paths agree.
+
+### Execution record — C7 folded in early (2026-10-10)
+
+Taken ahead of the rest of Phase 2 because it blocks revenue rather than a storefront.
+
+| Change | Detail |
+|---|---|
+| **New** `migrate_ewallet_ref_types.sql` | Adds `'upgrade'` to `ewallet_ledger.ref_type`, `information_schema`-guarded so it is a no-op on re-run. Documents the full failure mode in the file header. |
+| `install.sql:394` | Column now `ENUM(…,'registration','upgrade','shop_order')`, with a comment pointing at `Ewallet::VALID_REF_TYPES`. |
+| `models/Ewallet.php` | **D2 applied.** Two hand-maintained `$valid` arrays (which had drifted from the column in *opposite* directions) replaced by one `public const VALID_REF_TYPES` plus a private `assertRefType()` helper. `credit()` and `debit()` both route through it. |
+
+**Verified:**
+
+- Migration applied to the live dev schema; `enum(…,'registration','upgrade','shop_order')`. Re-run twice —
+  idempotent, no error.
+- The statement that used to fail now succeeds:
+  `INSERT INTO ewallet_ledger (…, ref_type) VALUES (…, 'upgrade')` → **row inserted**.
+- New harness suite `C7 — e-wallet ref_type ledger` reproduces the exact `User.php:434` call and asserts the row
+  lands, the admin is credited, `debit()` now accepts `'upgrade'` too, and an unknown type is still refused.
+- Drift-test ref_type failures: **4 → 0** (both directions now clean).
+
+**Suite movement — 16 failures → 12 failures:**
+
+| Suite | Before | After |
+|---|---|---|
+| `SchemaDriftTest.php` | 9 of 16 | **5 of 16** |
+| `ShopStateMachineTest.php` | 7 of 101 | **7 of 106** (5 new C7 assertions, all passing) |
+
+The remaining `SchemaDriftTest` failures are C1, H4, M5, M16 and the `install.sql` hardcoded schema name — all
+still Phase 2 scope.
+
+**Note on the C2 symptom changing.** The refund test now fails with
+`1265 Data truncated for column 'status'` instead of `Invalid ref_type: shop_order`. That is the correct layering:
+fixing C2 let the wallet credit succeed, so execution now reaches the *next* barrier, which is C1. Both are Phase 2;
+neither is masked.
 
 ---
 
@@ -606,7 +764,7 @@ strictly sequential.
 | Risk | Likelihood | Mitigation |
 |---|---|---|
 | A schema change in Phase 2 corrupts live data | Low | Phase 0 dump; `ALTER` only, never a table rewrite; verify against the test DB first |
-| The harness itself becomes wrong and gives false confidence | Medium | Keep the original 85 assertions verbatim as a regression floor; never weaken a test to make it pass |
+| The harness itself becomes wrong and gives false confidence | Medium | Keep the 56 ported model assertions verbatim as a regression floor; never weaken a test to make it pass. |
 | Refund-state vocabulary churn ripples into the plan docs and QA suite | Medium | Resolve D1 first; do Phase 9's doc reconciliation in the same change |
 | Fixing the IDOR reveals carts with orphaned items from prior abuse | Medium | Audit `cart_items` for rows whose `cart_id` does not match its owner's active cart before cleanup |
 | Scope creep into Strategy C / commission work | Low | The `git diff core/Commission.php` gate stays empty; if a phase needs to touch it, that phase has left scope |
@@ -625,6 +783,7 @@ strictly sequential.
 | **C4** | `$order` undefined in `order_status_badge.php` → every order row renders "Unknown" | `order_status_badge.php:8` reads `$order`; `member/shop_orders.php:43-50` loops `$o`; `admin/shop_orders.php:96` sets `$tmp` (never referenced anywhere) |
 | **C5** | Stored XSS via `payment_reference` | `admin/shop_order.php:46` — `e()` (HTML escaper) inside a JS string literal in an `onclick` attribute. `payment_reference` has no server-side cap |
 | **C6** | Admin "Complete" button can never succeed | `ShopOrder.php:71` actors `['customer','system']`; `AdminController.php:1177` passes `'admin'` → always `false` → misleading "This order just changed" flash |
+| **C7** | ✅ **FIXED 2026-10-10.** `Ewallet::credit()` accepted `ref_type='upgrade'`, which the ledger ENUM rejected → **every e-wallet package upgrade failed** with `ERROR 1265`, rolling back the whole upgrade. | `models/User.php:434` credited with `'upgrade'`; the ENUM omitted it. **Fix:** `migrate_ewallet_ref_types.sql` adds the value; `install.sql` updated; `Ewallet::VALID_REF_TYPES` (D2) is now the single allow-list behind both `credit()` and `debit()` |
 
 ### High
 
