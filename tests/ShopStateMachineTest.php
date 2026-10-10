@@ -474,6 +474,37 @@ test('a rejected proof is measured against correction_deadline', function (): vo
         Fixtures::statusOf($orderId),
         'H3: correction window is honoured, not the stale payment_deadline'
     );
+
+    // ── The other direction: a lapsed correction window MUST still cancel ──
+    // Without this half, a fix that simply stopped the timer would also pass.
+    db()->prepare("UPDATE shop_orders SET correction_deadline = DATE_SUB(NOW(), INTERVAL 1 HOUR) WHERE id = ?")->execute([$orderId]);
+    ShopOrder::expireOverdue(200);
+    T::eq(
+        'cancelled',
+        Fixtures::statusOf($orderId),
+        'H3: a lapsed correction window still cancels the order'
+    );
+    $ev = Fixtures::lastEvent($orderId);
+    T::ok(
+        $ev['actor_type'] === 'system' && $ev['source'] === 'timer',
+        'H3: the correction-window cancellation is attributed to the timer'
+    );
+
+    // ── A pending order is measured against payment_deadline, as before ──
+    $p = Fixtures::pendingOrder($MEMBER, $pid, 1);
+    db()->prepare("UPDATE shop_orders SET payment_deadline = DATE_SUB(NOW(), INTERVAL 1 HOUR) WHERE id = ?")->execute([$p]);
+    T::ok(ShopOrder::expireOverdue(200) >= 1, 'H3: a pending order past its deadline is still picked up');
+    T::eq('cancelled', Fixtures::statusOf($p), 'H3: pending still expires on payment_deadline');
+
+    // ── No deadline at all must never match ──
+    $none = Fixtures::pendingOrder($MEMBER, $pid, 1);
+    db()->prepare("UPDATE shop_orders SET payment_deadline = NULL WHERE id = ?")->execute([$none]);
+    ShopOrder::expireOverdue(200);
+    T::eq(
+        'pending',
+        Fixtures::statusOf($none),
+        'H3: an order with no deadline is never expired'
+    );
 });
 
 T::group('C7 — e-wallet ref_type ledger (non-shop regression)');

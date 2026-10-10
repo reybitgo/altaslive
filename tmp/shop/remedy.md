@@ -176,7 +176,7 @@ Read-only probes against the live dev DB and the source tree. No data was mutate
 | **C3** | `Cart::removeItemById` scopes the row to a cart | **BROKEN** | `Cart.php:107` → `DELETE FROM cart_items WHERE id = ?` (no `cart_id` predicate) |
 | **C3b** | `Cart::updateItemQuantity` scopes the row to a cart | **BROKEN** | `Cart.php:102` → `UPDATE cart_items SET quantity = ?, updated_at = NOW() WHERE id = ?` (no `cart_id` predicate) |
 | **C6** | Admin may transition an order to `completed` | **BROKEN** | `TRANSITIONS['completed']['actors'] = [customer, system]`; `AdminController.php:1177` passes `'admin'` |
-| **H3** | `expireOverdue` measures `payment_failed` against `correction_deadline` | **BROKEN** | `ShopOrder.php:1093` uses `COALESCE(payment_deadline, correction_deadline)`; `payment_deadline` is always non-null, so `correction_deadline` is never read |
+| **H3** | ✅ **FIXED 2026-10-10.** `expireOverdue` used `COALESCE(payment_deadline, correction_deadline)`; since `payment_deadline` is always set, `correction_deadline` was **never read** and buyers lost most of their correction window. | **Fix:** status-aware `EXPIRY_DEADLINE_SQL`; `payment_failed` measured against `correction_deadline`. Verified on 5 synthetic cases. |
 | **H4** | `shop_refunds.cause` accepts the controller default | **BROKEN** | `cause ENUM = enum('admin_cancel','delivery_failure','customer_dispute','other')`; `AdminController.php:1321` defaults to `'customer_request'` |
 | **M5** | `shop_shipments.state` accepts `flagLost()`'s value | **BROKEN** | `state ENUM = enum('draft','active','closed','void')`; `ShopShipment.php:78` writes `state='lost'` |
 | **M16** | `shop_orders` can be deleted when a refund exists | **BROKEN** | `shop_refunds.order_id` FK `DELETE_RULE = RESTRICT` |
@@ -596,7 +596,58 @@ The view's `$isSelf` hiding is kept, but it is now purely a UX affordance.
 
 The single remaining failure is **H3** (the expiry timer ignores `correction_deadline`), which is Phase 5 scope.
 
-### Addendum — C5b closed 2026-10-10
+### Addendum — H3 closed 2026-10-10
+
+Taken ahead of Phase 4 because it was the only remaining functional bug in the shop and the only red test.
+
+**The bug.** `ShopOrder::expireOverdue()` selected candidates with:
+
+```sql
+AND COALESCE(payment_deadline, correction_deadline) < NOW()
+```
+
+`payment_deadline` is set at order creation and is **never cleared** — deliberately, because `payment_review` is
+exempt from expiry (§0.5 T7) and the original stamp is part of the audit trail. So `COALESCE` always returned
+`payment_deadline`, and `correction_deadline` was **never read at all**.
+
+A buyer whose proof was rejected near the payment deadline lost most of the 24 h correction window the code had
+just opened for them: they were cancelled at the original deadline rather than the correction one.
+
+**The fix.** A status-aware deadline expression, extracted to a named constant so the `WHERE` and the `ORDER BY`
+cannot drift apart:
+
+```php
+private const EXPIRY_DEADLINE_SQL =
+    "COALESCE(CASE WHEN status = 'payment_failed' THEN correction_deadline END, payment_deadline)";
+```
+
+`pending` keeps using `payment_deadline`; `payment_failed` uses `correction_deadline`, falling back to
+`payment_deadline` if it is somehow null. An `IS NOT NULL` guard was added so an order with no deadline at all is
+never picked up — previously a null deadline could never satisfy `< NOW()` either, but stating it removes the
+reliance on that.
+
+**Verified on synthetic rows against the live schema** (inserted, checked, rolled back — 0 rows left):
+
+| Order | Status | `payment_deadline` | `correction_deadline` | Should expire | Result |
+|---|---|---|---|---|---|
+| A | `payment_failed` | past | future | no | ✅ **this was the bug** |
+| B | `payment_failed` | past | past | yes | ✅ still expires |
+| C | `pending` | past | — | yes | ✅ unchanged |
+| D | `pending` | future | — | no | ✅ unchanged |
+| E | `pending` | null | — | no | ✅ `NULL`, excluded by the guard |
+
+**Harness extended to both directions.** The original assertion only proved the timer does not *over*-cancel, which
+a fix that simply disabled the timer would also satisfy. Three cases added: a lapsed correction window **must**
+cancel; a pending order still expires on `payment_deadline`; an order with no deadline is never expired.
+
+**Suite result: all green for the first time.**
+
+| Suite | Assertions | Failures |
+|---|---|---|
+| `SchemaDriftTest.php` | 25 | 0 |
+| `ShopStateMachineTest.php` | 126 | 0 |
+| `TemplateLintTest.php` | 8 | 0 |
+| **Total** | **159** | **0** |
 
 Taken as a separate pass after Phase 3 committed, because it is the live-exploitable item.
 
@@ -716,9 +767,9 @@ all where the UI or the SQL disagrees with it.
    matrix-legal `(status, actor, to)` triple — this is the class-level fix, and it also protects H2.
 2. **H2 — missing `returned_to_sender` form.** Render it for `shipped` / `out_for_delivery` /
    `delivery_failed`. This unblocks the reship flow and the member RTS panel.
-3. **H3 — correction window ignored.** Replace `COALESCE(payment_deadline, correction_deadline)` with a
-   status-aware expression so `payment_failed` orders are measured against `correction_deadline`. Add a harness
-   test: reject a proof at T+23 h, assert the order survives to T+27 h.
+3. ✅ **H3 — correction window ignored.** ~~`COALESCE(payment_deadline, correction_deadline)`~~ **Closed
+   2026-10-10, ahead of Phase 4** — see the Phase 3 addendum. Status-aware `EXPIRY_DEADLINE_SQL`; harness asserts
+   both directions plus the null-deadline case.
 4. **H1 — POD upload dead.** Add `enctype="multipart/form-data"` to the `to=delivered` form. Consider
    consolidating all POD entry onto the shipment-edit form (which already has the correct enctype) so there is
    one place POD is captured.
@@ -983,7 +1034,7 @@ strictly sequential.
 |---|---|---|
 | **H1** | POD photo upload is dead | `admin/shop_order.php:157` form has no `enctype="multipart/form-data"` (compare `:324`, which does) |
 | **H2** | `returned_to_sender` is UI-unreachable | `AdminController.php:1140` implements it; no form anywhere posts `to=returned_to_sender` |
-| **H3** | `expireOverdue` never consults `correction_deadline` | `ShopOrder.php:1093` `COALESCE(payment_deadline, correction_deadline)` — `payment_deadline` is always non-null, so `COALESCE` always returns it |
+| **H3** | ✅ **FIXED 2026-10-10.** `expireOverdue` never consulted `correction_deadline`: the query used `COALESCE(payment_deadline, correction_deadline)` and `payment_deadline` is always set, so the correction window was dead code. | **Fix:** status-aware `EXPIRY_DEADLINE_SQL`. Verified on 5 synthetic cases covering both directions and the null-deadline edge. |
 | **H4** | ✅ **FIXED 2026-10-10.** The `shop_refunds.cause` default was outside the ENUM, so a forged or omitted value produced an uncaught `PDOException` (500). | `AdminController.php:1321` defaulted `'customer_request'`; ENUM is `('admin_cancel','delivery_failure','customer_dispute','other')`. Uncaught `PDOException` → 500 |
 | **H5** | `per_page()` unbounded | `core/helpers.php:459-463` — `max($min, (int)$_GET['per_page'])`, no ceiling |
 | **H6** | ✅ **FIXED 2026-10-10.** Segregation of duties was view-only on 5 of 6 admin endpoints. | **Fix:** guard moved into the model — `ShopOrder::onHold/resume/cancel` and all four `ShopRefund` entry points; `orderShipment` guarded in the controller. A different admin is still permitted, asserted. | `assertNotSelfReview` called only at `AdminController.php:1091`. `orderRefund`, `orderHold`, `orderResume`, `orderReship`, `orderShipment` have no server-side check |

@@ -1088,18 +1088,39 @@ class ShopOrder
     }
 
     /**
+     * The deadline that applies to an order in its CURRENT status.
+     *
+     *   pending          -> payment_deadline    (the window to pay in)
+     *   payment_failed   -> correction_deadline (the window to fix and re-upload)
+     *
+     * payment_deadline is deliberately never cleared when a proof is rejected,
+     * because payment_review is exempt from expiry and the original stamp is
+     * part of the audit trail. That is exactly why a plain
+     * COALESCE(payment_deadline, correction_deadline) is wrong: payment_deadline
+     * is ALWAYS set, so COALESCE always returned it and the correction window
+     * was never read. A buyer whose proof was rejected near the payment
+     * deadline lost most of the 24h correction window the code had just opened
+     * for them (defect H3, tmp/shop/remedy.md).
+     */
+    private const EXPIRY_DEADLINE_SQL =
+        "COALESCE(CASE WHEN status = 'payment_failed' THEN correction_deadline END, payment_deadline)";
+
+    /**
      * Timer leg 1 (cron + admin_shop_expire): cancel pending/payment_failed
-     * orders whose deadline passed. NEVER touches payment_review (§0.5 T7) —
-     * a submitted proof is exempt from expiry. Every candidate goes through
-     * the conditional transition, so the proof-vs-expiry race has one winner.
+     * orders whose applicable deadline has passed. NEVER touches
+     * payment_review (§0.5 T7) — a submitted proof is exempt from expiry. Every
+     * candidate goes through the conditional transition, so the proof-vs-expiry
+     * race has one winner.
      */
     public static function expireOverdue(int $limit = 200): int
     {
+        $deadline = self::EXPIRY_DEADLINE_SQL;
         $st = db()->prepare(
             "SELECT id FROM shop_orders
               WHERE status IN ('pending','payment_failed')
-                AND COALESCE(payment_deadline, correction_deadline) < NOW()
-              ORDER BY COALESCE(payment_deadline, correction_deadline) ASC
+                AND {$deadline} < NOW()
+                AND {$deadline} IS NOT NULL
+              ORDER BY {$deadline} ASC
               LIMIT ?"
         );
         $st->bindValue(1, $limit, PDO::PARAM_INT);
