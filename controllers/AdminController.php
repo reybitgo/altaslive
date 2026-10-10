@@ -1171,17 +1171,8 @@ class AdminController
                         (string) ($_POST['hold_deadline'] ?? ''));
                     break;
 
-                case 'completed':
-                    // Admin may close on the buyer's behalf after the window;
-                    // the guard lives in the matrix (from delivered only).
-                    $ok = ShopOrder::transition($orderId, 'completed', 'admin', Auth::id(), [
-                        'reason_code' => 'admin_closed',
-                    ]);
-                    break;
-
-                default:
+default:
                     flash('error', 'Unknown transition target.');
-                    redirect($back);
             }
         } catch (InvalidArgumentException $e) {
             flash('error', $e->getMessage());

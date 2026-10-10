@@ -548,4 +548,117 @@ test('an e-wallet package upgrade can credit the admin', function (): void {
     );
 });
 
+T::group('M1 / M2 / M3 — proof race, re-reservation, refund blocking');
+
+test('M1 — a failed proof upload leaves no orphan proof row', function (): void {
+    $MEMBER = Fixtures::member();
+    $ADMIN  = Fixtures::admin();
+    $pid    = Fixtures::product('__M1__', 100.00, 10);
+    $cartId = (int) Cart::getOrCreate($MEMBER)['id'];
+    Cart::addItem($cartId, $pid, 1);
+    $addr = ['billing_name' => 'M', 'shipping_name' => 'M', 'shipping_address' => '1 St'];
+    $oid  = ShopOrder::createFromCart($MEMBER, $cartId, $addr, 'gcash', 'TEST-IDEM-M1');
+
+    // Happy path: proof and status move together.
+    T::ok(ShopOrder::submitProof($oid, $MEMBER, 'shop_proofs/ok.jpg', ['reference_no' => 'M1-A']), 'M1: proof accepted');
+    T::eq('payment_review', Fixtures::statusOf($oid), 'M1: status moved to payment_review');
+    T::eq(1, (int) Fixtures::scalar("SELECT COUNT(*) FROM shop_payment_proofs WHERE order_id = ?", [$oid]), 'M1: exactly one proof row');
+    T::ok(ShopOrder::lastProofId() !== null, 'M1: lastProofId() reports the written proof');
+
+    // Now the losing side of the race: the timer cancels the order, then the
+    // buyer's upload arrives. Before the fix the INSERT had already happened, so
+    // the cancelled order kept a proof claiming payment.
+    // A fresh cart: createFromCart converted the first one.
+    $cart2 = (int) Cart::getOrCreate($MEMBER)['id'];
+    Cart::addItem($cart2, $pid, 1);
+    $oid2 = ShopOrder::createFromCart($MEMBER, $cart2, $addr, 'gcash', 'TEST-IDEM-M1B');
+    ShopOrder::cancel($oid2, 'system', null, 'payment_expired');
+    T::ok(
+        ShopOrder::submitProof($oid2, $MEMBER, 'shop_proofs/late.jpg', ['reference_no' => 'M1-B']) === false,
+        'M1: upload after the timer cancelled is refused'
+    );
+    T::eq(
+        0,
+        (int) Fixtures::scalar("SELECT COUNT(*) FROM shop_payment_proofs WHERE order_id = ?", [$oid2]),
+        'M1: the refused upload wrote NO proof row (no orphan on a cancelled order)'
+    );
+});
+
+test('M2 — a re-upload cannot re-reserve goods that are gone', function (): void {
+    $MEMBER = Fixtures::member();
+    $ADMIN  = Fixtures::admin();
+    // Stock of 1, one unit on the order.
+    $pid    = Fixtures::product('__M2__', 100.00, 1);
+    $cartId = (int) Cart::getOrCreate($MEMBER)['id'];
+    Cart::addItem($cartId, $pid, 1);
+    $addr = ['billing_name' => 'M2', 'shipping_name' => 'M2', 'shipping_address' => '1 St'];
+    $oid  = ShopOrder::createFromCart($MEMBER, $cartId, $addr, 'gcash', 'TEST-IDEM-M2');
+
+    ShopOrder::submitProof($oid, $MEMBER, 'shop_proofs/m2.jpg', ['reference_no' => 'M2-A']);
+    T::ok(ShopOrder::rejectProof($oid, $ADMIN, 'unclear_proof'), 'M2: proof rejected');
+    T::eq('payment_failed', Fixtures::statusOf($oid), 'M2: order is payment_failed');
+    T::eq('released', Fixtures::itemState($oid), 'M2: rejection released the line, so it is sellable again');
+
+    // Somebody else buys the unit while the buyer has their correction window.
+    db()->prepare("UPDATE products SET stock = 0 WHERE id = ?")->execute([$pid]);
+
+    T::ok(
+        ShopOrder::submitProof($oid, $MEMBER, 'shop_proofs/m2b.jpg', ['reference_no' => 'M2-B']) === false,
+        'M2: re-upload refused when the goods are no longer available'
+    );
+    T::eq('payment_failed', Fixtures::statusOf($oid), 'M2: the order stays payment_failed');
+    T::eq('released', Fixtures::itemState($oid), 'M2: the line was NOT silently re-reserved');
+
+    // With stock restored the same upload succeeds — the guard is about stock,
+    // not about refusing re-uploads outright.
+    db()->prepare("UPDATE products SET stock = 1 WHERE id = ?")->execute([$pid]);
+    T::ok(
+        ShopOrder::submitProof($oid, $MEMBER, 'shop_proofs/m2c.jpg', ['reference_no' => 'M2-C']),
+        'M2: re-upload succeeds once the goods are available again'
+    );
+    T::eq('reserved', Fixtures::itemState($oid), 'M2: the line is re-reserved');
+});
+
+test('M3 — an APPROVED refund still blocks completion', function (): void {
+    $MEMBER = Fixtures::member();
+    $ADMIN  = Fixtures::admin();
+    $pid    = Fixtures::product('__M3__', 100.00, 10);
+    $oid    = Fixtures::pendingOrder($MEMBER, $pid, 1);
+    foreach (['paid', 'packing', 'ready_to_ship', 'shipped', 'out_for_delivery', 'delivered'] as $to) {
+        ShopOrder::transition($oid, $to, 'admin', $ADMIN);
+    }
+    T::eq('delivered', Fixtures::statusOf($oid), 'M3: order is delivered');
+
+    $refundId = ShopRefund::create($oid, 100.00, 'admin_cancel', 'ewallet', null, $ADMIN);
+    T::ok(ShopRefund::hasOpen($oid), 'M3: an open refund blocks completion');
+
+    T::ok(ShopRefund::approve($refundId, $ADMIN), 'M3: refund approved');
+    T::ok(
+        ShopRefund::hasOpen($oid),
+        'M3: an APPROVED refund still blocks completion (not just an open one)'
+    );
+    T::ok(
+        ShopOrder::canMemberAct(ShopOrder::find($oid), 'confirm') === false,
+        'M3: the Confirm-receipt button is hidden while a refund is approved'
+    );
+    T::ok(
+        ShopOrder::confirmReceipt($oid, $MEMBER) === false,
+        'M3: the buyer cannot confirm receipt over an approved refund'
+    );
+
+    db()->prepare("UPDATE shop_orders SET completion_due_at = DATE_SUB(NOW(), INTERVAL 1 DAY) WHERE id = ?")->execute([$oid]);
+    ShopOrder::autoComplete(200);
+    T::eq(
+        'delivered',
+        Fixtures::statusOf($oid),
+        'M3: the auto-complete timer also refuses while a refund is approved'
+    );
+
+    // Once the refund is settled the block lifts.
+    ShopRefund::markPaid($refundId, $ADMIN, 'RECEIPT-M3');
+    T::ok(!ShopRefund::hasOpen($oid), 'M3: a processed refund no longer blocks');
+    T::ok(ShopOrder::confirmReceipt($oid, $MEMBER), 'M3: the buyer can now confirm receipt');
+    T::eq('completed', Fixtures::statusOf($oid), 'M3: order completes');
+});
+
 exit(T::summary());

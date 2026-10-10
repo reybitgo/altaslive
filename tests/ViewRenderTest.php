@@ -328,4 +328,150 @@ test('the status badge shows real labels in the rendered member list', function 
     T::ok(str_contains($html, 'AL'), 'M12: rendered list shows the stored AL order number');
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+T::group('C6 / H2 — every rendered admin button is matrix-legal');
+
+test('no admin action bar renders a transition the matrix refuses', function (): void {
+    $adminId = Fixtures::admin();
+    $memberId = Fixtures::member();
+    $pid = Fixtures::product('__MTRX__', 100.00, 20);
+
+    // Every status an order can be in. For each we render the admin desk and
+    // pull out every `to=` value the action bar posted, then check it against
+    // ShopOrder::TRANSITIONS for (status, 'admin').
+    $illegal = [];
+    $checked = 0;
+
+    foreach (ShopOrder::STATUSES as $status) {
+        $oid = Fixtures::pendingOrder($memberId, $pid, 1);
+        db()->prepare("UPDATE shop_orders SET status = ? WHERE id = ?")->execute([$status, $oid]);
+        $order = ShopOrder::find($oid);
+
+        $vars = [
+            'order'          => $order,
+            'orderNo'        => $order['order_no'],
+            'buyer'          => User::find($memberId),
+            'events'         => ShopOrderEvent::forOrder($oid),
+            'proofs'         => ShopPaymentProof::byOrder($oid),
+            'shipments'      => ShopShipment::byOrder($oid),
+            'activeShipment' => ShopShipment::activeFor($oid),
+            'refunds'        => ShopRefund::forOrder($oid),
+            'counts'         => ShopOrder::statusCounts(),
+            'pageTitle'      => 'Order',
+        ];
+
+        Fixtures::loginAs($adminId, 'admin');
+        ob_start();
+        RenderLog::arm();
+        try {
+            extract($vars, EXTR_SKIP);
+            require REPO_ROOT . '/views/admin/shop_order.php';
+        } catch (Throwable $e) {
+            RenderLog::$problems[] = 'THROWN@' . $status . ': ' . $e->getMessage();
+        } finally {
+            RenderLog::disarm();
+            $html = (string) ob_get_clean();
+            Fixtures::logout();
+        }
+
+        preg_match_all('/name="to"\s+value="([a-z_]+)"/', $html, $m);
+        foreach ($m[1] as $to) {
+            $checked++;
+            $rule = ShopOrder::TRANSITIONS[$to] ?? null;
+            $from = $rule['from']['admin'] ?? $rule['from'] ?? [];
+            if ($rule === null
+                || !in_array('admin', $rule['actors'], true)
+                || !in_array($status, $from, true)
+            ) {
+                $illegal[] = "{$status} -> {$to}";
+            }
+        }
+    }
+
+    T::ok($checked > 0, 'C6: the action bar rendered some transitions to check', "{$checked} button(s)");
+    T::ok(
+        $illegal === [],
+        'C6/H2: every rendered admin transition is legal for that status',
+        implode(', ', $illegal)
+    );
+});
+
+test('H2 — returned_to_sender is reachable from the delivery statuses', function (): void {
+    $adminId  = Fixtures::admin();
+    $memberId = Fixtures::member();
+    $pid      = Fixtures::product('__RTS__', 100.00, 20);
+
+    foreach (['shipped', 'out_for_delivery', 'delivery_failed'] as $status) {
+        $oid = Fixtures::pendingOrder($memberId, $pid, 1);
+        db()->prepare("UPDATE shop_orders SET status = ? WHERE id = ?")->execute([$status, $oid]);
+        $order = ShopOrder::find($oid);
+
+        Fixtures::loginAs($adminId, 'admin');
+        ob_start();
+        RenderLog::arm();
+        try {
+            extract([
+                'order' => $order, 'orderNo' => $order['order_no'],
+                'buyer' => User::find($memberId), 'events' => [],
+                'proofs' => [], 'shipments' => [], 'activeShipment' => null,
+                'refunds' => [], 'counts' => [], 'pageTitle' => 'Order',
+            ], EXTR_SKIP);
+            require REPO_ROOT . '/views/admin/shop_order.php';
+        } catch (Throwable $e) {
+            RenderLog::$problems[] = 'THROWN: ' . $e->getMessage();
+        } finally {
+            RenderLog::disarm();
+            $html = (string) ob_get_clean();
+            Fixtures::logout();
+        }
+
+        T::ok(
+            str_contains($html, 'value="returned_to_sender"'),
+            "H2: the '{$status}' desk offers Return to sender"
+        );
+    }
+});
+
+test('H1 — the delivered form can actually carry a file', function (): void {
+    $adminId  = Fixtures::admin();
+    $memberId = Fixtures::member();
+    $pid      = Fixtures::product('__POD__', 100.00, 20);
+    $oid      = Fixtures::pendingOrder($memberId, $pid, 1);
+    db()->prepare("UPDATE shop_orders SET status = 'shipped' WHERE id = ?")->execute([$oid]);
+    $order = ShopOrder::find($oid);
+
+    Fixtures::loginAs($adminId, 'admin');
+    ob_start();
+    RenderLog::arm();
+    try {
+        extract([
+            'order' => $order, 'orderNo' => $order['order_no'],
+            'buyer' => User::find($memberId), 'events' => [],
+            'proofs' => [], 'shipments' => [], 'activeShipment' => null,
+            'refunds' => [], 'counts' => [], 'pageTitle' => 'Order',
+        ], EXTR_SKIP);
+        require REPO_ROOT . '/views/admin/shop_order.php';
+    } finally {
+        RenderLog::disarm();
+        $html = (string) ob_get_clean();
+        Fixtures::logout();
+    }
+
+    T::ok(str_contains($html, 'name="pod_image"'), 'H1: the desk offers a POD photo upload');
+    T::ok(str_contains($html, 'enctype="multipart/form-data"'), 'H1: a form carrying pod_image declares enctype');
+});
+
+test('C6 — the dead admin Complete button is gone', function (): void {
+    $src = (string) file_get_contents(REPO_ROOT . '/views/admin/shop_order.php');
+    T::ok(
+        !preg_match('/name="to"\s+value="completed"/', $src),
+        'C6: no form posts to=completed'
+    );
+    $ctrl = (string) file_get_contents(REPO_ROOT . '/controllers/AdminController.php');
+    T::ok(
+        !preg_match("/'completed'\s*,\s*'admin'/", $ctrl),
+        'C6: the controller has no admin completed branch'
+    );
+});
+
 exit(T::summary());

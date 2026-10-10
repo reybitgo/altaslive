@@ -299,7 +299,46 @@ class ShopOrder
 
         // Re-upload after rejection (payment_failed → payment_review) brings
         // the released lines back into the pipeline (S39 inverse).
+        //
+        // M2: rejecting a proof RELEASES the reservation, so while the buyer
+        // had their correction window open those units were sellable to
+        // everyone else. Re-reserving them unconditionally is an oversell the
+        // availability read cannot catch afterwards, because at this point the
+        // order exists. Re-check per line and refuse the whole re-entry if any
+        // line can no longer be honoured.
         if ($to === 'payment_review' && ($order['status'] ?? '') === 'payment_failed') {
+            $lines = $pdo->prepare(
+                "SELECT product_id, quantity FROM shop_order_items
+                  WHERE order_id = ? AND reservation_state = 'released'"
+            );
+            $lines->execute([$orderId]);
+            $reserved = [];
+            foreach ($lines->fetchAll() as $line) {
+                $pid = (int) $line['product_id'];
+                $qty = (int) $line['quantity'];
+                $reserved[$pid] = ($reserved[$pid] ?? 0) + $qty;
+
+                $s = $pdo->prepare("SELECT stock FROM products WHERE id = ?");
+                $s->execute([$pid]);
+                $stock = (int) ($s->fetchColumn() ?? 0);
+
+                $r = $pdo->prepare(
+                    "SELECT COALESCE(SUM(oi.quantity), 0)
+                       FROM shop_order_items oi
+                       JOIN shop_orders o ON o.id = oi.order_id
+                      WHERE oi.product_id = ?
+                        AND oi.reservation_state IN ('reserved','committed')
+                        AND o.id <> ?
+                        AND o.status IN ('pending','payment_review','payment_failed','paid','packing','ready_to_ship','on_hold')"
+                );
+                $r->execute([$pid, $orderId]);
+                $heldElsewhere = (int) $r->fetchColumn();
+
+                if ($stock - $heldElsewhere < $qty) {
+                    throw new RuntimeException('stock_conflict');
+                }
+            }
+
             $st = $pdo->prepare(
                 "UPDATE shop_order_items
                     SET reservation_state = 'reserved', released_at = NULL
@@ -697,17 +736,45 @@ class ShopOrder
         if (!self::proofWindowOpen($order)) return false;
         if ($imagePath === '') return false;
 
-        ShopPaymentProof::add($orderId, $imagePath, [
-            'reference_no'  => $claim['reference_no'] ?? null,
-            'amount'        => $claim['amount'] ?? null,
-            'transfer_date' => $claim['transfer_date'] ?? null,
-            'ip'            => $_SERVER['REMOTE_ADDR'] ?? null,
-            'uploaded_by'   => $memberId,
+        $proofId = null;
+        $image   = $imagePath;
+
+        // The proof row is written from a GUARD, so it commits or rolls back
+        // inside transition()'s transaction.
+        //
+        // It used to be INSERTed first, outside, and the status change second.
+        // Against the expiry cron that left a real window: if the timer won the
+        // race between the two, transition() returned false and the order was
+        // cancelled WITH an orphan proof attached claiming payment that no
+        // longer mattered (defect M1). The plan asked for "exactly one winner";
+        // this is what makes that true.
+        $insertProof = static function () use (&$proofId, $orderId, &$image, $claim, $memberId): bool {
+            $proofId = ShopPaymentProof::add($orderId, $image, [
+                'reference_no'  => $claim['reference_no'] ?? null,
+                'amount'        => $claim['amount'] ?? null,
+                'transfer_date' => $claim['transfer_date'] ?? null,
+                'ip'            => $_SERVER['REMOTE_ADDR'] ?? null,
+                'uploaded_by'   => $memberId,
+            ]);
+            return $proofId > 0;
+        };
+
+        $ok = self::transition($orderId, 'payment_review', 'customer', $memberId, [
+            'reason_code' => 'proof_submitted',
+            'guards'      => [$insertProof],
         ]);
 
-        return self::transition($orderId, 'payment_review', 'customer', $memberId, [
-            'reason_code' => 'proof_submitted',
-        ]);
+        // Only meaningful on success; kept for callers that want the id.
+        self::$lastProofId = $ok ? $proofId : null;
+        return $ok;
+    }
+
+    /** Id of the proof written by the most recent successful submitProof(). */
+    private static ?int $lastProofId = null;
+
+    public static function lastProofId(): ?int
+    {
+        return self::$lastProofId;
     }
 
     /**
@@ -1154,7 +1221,7 @@ class ShopOrder
                 AND o.completion_due_at < NOW()
                 AND NOT EXISTS (
                     SELECT 1 FROM shop_refunds r
-                     WHERE r.order_id = o.id AND r.status = 'open'
+                     WHERE r.order_id = o.id AND r.status IN ('open','approved')
                 )
               LIMIT ?"
         );

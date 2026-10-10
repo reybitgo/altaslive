@@ -2,7 +2,19 @@
 class ShopRefund
 {
     /**
-     * Refund task lifecycle: open → approved → processed (closed only by a
+ * Refund states that block delivered → completed (§0.5 T24).
+ *
+ * BOTH open AND approved block. An approved-but-unsettled refund is money
+ * that has been promised to the buyer and not yet returned; completing the
+ * order underneath it would hide that. This model previously counted only
+ * status='open', so a refund sitting in 'approved' let the buyer confirm
+ * receipt and let the auto-complete timer fire (defect M3). Both callers of
+ * the old check — ShopOrder::canMemberAct() and ShopOrder::autoComplete() —
+ * are corrected by changing this one list.
+ */
+public const BLOCKING_STATUSES = ['open', 'approved'];
+
+/** Refund task lifecycle: open → approved → processed (closed only by a
      * receipt). denied covers both "denied" and a buyer's own cancellation.
      *
      * These five values are the DDL vocabulary (install.sql, shop_refunds.status).
@@ -35,8 +47,9 @@ class ShopRefund
 
     public static function open(int $orderId): int
     {
-        $st = db()->prepare("SELECT COUNT(*) FROM shop_refunds WHERE order_id = ? AND status = 'open'");
-        $st->execute([$orderId]);
+        $ph  = implode(',', array_fill(0, count(self::BLOCKING_STATUSES), '?'));
+        $st  = db()->prepare("SELECT COUNT(*) FROM shop_refunds WHERE order_id = ? AND status IN ({$ph})");
+        $st->execute(array_merge([$orderId], self::BLOCKING_STATUSES));
         return (int) $st->fetchColumn();
     }
 

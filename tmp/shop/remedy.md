@@ -875,7 +875,73 @@ deduction, refund blocks completion, proof-vs-expiry race.
 
 ### Done when
 
-The whole lifecycle runs green from order placement to completion, including the failure and reship branches.
+✅ The whole lifecycle runs green from order placement to completion, including the failure and reship branches.
+**Met 2026-10-10** — see below. H3 closed early in the Phase 3 addendum; the other six here.
+
+### Execution record — 2026-10-10
+
+| Defect | Change |
+|---|---|
+| **C6** | `to=completed` form removed from the action bar and the dead `case 'completed'` branch removed from `AdminController::orderTransition()` (decision D3 — the matrix stays the single source of truth). |
+| **H1** | `enctype="multipart/form-data"` added to the `to=delivered` form, so `$_FILES['pod_image']` is no longer always empty and a POD **photo** can actually satisfy the guard. |
+| **H2** | New `to=returned_to_sender` form on `shipped` / `out_for_delivery` / `delivery_failed`. That status was reachable only by a hand-crafted POST, which also made the Reship button dead. |
+| **M1** | `ShopOrder::submitProof()` writes the proof row from inside `transition()`'s transaction, via a guard. |
+| **M2** | Re-reserving a rejected proof's released lines now re-checks per-line availability and throws `stock_conflict` if any unit has since been sold. |
+| **M3** | `ShopRefund::BLOCKING_STATUSES = ['open','approved']`, used by both `hasOpen()` and `ShopOrder::autoComplete()`'s `NOT EXISTS`. |
+
+#### The matrix assertion the plan asked for
+
+> "add a harness assertion that **every** button the view can render is a matrix-legal `(status, actor, to)` triple"
+
+Implemented as a render test: for each of the 14 statuses, render the admin desk, extract every `name="to"` value
+from the action bar, and check it against `ShopOrder::TRANSITIONS` for `(status, 'admin')`.
+
+Coverage measured, not assumed — **23 buttons across 11 statuses**:
+
+| Status | Buttons rendered |
+|---|---|
+| `pending` | cancelled |
+| `payment_review` | paid, payment_failed |
+| `payment_failed` | cancelled |
+| `paid` | packing, payment_review, cancelled |
+| `packing` | ready_to_ship, cancelled |
+| `ready_to_ship` | shipped, cancelled |
+| `shipped` | out_for_delivery, delivery_failed, delivered, **returned_to_sender** |
+| `out_for_delivery` | delivery_failed, delivered, **returned_to_sender** |
+| `delivery_failed` | out_for_delivery, delivered, **returned_to_sender** |
+| `returned_to_sender` | cancelled *(plus the reship form, which posts to `admin_order_reship`)* |
+| `on_hold` | cancelled |
+| `delivered`, `completed`, `cancelled` | **none** — correct |
+
+`delivered` rendering **zero** buttons is the C6 fix proven: it previously rendered the Complete button, which the
+matrix refused every time.
+
+**A negative check was attempted and was inconclusive**, so it is recorded rather than claimed: re-introducing the
+`to=completed` form mid-file broke the render, so the test found 0 buttons rather than 1 illegal one. The coverage
+table above is the actual evidence.
+
+#### M1 — what the fix prevents
+
+The proof `INSERT` used to run **before** the status change, outside any transaction. Against the expiry timer that
+left a real window: if the timer won the race between the two, `transition()` returned `false`, the order was
+cancelled, and it kept an orphan `shop_payment_proofs` row claiming a payment that no longer mattered. The plan
+asked for "exactly one winner"; moving the insert into the transaction is what makes that true. A refused upload is
+now asserted to leave **zero** proof rows.
+
+#### M2 — why this was an oversell
+
+Rejecting a proof **releases** the reservation, so for the length of the correction window those units were sellable
+to everyone else. The old code re-reserved them unconditionally. Because the order exists by then, no later
+availability read can catch it. The guard re-checks per line, excluding this order's own reservation, and refuses
+with `stock_conflict`. Asserted both ways: refused when the goods are gone, **and accepted again once stock is
+restored** — so the guard is demonstrably about stock rather than refusing re-uploads outright.
+
+#### M3 — one list, two callers
+
+An approved-but-unsettled refund is money promised to the buyer and not yet returned; completing the order underneath
+it hides that. Both `canMemberAct()` and `autoComplete()` previously checked only `status='open'`, so either the
+buyer or the timer could close an order with a refund in `approved`. One constant now drives both. Asserted across the
+whole arc: open blocks → approved **still** blocks → settled releases the block.
 
 ---
 
@@ -1111,15 +1177,15 @@ strictly sequential.
 | **C4** | ✅ **FIXED 2026-10-10.** `$order` was undefined in `order_status_badge.php` because both list views loop rows as `$o`, so every order row rendered "Unknown" with two warnings per row. | **Fix:** the partial now takes explicit `$badgeStatus` / `$badgeStamp`; both callers set them. All 14 statuses asserted to render their real label. | `order_status_badge.php:8` reads `$order`; `member/shop_orders.php:43-50` loops `$o`; `admin/shop_orders.php:96` sets `$tmp` (never referenced anywhere) |
 | **C5** | ✅ **FIXED 2026-10-10.** Stored XSS via `payment_reference`: `e()` HTML-decodes back to a quote before the JS parser runs. | **Fix:** new `js()` helper (JSON_HEX_* + htmlspecialchars); `admin/shop_order.php:46` now `copyText(<?= js($x) ?>)`. |
 | **C5b** | ✅ **FIXED 2026-10-10.** 20 further `e()`-inside-`on*=` sites in `payouts.php`, `reactivations.php`, `user_view.php`, `codes.php`, `payout.php`. `payouts.php` and `reactivations.php` carry the user-set GCash/USDT account and **were exploitable**. | See the Phase 3 addendum below — the attribute was only half the problem; there was also an `innerHTML` sink. All 20 fixed; `tests/TemplateLintTest.php` KNOWN_C5B is now **empty**. | `admin/shop_order.php:46` — `e()` (HTML escaper) inside a JS string literal in an `onclick` attribute. `payment_reference` has no server-side cap |
-| **C6** | Admin "Complete" button can never succeed | `ShopOrder.php:71` actors `['customer','system']`; `AdminController.php:1177` passes `'admin'` → always `false` → misleading "This order just changed" flash |
+| **C6** | ✅ **FIXED 2026-10-10.** The admin "Complete" button could never succeed: `TRANSITIONS['completed'].actors` is `[customer,system]` and the controller passed `'admin'`. | **Fix (D3):** the button and its controller branch are removed; the matrix stays the single source of truth. A render test now asserts every rendered button is matrix-legal — 23 buttons across 11 statuses. | `ShopOrder.php:71` actors `['customer','system']`; `AdminController.php:1177` passes `'admin'` → always `false` → misleading "This order just changed" flash |
 | **C7** | ✅ **FIXED 2026-10-10.** `Ewallet::credit()` accepted `ref_type='upgrade'`, which the ledger ENUM rejected → **every e-wallet package upgrade failed** with `ERROR 1265`, rolling back the whole upgrade. | `models/User.php:434` credited with `'upgrade'`; the ENUM omitted it. **Fix:** `migrate_ewallet_ref_types.sql` adds the value; `install.sql` updated; `Ewallet::VALID_REF_TYPES` (D2) is now the single allow-list behind both `credit()` and `debit()` |
 
 ### High
 
 | ID | Defect | Evidence |
 |---|---|---|
-| **H1** | POD photo upload is dead | `admin/shop_order.php:157` form has no `enctype="multipart/form-data"` (compare `:324`, which does) |
-| **H2** | `returned_to_sender` is UI-unreachable | `AdminController.php:1140` implements it; no form anywhere posts `to=returned_to_sender` |
+| **H1** | ✅ **FIXED 2026-10-10.** The POD photo upload was dead: the `to=delivered` form had no `enctype`, so `$_FILES` was always empty and only a typed receiver name could satisfy the guard. | `enctype="multipart/form-data"` added and asserted. | `admin/shop_order.php:157` form has no `enctype="multipart/form-data"` (compare `:324`, which does) |
+| **H2** | ✅ **FIXED 2026-10-10.** `returned_to_sender` was implemented and matrix-legal but had **no form**, making the status and the Reship button unreachable. | New `to=returned_to_sender` form on `shipped` / `out_for_delivery` / `delivery_failed`, asserted to render. | `AdminController.php:1140` implements it; no form anywhere posts `to=returned_to_sender` |
 | **H3** | ✅ **FIXED 2026-10-10.** `expireOverdue` never consulted `correction_deadline`: the query used `COALESCE(payment_deadline, correction_deadline)` and `payment_deadline` is always set, so the correction window was dead code. | **Fix:** status-aware `EXPIRY_DEADLINE_SQL`. Verified on 5 synthetic cases covering both directions and the null-deadline edge. |
 | **H4** | ✅ **FIXED 2026-10-10.** The `shop_refunds.cause` default was outside the ENUM, so a forged or omitted value produced an uncaught `PDOException` (500). | `AdminController.php:1321` defaulted `'customer_request'`; ENUM is `('admin_cancel','delivery_failure','customer_dispute','other')`. Uncaught `PDOException` → 500 |
 | **H5** | `per_page()` unbounded | `core/helpers.php:459-463` — `max($min, (int)$_GET['per_page'])`, no ceiling |
@@ -1129,9 +1195,9 @@ strictly sequential.
 
 | ID | Defect | Location |
 |---|---|---|
-| **M1** | Proof row inserted before the conditional transition → orphan proof on a lost race | `ShopOrder.php:698-708` |
-| **M2** | Rejected proof releases stock; re-upload re-reserves with no availability check | `ShopOrder.php:96`, `:302-309` |
-| **M3** | An **approved** refund does not block completion (plan requires `open` or `approved`) | `ShopRefund.php:21`, `ShopOrder.php:1128` |
+| **M1** | ✅ **FIXED 2026-10-10.** The proof row was INSERTed outside the transaction, so a lost race against the expiry timer left a cancelled order carrying an orphan proof. | The insert now runs from a guard inside `transition()`; a refused upload is asserted to write zero proof rows. | `ShopOrder.php:698-708` |
+| **M2** | ✅ **FIXED 2026-10-10.** A rejected proof released the reservation, and re-upload re-reserved it with no availability check — an oversell no later read could catch. | Re-checks per line and refuses with `stock_conflict`; asserted refused when stock is gone and accepted once restored. | `ShopOrder.php:96`, `:302-309` |
+| **M3** | ✅ **FIXED 2026-10-10.** An **approved** refund did not block completion: both checks tested only `status='open'`, so the buyer or the timer could close an order with money still owed. | `ShopRefund::BLOCKING_STATUSES = ['open','approved']` drives both `hasOpen()` and `autoComplete()`. | `ShopRefund.php:21`, `ShopOrder.php:1128` |
 | **M4** | POD written to `shop_shipments` after the transition commits | `ShopOrder.php:983-997` |
 | **M5** | ✅ **FIXED 2026-10-10.** `ShopShipment::flagLost()` wrote `state='lost'`, not in the ENUM. Dead code with no callers. | **Fix:** deleted. Drift test now derives state writes from source. |
 | **M6** | `shop_refunds.method` column unused; e-wallet decision is a `str_contains` substring match on free text | `ShopRefund.php:68-69` |

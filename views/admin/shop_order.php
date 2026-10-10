@@ -154,7 +154,11 @@ $needConfirm = ['cancelled', 'returned_to_sender', 'payment_failed', 'on_hold'];
                 <?php endif; ?>
 
                 <?php if (in_array($status, ['shipped', 'out_for_delivery', 'delivery_failed'], true)): ?>
-                  <form method="post" action="<?= link_to('admin_order_transition') ?>" class="border rounded p-2">
+                  <?php /* H1: without enctype the browser sends no files, so
+                         $_FILES['pod_image'] was always empty and only a typed
+                         receiver name could satisfy the POD guard. */ ?>
+                  <form method="post" action="<?= link_to('admin_order_transition') ?>"
+                        enctype="multipart/form-data" class="border rounded p-2">
                     <?= csrf_field() ?>
                     <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
                     <input type="hidden" name="to" value="delivered">
@@ -163,6 +167,21 @@ $needConfirm = ['cancelled', 'returned_to_sender', 'payment_failed', 'on_hold'];
                     <input type="file" name="pod_image" class="form-control form-control-sm mb-1" accept="image/*">
                     <div class="form-text" style="font-size:.7rem;">Receiver name or POD photo required.</div>
                     <button type="submit" class="btn btn-success btn-sm w-100">Delivered</button>
+                  </form>
+                <?php endif; ?>
+
+                <?php /* H2: returned_to_sender was implemented in the controller and
+                       legal in the matrix, but NO form rendered it — so the status
+                       was unreachable and so was the Reship button below. */ ?>
+                <?php if (in_array($status, ['shipped', 'out_for_delivery', 'delivery_failed'], true)): ?>
+                  <form method="post" action="<?= link_to('admin_order_transition') ?>" class="border rounded p-2"
+                        onsubmit="return confirm('Mark this parcel as RETURNED TO SENDER?');">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
+                    <input type="hidden" name="to" value="returned_to_sender">
+                    <div class="fw-semibold mb-1" style="font-size:.82rem;">📮 Return to sender</div>
+                    <div class="form-text mb-1" style="font-size:.7rem;">Parcel is coming back or was intercepted. Closes the active shipment.</div>
+                    <button type="submit" class="btn btn-outline-warning btn-sm w-100">Return to sender</button>
                   </form>
                 <?php endif; ?>
 
@@ -177,17 +196,14 @@ $needConfirm = ['cancelled', 'returned_to_sender', 'payment_failed', 'on_hold'];
                   </form>
                 <?php endif; ?>
 
-                <?php if (in_array($status, ['delivered'], true)): ?>
-                  <form method="post" action="<?= link_to('admin_order_transition') ?>" class="border rounded p-2"
-                        onsubmit="return confirm('Close this order on the buyer\\'s behalf?');">
-                    <?= csrf_field() ?>
-                    <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
-                    <input type="hidden" name="to" value="completed">
-                    <div class="fw-semibold mb-1" style="font-size:.82rem;">✔ Close order</div>
-                    <div class="form-text mb-1" style="font-size:.7rem;">Only after the report window with no open refund.</div>
-                    <button type="submit" class="btn btn-outline-success btn-sm w-100">Complete</button>
-                  </form>
-                <?php endif; ?>
+                <?php /* C6 (decision D3): the "Close order" button is GONE.
+       It posted to=completed with actor 'admin', but the matrix allows only
+       ['customer','system'] for that target — so the transition was refused
+       every time and the admin saw the misleading "This order just changed.
+       Reload and try again." An admin force-close also bypasses the report
+       window and the open-refund block, both of which the customer-confirm
+       and auto-complete-timer paths honour. Removed rather than widened:
+       the matrix stays the single source of truth. */ ?>
 
                 <?php if (in_array($status, ['pending', 'payment_failed', 'paid', 'packing', 'ready_to_ship', 'on_hold', 'returned_to_sender'], true)): ?>
                   <form method="post" action="<?= link_to('admin_order_transition') ?>" class="border border-danger-subtle rounded p-2"
