@@ -101,11 +101,12 @@ if (Auth::check()) {
         <?php endif; ?>
 
         <?php if (Auth::check()): ?>
-        <a href="<?= link_to('cart') ?>" class="btn btn-sm btn-light position-relative border-0 topbar-cart-btn"
-           title="Cart" style="font-size:1.05rem;line-height:1;padding:.3rem .55rem;">
+        <button type="button" class="btn btn-sm btn-light position-relative border-0 topbar-cart-btn"
+                data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas"
+                title="Cart" style="font-size:1.05rem;line-height:1;padding:.3rem .55rem;">
             🛒
             <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary topbar-cart-badge"><?= $topbarCartCount ?></span>
-        </a>
+        </button>
         <?php endif; ?>
     </div>
 </div>

@@ -28,7 +28,20 @@
         <div class="mt-2">No products are available right now. Check back soon.</div>
       </div></div>
     <?php else: ?>
-      <div class="row g-3">
+      <div class="row g-3" id="shopContent">
+        <?php /* preload cart items so the card can show per-product in-cart state */ ?>
+        <?php /* phpcs:disable Squiz.PHP.DisallowShortOpenTag.E short tag is intentional inline JSON */ ?>
+        <?php
+          $cartItems = [];
+          if ($cartId) {
+            $raw = Cart::getItems($cartId);
+            foreach ($raw as $row) {
+              $cartItems[(int) $row['product_id']] = [
+                'quantity' => (int) $row['quantity'],
+              ];
+            }
+          }
+        ?>
         <?php foreach ($products as $p):
           $img     = !empty($p['image_url']) ? APP_URL . '/uploads/' . e($p['image_url']) : null;
           $avail   = Product::availableStock((int) $p['id']);
@@ -58,14 +71,20 @@
                     <?php endif; ?>
                   </div>
                   <?php if (!$soldOut): ?>
-                    <form method="post" action="<?= link_to('add_to_cart') ?>" class="mt-2">
+                    <?php $inCart = $cartId && isset($cartItems[(int) $p['id']]); ?>
+                    <form method="post" action="<?= link_to('add_to_cart') ?>" data-product-id="<?= (int) $p['id'] ?>"<?= $inCart ? ' data-in-cart="1"' : '' ?>>
                       <?= csrf_field() ?>
                       <input type="hidden" name="product_id" value="<?= (int) $p['id'] ?>">
-                      <div class="input-group input-group-sm">
-                        <input type="number" name="quantity" class="form-control text-center" value="1" min="1" max="<?= $avail ?>" style="max-width:70px;">
-                        <button type="submit" class="btn btn-primary">Add</button>
-                      </div>
+                      <input type="hidden" name="quantity" value="1">
+                      <button type="submit" class="btn btn-primary shop-add-btn w-100"<?= $inCart ? ' disabled' : '' ?>>
+                        <?= $inCart ? 'Already in cart' : 'Add to cart' ?>
+                      </button>
                     </form>
+                    <?php if ($inCart): ?>
+                      <div class="text-success small shop-already-in-cart" role="status">
+                        Item already in the cart
+                      </div>
+                    <?php endif; ?>
                   <?php endif; ?>
                 </div>
               </div>
@@ -101,6 +120,13 @@
               new bootstrap.Modal(document.getElementById('productDescModal')).show();
             });
           });
+
+          // Product-card add-to-cart is intentionally non-incrementing.
+          // If a product is already in the cart the card renders a disabled
+          // "Already in cart" button + an in-page notice, so repeated taps
+          // never add a second copy or bump the quantity.
+          // (Cart add is still handled server-side normally for products not
+          // in the cart; this guard is only a UI convenience on the shop page.)
         });
       </script>
       <?php endif; ?>

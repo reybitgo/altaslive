@@ -3,8 +3,7 @@
 **For:** a complete beginner testing the shop by hand, in the browser.
 **App:** AltasLive — `http://localhost/altaslive`
 **Test date:** 2026-10-09
-**Status of the code:** implementation and automated testing are **complete** (see §0 below) —
-this document is the _manual_ (human) test that goes on top of the automated smoke test.
+**Status of the code:** implementation and automated testing are **complete** (see §0 below) — this v3 is the _manual_ (human) test that sits on top of the automated smoke test, and its steps/expected text have been updated to match the cart, checkout, shop and off-canvas cart UI currently implemented in the repo.
 
 ---
 
@@ -30,7 +29,7 @@ The app has **two sides**:
 
 | Side                        | Who             | Where                                                       |
 | --------------------------- | --------------- | ----------------------------------------------------------- |
-| **Shop (member side)**      | A normal member | Sidebar → **Shop**, **My Orders**, cart icon in the top bar |
+| **Shop (member side)**      | A normal member | Sidebar → **Shop**, **My Orders**, cart icon in the top bar (opens the off-canvas cart drawer) |
 | **Admin products & orders** | An admin        | Sidebar → **Shop Products**, **Shop Orders**                |
 
 An order's life looks like this (each box is a status you will see):
@@ -42,10 +41,12 @@ pending → payment_review → paid → packing → ready_to_ship → shipped
                                                        deliveries can fail → back to shop
 ```
 
+> **UI note for this v3:** on the member side, the topbar cart icon (🛒 with a count badge) opens an **off-canvas cart drawer**. That drawer is also where you will often see a quick "View full cart" link into the dedicated `?page=cart` page. The member **cart page** itself is still `?page=cart`, and **checkout** is still reached from that cart page via **Proceed to checkout**.
+
 ### 1.2 You need
 
 - [ ] A **member** login (e.g. `altas02` / its password) with at least ₱700 in the e-wallet.
-- [ ] An **admin** login (e.g. `admin` — password `Richman26$$$`).
+- [ ] An **admin** login (e.g. `admin` — password `Admin@1234`).
 - [ ] Any two small images on your computer to use as a "payment proof" (a screenshot of anything works).
 - [ ] Google Chrome or Firefox. Use **one private/incognito window per account** so two
       logins never fight each other:
@@ -84,9 +85,9 @@ _Purpose: give the shop something to sell. One product is enough for the whole s
 7. **Image check (optional):** Edit the product, upload a JPG/PNG/GIF/WebP image, click **💾 Update Product** → **PASS if** a 72×72 thumbnail is shown in the list. Then edit again, tick the **Remove current image** checkbox, and click **💾 Update Product** → **PASS if** the thumbnail disappears.
    - Image rules: JPG, PNG, GIF or WebP, max 5 MB. On edit, leaving the file input empty keeps the current image (you don't need to re-upload to keep it).
 
-**Record the product's numeric ID** — open it in the list and note the number in the URL, e.g. `?page=admin_shop&edit=41` → your product ID is **41**. Write it here: `50`
+**Record the product's numeric ID** — open it in the list and note the number in the URL, e.g. `?page=admin_shop&edit=41` → your product ID is **41**. Write it here: `____`
 
-> **Modal note (2026-10-09):** The product modal has `data-bs-backdrop="static"` (you can't click outside to close) and is **scrollable** — if the form is too tall for the screen, the body scrolls internally and the **Cancel** / **➕ Create Product** footer buttons stay pinned at the bottom. The close button (✕) in the top-right corner of the modal header also works. On small screens (e.g. mobile), the modal-body has a max-height so the footer stays visible while the form fields scroll (see the CSS fix in `assets/css/layout.css`).
+> **Modal note (2026-10-10):** the product modal has `data-bs-backdrop="static"` (you can't click outside to close) and is **scrollable** (`modal-dialog-scrollable`) — the body scrolls internally and the **Cancel** / **➕ Create Product** (or **💾 Update Product**) footer buttons stay pinned at the bottom. The close button (✕) in the top-right corner of the modal header also works. On **Edit**, the page re-opens with the modal already shown and the product's values pre-filled.
 
 ---
 
@@ -96,23 +97,28 @@ _Purpose: give the shop something to sell. One product is enough for the whole s
 
 1. Open `http://localhost/altaslive/?page=shop`.
 2. Find **QA Widget** (price ₱100.00, 5 in stock).
-3. Click **Add to cart** (adds 1 unit — there is no quantity stepper on the product card; each tap adds one).
-4. **PASS if:** the cart badge in the top bar goes up by 1 (typically **1 unit** after the first add).
-5. Repeat **Add to cart** once more for the same product → **PASS if:** the badge goes up by 1 again (now **2 units**).
-6. Click the cart icon (🛒 with badge) → **PASS if:** the cart page lists `QA Widget × 2 = ₱200.00`.
+3. Click **Add to cart** once (the card submits 1 unit with the request; the card itself has no quantity stepper).
+4. **PASS if:** you land back on the shop page with green flash _"Added to cart."_, the cart drawer auto-opens on the right (URL ends in `?page=shop&cart=1`), and the topbar 🛒 badge shows **1**. On the product card the button now reads **Already in cart** (disabled) with a green notice _"Item already in the cart"_ under it.
+5. To reach 2 units, use the cart drawer's **+** stepper (or open **View full cart** (`?page=cart`) and use its stepper) to bump the quantity to 2.
+6. **PASS if:** the topbar badge and the drawer's count badge both read **2**, and the drawer subtotal shows `200.00 PHP`.
+7. Click **View full cart** in the drawer → **PASS if:** the cart page lists `QA Widget` with quantity 2 and line total `200.00`.
+
+> **Already-in-cart behavior (by design):** once a product is in the cart, its product card renders a **disabled "Already in cart" button** plus the notice _"Item already in the cart"_ — repeated taps on the card **cannot** add a second copy or bump the quantity. Use the drawer or cart page steppers to change quantity; use the ✕ remove control (or **Remove** in the drawer) to take it out.
+
+> **Drawer notes:** the topbar 🛒 button opens the off-canvas drawer; "View full cart" has no underline. Remove/update inside the drawer happen over AJAX (no page reload); if removing the last item empties the cart, the drawer redraws itself with _"Your cart is empty"_ and a **Browse Products** button.
 
 ### B2 — stock-out guard (the S40 test)
 
 1. In the **admin** window, edit `QA Widget` and set **Stock = 2**. Click **💾 Update Product**.
-2. Back in the member window, on the shop page click **Add to cart** again once (your cart now wants 2 + 1 = 3, only 2 exist).
+2. Back in the member window, on the shop page click **Add to cart** again once — the card is now showing **Already in cart** (disabled), so instead bump the drawer/cart quantity from 2 to **3** (your cart now wants 3, only 2 exist).
 3. **PASS if:** a red/danger message appears saying exactly:
    **"Insufficient stock. Requested 3, only 2 available."**
    (The numbers will match whatever you actually have — the _shape_ `Requested N, only M available` is what matters.)
-4. In the admin window set **Stock back to 5** (edit → Stock = 5 → **💾 Update Product**), and in the member window remove the extra failed line if any landed.
+4. In the admin window set **Stock back to 5** (edit → Stock = 5 → **💾 Update Product**), and in the member window set the qty back to 2 in the cart.
    _(This guard is proven against real buyer data in the automated run too: requests beyond stock are refused at every gate — add, update and checkout.)_
 
 > Beginner note: the "Sold out" badge appears on a product whose _available_ stock is 0 — you'll see it properly in Test B3 if you want:
-> set stock to 0 in admin (edit → Stock = 0 → **💾 Update Product**), refresh the member shop page → the product card shows no add-form and no quantity field, just a "Sold out" badge. Set stock back to 5 afterwards.
+> set stock to 0 in admin (edit → Stock = 0 → **💾 Update Product**), refresh the member shop page → the product card shows no add-form at all, just a "Sold out" badge. Set stock back to 5 afterwards.
 
 ---
 
@@ -120,7 +126,7 @@ _Purpose: give the shop something to sell. One product is enough for the whole s
 
 ### C1 — E-wallet path (fastest, fully automatic)
 
-1. Member window: cart → click **Checkout**.
+1. Member window: cart → click **Proceed to checkout** (the blue button under the Summary card).
 2. Fill: billing name (yours), phone, shipping address (any), city, province, postal.
 3. **Payment method:** **E-Wallet**. Tick the terms checkbox.
 4. Click **Place order**.
@@ -218,6 +224,7 @@ This needs a fresh paid order (repeat C1 or use the C2 order admin-verified in T
    **PASS if** status = **Delivery failed**, attempt counter shows **1 of 3**, and the member window's order page now shows the reason + "_make sure someone is available_" message.
 3. Click **Out for delivery** again (retry) → **PASS if** status = **Out for delivery**.
 4. Repeat the fail twice more. After the **3rd fail**:
+
    **PASS if** the shipment shows a `response_deadline` date (+10 days) and the retry buttons now refuse (the parcel must go **Returned to sender** or straight to **Delivered**).
 5. Click **Returned to sender** → **PASS if** status = **Returned to sender** and the active shipment is closed.
 6. Click **Reship** → **PASS if** green flash — "_Reshipment opened — the shop absorbs the cost_" — status returns to **Packing**, and the order now has **two** shipment rows (row 2 linked to row 1).
@@ -271,7 +278,9 @@ Member window: confirm receipt on the reship-delivered order → **PASS if** com
 
 ---
 
-## 11. Test J — Shop on/off switch1. In admin → **Settings** (`?page=admin_settings`). The page opens on the **Site Basics** tab.
+## 11. Test J — Shop on/off switch
+
+1. In admin → **Settings** (`?page=admin_settings`). The page opens on the **Site Basics** tab.
 
 2. Find the **🛍️ Enable Shop** toggle switch (with helper text _"Members and staff can browse the catalog and place orders"_). Turn it **off** (toggle to the right).
 3. Scroll to the bottom of the tab and click **💾 Save Settings** (blue button, full-width).
@@ -284,11 +293,13 @@ Member window: confirm receipt on the reship-delivered order → **PASS if** com
 
 | #   | You do                                                                                        | You expect                                                              |
 | --- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| 1   | Open `?page=cart` with an empty cart                                                          | "_Your cart is empty._" + a link to the shop, no error                  |
+| 1   | Open `?page=cart` with an empty cart                                                          | "_Cart is empty._" + a "Browse the Shop" link, no error                  |
 | 2   | On the cart page set a line's qty to `0` in the qty box and update                            | The line disappears (qty 0 = remove)                                    |
 | 3   | Set a line's qty to a number bigger than available stock, update                              | Red flash "**Insufficient stock. Requested N, only M available.**"      |
 | 4   | In admin, click **Delete** on your QA product (with QA orders still existing)                 | Refused: _"Cannot delete product: it has existing shop orders."_        |
 | 5   | On the shop page in the member window, look at the top-right cart badge after each add/remove | The number always matches the count of units in the cart (0 when empty) |
+
+> **Drawer vs page badge:** the same count should also be reflected in the off-canvas cart drawer when you open it from the topbar. If the page badge and drawer badge disagree, note both numbers in Appendix B.
 
 ---
 
@@ -305,7 +316,7 @@ Tick every box. Any box you cannot tick = find a developer and show them this do
 - [ ] An open refund blocked confirm-receipt until denied.
 - [ ] Expired pending orders auto-cancelled; payment_review orders were NEVER expired.
 - [ ] shop_enabled=0 closed the shop; re-enabled it.
-- [ ] Cart quantity/refusal/playground edge cases behaved; no raw PHP errors appeared anywhere.
+- [ ] Cart and off-canvas drawer badges matched the real cart contents; empty cart showed "Cart is empty"; the "Proceed to checkout" / "View full cart" / "Back to cart" labels matched what you saw.
 
 ## 14. Cleanup after testing
 
@@ -359,6 +370,8 @@ Tick every box. Any box you cannot tick = find a developer and show them this do
 **Modal footer:** `Cancel` (outline secondary, dismisses modal) + `➕ Create Product` (blue primary, submits). On edit mode the button reads `💾 Update Product`.
 
 **Modal title:** `➕ New Product` (create) or `✏️ Edit Product` (edit).
+
+> If the modal in your build is scrollable / has a static backdrop, the footer buttons stay pinned while the form scrolls; the ✕ close button in the modal header also works. If it looks different, follow the visible labels — the manual pass criteria are the flashes and list behavior, not the exact modal chrome.
 
 ### Package modal (`?page=admin_packages`, "+ New Package" button)
 
@@ -414,6 +427,15 @@ A sub-section titled "🔗 Indirect Referral Bonuses (10 Levels)" with 10 rows (
 - Helper below table: "Stock is absolute inventory. It is deducted automatically when an order is handed to the courier; adjust it here for deliveries, write-offs, and recounts."
 - Pagination footer when multiple pages.
 
+### Off-canvas cart drawer (member topbar)
+
+- The topbar cart icon (🛒 with count badge) opens an off-canvas cart drawer for the logged-in user.
+- Drawer shows the same kinds of line items as the cart page: product, unit price, qty stepper, remove control, subtotal/total.
+- Empty drawer state should be consistent with the empty cart page ("Cart is empty" family of messaging) and include a way back to shop.
+- **View full cart** link in the drawer leads to `?page=cart`.
+
 ---
 
 _Automated counterpart of this document: `php tmp/shop/smoke_test.php` — 85 assertions, all passing as of 2026-10-09._
+
+_This is v3 of the manual cart/shop QA test. If any instruction or expected text above no longer matches the live app, treat that line itself as a QA finding and record it in Appendix B._

@@ -10,15 +10,24 @@
 
 // ── Toast ────────────────────────────────────────────────────
 function showToast(message, type = "success") {
-  const icons = { success: "✓", danger: "✕", warning: "⚠", info: "ℹ" };
+  // 'error' is the common typo callers make; map it to Bootstrap's real 'danger'
+  // so burned-in text 'text-bg-error' (not a real class → no red background)
+  // never renders. Same for other near-miss synonyms.
+  const aliases = { error: "danger", fail: "danger", critical: "danger" };
+  type = aliases[type] || type;
   const id = "toast_" + Date.now();
+  // Errors carry no leading glyph — callers pass the full sentence (e.g.
+  // "Insufficient stock. …"); the dismiss ✕ sits in the top-right corner
+  // instead of being repeated in front of the text.
+  const icons = { success: "✓", warning: "⚠", info: "ℹ" };
+  const icon = icons[type] || "";
   const html = `
-    <div id="${id}" class="toast align-items-center text-bg-${type} border-0 mb-2" role="alert" aria-live="assertive" aria-atomic="true">
-      <div class="d-flex">
+    <div id="${id}" class="toast text-bg-${type} border-0 mb-2" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="d-flex align-items-start">
         <div class="toast-body fw-semibold" style="font-size:.875rem;">
-          ${icons[type] || "•"} ${message}
+          ${icon ? icon + " " : ""}${message}
         </div>
-        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        <button type="button" class="btn-close btn-close-white m-2 flex-shrink-0" data-bs-dismiss="toast" aria-label="Close"></button>
       </div>
     </div>`;
   let container = document.getElementById("toastContainer");

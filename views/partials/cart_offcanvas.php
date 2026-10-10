@@ -56,8 +56,7 @@ $itemCount  = (int) $cartTotals['total_items'];
           <span>Total</span>
           <span id="cartTotalPrice"><?= number_format((float) $cartTotals['total_price'], 2) ?> PHP</span>
         </div>
-        <a href="<?= link_to('checkout') ?>" class="btn btn-primary w-100">Checkout</a>
-        <a href="<?= link_to('cart') ?>" class="btn btn-link btn-sm w-100 mt-2">View full cart</a>
+        <a href="<?= link_to('checkout') ?>" class="btn btn-primary w-100">Checkout</a>          <a href="<?= link_to('cart') ?>" class="btn btn-link btn-sm w-100 mt-2" style="text-decoration:none;">View full cart</a>
       </div>
     <?php endif; ?>
   </div>
@@ -65,6 +64,10 @@ $itemCount  = (int) $cartTotals['total_items'];
 <script>
 (function () {
   var CSRF = '<?= e(function_exists('csrf_token') ? csrf_token() : '') ?>';
+
+  // Seed the last server-confirmed quantity on every drawer line so a failed
+  // update can roll the input back to a value that actually exists server-side.
+  document.querySelectorAll('#cartOffcanvas .cart-qty-input').forEach(function (i) { i.dataset.qty = i.value; });
 
   function updateTopbarBadge(count) {
     var el = document.querySelector('.topbar-wrapper .topbar-cart-badge');
@@ -79,10 +82,19 @@ $itemCount  = (int) $cartTotals['total_items'];
   }
 
   function refreshDrawer() {
-    // Reload only the drawer content by swapping the page section is complex;
-    // a targeted fetch of the current URL into the drawer is overkill for v1.
-    // Totals + counts are updated in place; removed rows collapse on reload.
-    location.reload();
+    // No full reload: redraw the empty-state / Browse Products link in place.
+    var container = document.getElementById('cartItemsContainer');
+    if (!container) return;
+    if (document.querySelector('#cartItemsContainer .cart-item')) return; // items still present
+    container.innerHTML =
+      '<div class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-muted p-4">' +
+      '<div style="font-size:3rem;line-height:1">🛒</div>' +
+      '<p class="mt-3 mb-2">Your cart is empty</p>' +
+      '<a href="' + '<?= APP_URL ?>' + '/?page=shop" class="btn btn-primary btn-sm">Browse Products</a>' +
+      '</div>';
+    updateFooter(0);
+    updateTopbarBadge(0);
+    document.getElementById('offcanvasCount').textContent = 0;
   }
 
   function post(url, data) {
@@ -109,11 +121,29 @@ $itemCount  = (int) $cartTotals['total_items'];
       var wrap  = qtyBtn.closest('.cart-item');
       var input = wrap.querySelector('.cart-qty-input');
       var cur   = parseInt(input.value, 10) || 1;
-      var next  = qtyBtn.dataset.dir === 'up' ? cur + 1 : Math.max(1, cur - 1);
+      var stock = parseInt(input.max, 10) || 0;  // server-rendered stock ceiling
+      var next;
+      if (qtyBtn.dataset.dir === 'up') {
+        next = cur + 1;
+        if (stock > 0 && next > stock) {
+          // Stock ceiling: quantity stays at stock and the member is told
+          // why — no POST of a value the server would reject anyway.
+          next = Math.min(cur, stock);
+          if (window.showToast) showToast('Insufficient stock. Requested ' + (cur + 1) + ', only ' + stock + ' available.', 'error');
+          if (next === cur) return;  // already at/below ceiling — display-only, nothing to save
+        }
+      } else {
+        next = Math.max(1, cur - 1);
+      }
       input.value = next;
       post('<?= link_to('update_cart_item') ?>', {item_id: wrap.dataset.itemId, quantity: next})
         .then(function (res) {
-          if (!res.ok) { if (window.showToast) showToast(res.error || 'Update failed', 'error'); return; }
+          if (!res.ok) {
+            if (window.showToast) showToast(res.error || 'Update failed', 'error');
+            input.value = input.dataset.qty || input.defaultValue;  // server kept the old quantity
+            return;
+          }
+          input.dataset.qty = String(next);
           updateFooter(res.subtotal);
           updateTopbarBadge(res.count);
           document.getElementById('offcanvasCount').textContent = res.count;
@@ -132,7 +162,9 @@ $itemCount  = (int) $cartTotals['total_items'];
           updateFooter(res.subtotal);
           updateTopbarBadge(res.count);
           document.getElementById('offcanvasCount').textContent = res.count;
-          if (!document.querySelector('#cartItemsContainer .cart-item')) refreshDrawer();
+          if (!document.querySelector('#cartItemsContainer .cart-item')) {
+            refreshDrawer();
+          }
         });
     }
   });
@@ -141,11 +173,24 @@ $itemCount  = (int) $cartTotals['total_items'];
     if (!e.target.classList.contains('cart-qty-input')) return;
     if (!inDrawer(e.target)) return;
     var wrap = e.target.closest('.cart-item');
-    var v = Math.max(1, parseInt(e.target.value, 10) || 1);
-    e.target.value = v;
+    var input = e.target;
+    var v = Math.max(1, parseInt(input.value, 10) || 1);
+    var stock = parseInt(input.max, 10) || 0;
+    // Typed over the stock ceiling: hold at stock + notify, don't POST.
+    if (stock > 0 && v > stock) {
+      input.value = stock;
+      if (window.showToast) showToast('Insufficient stock. Requested ' + v + ', only ' + stock + ' available.', 'error');
+      return;
+    }
+    input.value = v;
     post('<?= link_to('update_cart_item') ?>', {item_id: wrap.dataset.itemId, quantity: v})
       .then(function (res) {
-        if (!res.ok) { if (window.showToast) showToast(res.error || 'Update failed', 'error'); return; }
+        if (!res.ok) {
+          if (window.showToast) showToast(res.error || 'Update failed', 'error');
+          input.value = input.dataset.qty || input.defaultValue;  // server kept the old quantity
+          return;
+        }
+        input.dataset.qty = String(v);
         updateFooter(res.subtotal);
         updateTopbarBadge(res.count);
         document.getElementById('offcanvasCount').textContent = res.count;

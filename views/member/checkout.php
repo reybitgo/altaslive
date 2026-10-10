@@ -116,7 +116,7 @@
             </div>
             <div class="card-footer">
               <button type="submit" class="btn btn-primary w-100" id="placeOrderBtn">Place order</button>
-              <a href="<?= link_to('cart') ?>" class="btn btn-link btn-sm w-100 mt-2">← Back to cart</a>
+              <a href="<?= link_to('cart') ?>" class="btn btn-link btn-sm w-100 mt-2" style="text-decoration:none;">← Back to cart</a>
             </div>
           </div>
         </div>

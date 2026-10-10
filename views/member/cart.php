@@ -32,10 +32,9 @@
       <div class="col-lg-8">
         <div class="card">
           <?php if (empty($items)): ?>
-            <div class="card-body text-center py-5 text-muted">
-              <div style="font-size:2.5rem;opacity:.35;">🛒</div>
-              <div class="mt-2">Your cart is empty.</div>
-              <a href="<?= link_to('shop') ?>" class="btn btn-primary btn-sm mt-2">Browse the Shop</a>
+            <div class="card-body text-center py-5">
+              <div class="mt-1 h5 mb-0">Cart is empty</div>
+              <a href="<?= link_to('shop') ?>" class="btn btn-primary btn-sm mt-3">Browse the Shop</a>
             </div>
           <?php else: ?>
             <div class="table-responsive" id="cartPageItems">
@@ -72,7 +71,7 @@
                       </td>
                       <td class="text-end font-mono fw-semibold"><?= number_format((float) $item['unit_price'] * (int) $item['quantity'], 2) ?></td>
                       <td class="text-end" style="padding-right:1rem;">
-                        <button class="btn btn-sm btn-link text-danger cart-remove-btn" data-item-id="<?= (int) $item['id'] ?>" type="button" title="Remove">✕</button>
+                        <button class="btn btn-sm btn-link text-danger cart-remove-btn" data-item-id="<?= (int) $item['id'] ?>" type="button" title="Remove" style="text-decoration:none;">✕</button>
                       </td>
                     </tr>
                   <?php endforeach; ?>
@@ -97,7 +96,7 @@
           </div>
           <div class="card-footer">
             <?php if (!empty($items) && !$stockErrors): ?>
-              <a href="<?= link_to('checkout') ?>" class="btn btn-primary w-100">Proceed to checkout</a>
+              <a href="<?= link_to('checkout') ?>" class="btn btn-primary w-100" id="checkoutBtn">Proceed to checkout</a>
             <?php elseif (!empty($stockErrors)): ?>
               <button class="btn btn-primary w-100" disabled>Fix stock issues to continue</button>
             <?php endif; ?>
@@ -136,33 +135,77 @@
     var list = document.getElementById('cartPageItems');
     if (!list || list.dataset.observed) return;
     list.dataset.observed = '1';
+    list.querySelectorAll('.cart-qty-input').forEach(function (i) { i.dataset.qty = i.value; });  // last qty the server confirmed
     list.addEventListener('click', function (e) {
       var btn = e.target.closest('.cart-qty-btn');
       if (btn) {
         var row = btn.closest('.cart-item');
         var input = row.querySelector('.cart-qty-input');
         var cur = parseInt(input.value, 10) || 1;
-        input.value = btn.dataset.dir === 'up' ? cur + 1 : Math.max(1, cur - 1);
+        var stock = parseInt(input.max, 10) || 0;  // server-rendered stock ceiling
+        if (btn.dataset.dir === 'up') {
+          var next = cur + 1;
+          if (stock > 0 && next > stock) {
+            // Stock ceiling: hold the quantity at stock and notify (same
+            // wording the server would send) instead of POSTing a doomed value.
+            input.value = Math.min(cur, stock);
+            if (window.showToast) showToast('Insufficient stock. Requested ' + next + ', only ' + stock + ' available.', 'error');
+            if (parseInt(input.value, 10) !== cur) {
+              input.dispatchEvent(new Event('change', { bubbles: true }));  // stale over-stock line → sync down
+            }
+            return;
+          }
+          input.value = next;
+        } else {
+          input.value = Math.max(1, cur - 1);
+        }
         input.dispatchEvent(new Event('change', { bubbles: true }));  // must bubble to reach the list-level listener
         return;
-      }
-      var rm = e.target.closest('.cart-remove-btn');
-      if (rm) {
-        var r = rm.closest('.cart-item');
-        post('<?= link_to('remove_cart_item') ?>', {item_id: r.dataset.itemId}).then(function (res) {
-          if (!res.ok) { if (window.showToast) showToast(res.error || 'Remove failed', 'error'); return; }
-          r.remove(); refreshSummary(document.querySelectorAll('#cartPageItems .cart-item'));
-          document.getElementById('cartPageItemsCount').textContent = res.count;
-        });
-      }
+      }        var rm = e.target.closest('.cart-remove-btn');
+        if (rm) {
+          var r = rm.closest('.cart-item');
+          var checkoutBtn = document.getElementById('checkoutBtn');
+          post('<?= link_to('remove_cart_item') ?>', {item_id: r.dataset.itemId}).then(function (res) {
+            if (!res.ok) { if (window.showToast) showToast(res.error || 'Remove failed', 'error'); return; }
+            r.remove();
+            refreshSummary(document.querySelectorAll('#cartPageItems .cart-item'));
+            document.getElementById('cartPageItemsCount').textContent = res.count;
+            // When the cart becomes empty after a remove, disable the checkout
+            // affordance from the UI so no checkout navigation can be triggered.
+            if (res.count == 0 && checkoutBtn) {
+              if (checkoutBtn.tagName === 'A') {
+                checkoutBtn.style.pointerEvents = 'none';
+                checkoutBtn.style.opacity = '0.5';
+              } else if (checkoutBtn.tagName === 'BUTTON') {
+                checkoutBtn.disabled = true;
+              }
+            }
+          });
+        }
     });
     list.addEventListener('change', function (e) {
       if (!e.target.classList.contains('cart-qty-input')) return;
       var row = e.target.closest('.cart-item');
-      var v = Math.max(1, parseInt(e.target.value, 10) || 1);
-      e.target.value = v;
+      var input = e.target;
+      var v = Math.max(1, parseInt(input.value, 10) || 1);
+      var stock = parseInt(input.max, 10) || 0;
+      // Typed over the stock ceiling: hold at stock + notify, don't POST a
+      // value we know the server will reject.
+      if (stock > 0 && v > stock) {
+        input.value = stock;
+        if (window.showToast) showToast('Insufficient stock. Requested ' + v + ', only ' + stock + ' available.', 'error');
+        refreshSummary(document.querySelectorAll('#cartPageItems .cart-item'));
+        return;
+      }
+      input.value = v;
       post('<?= link_to('update_cart_item') ?>', {item_id: row.dataset.itemId, quantity: v}).then(function (res) {
-        if (!res.ok) { if (window.showToast) showToast(res.error || 'Update failed', 'error'); return; }
+        if (!res.ok) {
+          if (window.showToast) showToast(res.error || 'Update failed', 'error');
+          input.value = input.dataset.qty || input.defaultValue;  // server kept the old quantity
+          refreshSummary(document.querySelectorAll('#cartPageItems .cart-item'));
+          return;
+        }
+        input.dataset.qty = String(v);
         refreshSummary(document.querySelectorAll('#cartPageItems .cart-item'));
         document.getElementById('cartPageItemsCount').textContent = res.count;
       });

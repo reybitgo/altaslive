@@ -25,6 +25,9 @@
   <!-- App CSS (cache-busted by file modification time) -->
   <link rel="stylesheet" href="<?= APP_URL ?>/assets/css/main.css?v=<?= filemtime(__DIR__ . '/../../assets/css/main.css') ?>">
   <link rel="stylesheet" href="<?= APP_URL ?>/assets/css/layout.css?v=<?= filemtime(__DIR__ . '/../../assets/css/layout.css') ?>">
+  <?php if (!empty($pageTitle) && $pageTitle === 'Shop'): ?>
+  <link rel="stylesheet" href="<?= APP_URL ?>/assets/css/shop.css?v=<?= filemtime(__DIR__ . '/../../assets/css/shop.css') ?>">
+  <?php endif; ?>
 </head>
 
 <body>
