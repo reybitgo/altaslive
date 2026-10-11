@@ -1,3 +1,35 @@
 AGENTS.md
 .vscode
 /uploads
+
+# Database dumps.
+#
+# tmp/shop/backups/pre_shop_realign_2026-10-06.sql is tracked deliberately. It is
+# the Phase 0 restore baseline referenced by tmp/shop/remedy.md, and it was
+# checked rather than assumed: it holds the shop schema plus reference rows
+# (products, reason codes) and empty order tables. No users table, no
+# ewallet_ledger, no addresses or phone numbers.
+#
+# NEW dumps must not be committed. A mysqldump of a running environment carries
+# every member row - password hashes, wallet balances, delivery addresses - and
+# it lives in every clone and every repo backup long after those rows are gone
+# from the live database. The tracked file above is the reason this rule exists:
+# taking a dump "just to be safe" is a one-line action, not a decision.
+tmp/shop/backups/*
+!tmp/shop/backups/pre_shop_realign_2026-10-06.sql
+*.sql.gz
+/tmp/*.sql
+
+# Credentials must never be committed, whatever the file extension. The QA
+# document at tmp/shop/qa_test_v2.md carried a live admin password in plain text
+# from commit 0e8efa9 until it was removed on 2026-10-10. Removing the line is
+# not enough on its own: the string is still in history, so the password has to
+# be rotated too. See tmp/shop/remedy.md.
+#
+# The patterns stay narrow on purpose - they want a credential-shaped filename.
+# Something broad like *password* would hide legitimate documentation about
+# authentication.
+*.my.cnf
+my.cnf
+.env
+.env.*

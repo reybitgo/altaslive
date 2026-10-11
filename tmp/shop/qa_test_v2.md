@@ -45,7 +45,7 @@ pending → payment_review → paid → packing → ready_to_ship → shipped
 ### 1.2 You need
 
 - [ ] A **member** login (e.g. `altas02` / its password) with at least ₱700 in the e-wallet.
-- [ ] An **admin** login (e.g. `admin` — password `Richman26$$$`).
+- [ ] An **admin** login (e.g. `admin` — password: *ask the shop owner; do not write passwords in this file*).
 - [ ] Any two small images on your computer to use as a "payment proof" (a screenshot of anything works).
 - [ ] Google Chrome or Firefox. Use **one private/incognito window per account** so two
       logins never fight each other:
