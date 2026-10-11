@@ -69,7 +69,11 @@ function showToast(message, type = "success") {
         <div class="toast-body fw-semibold" style="font-size:.875rem;">
           ${icon ? icon + " " : ""}${escHtml(String(message ?? ""))}
         </div>
-        <button type="button" class="btn-close btn-close-white m-2 flex-shrink-0" data-bs-dismiss="toast" aria-label="Close"></button>
+        <!-- Pinned to the top-right by CSS in main.css, so the position does
+             not depend on how the message wraps. The spacing utility that used
+             to sit on this button applied equal margins, which pulled it into
+             the vertical middle of a tall toast; the margin now lives in CSS. -->
+        <button type="button" class="btn-close btn-close-white flex-shrink-0" data-bs-dismiss="toast" aria-label="Close"></button>
       </div>
     </div>`;
   let container = document.getElementById("toastContainer");

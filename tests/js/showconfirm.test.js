@@ -24,6 +24,9 @@ const mk = () => ({
   addEventListener() {}, removeEventListener() {},
   style: {}, dataset: {}, textContent: "",
   classList: { add() {}, remove() {}, contains: () => false },
+  // showToast() writes into whatever getElementById hands back, and appends
+  // the toast to it — so the stub element needs to accept markup too.
+  insertAdjacentHTML(_pos, html) { inserted.push(html); },
 });
 
 global.document = {
@@ -88,6 +91,52 @@ ok(!/onload=/.test(html), "a hostile size value cannot inject an attribute");
 let parseFailed = false;
 try { new Function('var CSRF = &quot;x&quot;;'); } catch (e) { parseFailed = true; }
 ok(parseFailed, "js() inside a <script> block is a parse error, as documented");
+
+// ── showToast: geometry contract ───────────────────────────────────────────
+// The close button is positioned by CSS, not by the markup, so the assertions
+// that matter are that the CSS exists and that the markup no longer fights it.
+//
+// Comments are stripped first. The replacement block explains what the old
+// values were, and asserting against the raw text means the rule passes or
+// fails on its own documentation — the recurring trap in this repo, now the
+// fifth time it has come up.
+const cssRaw = fs.readFileSync(path.join(__dirname, "..", "..", "assets", "css", "main.css"), "utf8");
+const css = cssRaw.replace(/\/\*[\s\S]*?\*\//g, "");
+
+ok(/#toastContainer\s*\{[^}]*width:\s*320px/s.test(css), "toast container has a fixed 320px width");
+ok(/#toastContainer\s*\{[^}]*max-width/s.test(css), "toast container is clamped on narrow viewports");
+ok(
+  /#toastContainer\s+\.btn-close\s*\{[^}]*position:\s*absolute[^}]*top:\s*\.5rem[^}]*right:\s*\.5rem/s.test(css),
+  "the close button is pinned to the top-right corner"
+);
+ok(
+  /#toastContainer\s+\.toast\s*\{[^}]*position:\s*relative/s.test(css),
+  "the toast is the positioning context for that button"
+);
+ok(
+  /#toastContainer\s+\.toast-body\s*\{[^}]*padding-right/s.test(css),
+  "the message body reserves room so text does not run under the button"
+);
+ok(!/min-width:\s*280px/.test(css), "the old unbounded min-width is gone");
+
+inserted.length = 0;
+showToast("Insufficient stock. Requested 3, only 2 available.", "error");
+html = inserted[0] || "";
+ok(html.length > 0, "showToast inserts a toast");
+
+// Look at the BUTTON TAG only. A whole-string search matched the HTML comment
+// that explains why the spacing utility was removed — the assertion was
+// reading the explanation instead of the code.
+const closeTag = (html.match(/<button[^>]*btn-close[^>]*>/) || [""])[0];
+ok(closeTag.length > 0, "the toast has a close button");
+ok(
+  !/\bm-[0-9]/.test((closeTag.match(/class="([^"]*)"/) || ["", ""])[1]),
+  "the close button carries no spacing utility",
+  closeTag
+);
+ok(/class="btn-close btn-close-white flex-shrink-0"/.test(html), "the close button keeps its base classes");
+ok(html.includes("Insufficient stock."), "the message text is present");
+ok(!html.includes("<script"), "the message is escaped");
 
 console.log(failures === 0 ? "\nJS OK" : `\nJS FAILED (${failures})`);
 process.exit(failures === 0 ? 0 : 1);

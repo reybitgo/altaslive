@@ -641,7 +641,34 @@ body {
   bottom: 1.25rem;
   right: 1.25rem;
   z-index: 9999;
-  min-width: 280px;
+  /* Was `min-width: 280px` with no cap, while Bootstrap sizes a toast at
+     350px. The result was a toast that could only ever grow, with a long
+     message stretching it across the corner. Fixed width, and clamped on
+     narrow viewports so it never reaches the edge. */
+  width: 320px;
+  max-width: calc(100vw - 2.5rem);
+}
+
+/* The close button is pinned to the corner rather than laid out beside the
+   message. With a flex row the button's vertical position depends on the
+   message wrapping, which is how it ended up floating in the middle of a
+   tall toast; absolute placement puts it in the top-right every time. */
+#toastContainer .toast {
+  position: relative;
+  width: 100%;
+}
+
+#toastContainer .btn-close {
+  position: absolute;
+  top: .5rem;
+  right: .5rem;
+  margin: 0;
+  padding: .3rem;
+}
+
+#toastContainer .toast-body {
+  /* Keeps the last word of a long message clear of the button. */
+  padding-right: 2.25rem;
 }
 
 /* Print-only for codes */

@@ -677,11 +677,14 @@ test('the shared JS actually executes and builds a working modal', function (): 
     $out = [];
     $rc  = 1;
     exec('node ' . escapeshellarg($test) . ' 2>&1', $out, $rc);
-    $tail = trim(implode("\n", array_slice($out, -4)));
+
+    // Show the FAIL lines, not the tail — the tail is usually a passing
+    // assertion, which made a real failure read as nonsense.
+    $fails = array_values(array_filter($out, static fn($l) => stripos($l, 'FAIL') !== false));
     T::ok(
         $rc === 0,
         'showConfirm runs and produces a usable modal',
-        $rc !== 0 ? $tail : ''
+        $rc !== 0 ? ($fails ? implode(' | ', $fails) : trim(implode(' ', array_slice($out, -3)))) : ''
     );
 });
 
