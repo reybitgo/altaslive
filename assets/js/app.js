@@ -42,17 +42,32 @@ function showToast(message, type = "success") {
   // never renders. Same for other near-miss synonyms.
   const aliases = { error: "danger", fail: "danger", critical: "danger" };
   type = aliases[type] || type;
+  // M13: `type` lands inside a class attribute. Escape it rather than trust the
+  // caller's string, but the honest fix is to not accept arbitrary classes at
+  // all — an allow-list cannot be broken out of, and this value only ever
+  // selects a Bootstrap contextual colour.
+  const allowedTypes = ["success", "danger", "warning", "info"];
+  if (!allowedTypes.includes(type)) type = "info";
   const id = "toast_" + Date.now();
-  // Errors carry no leading glyph — callers pass the full sentence (e.g.
-  // "Insufficient stock. …"); the dismiss ✕ sits in the top-right corner
+  // Errors carry no leading glyph - callers pass the full sentence (e.g.
+  // "Insufficient stock. ."); the dismiss ? sits in the top-right corner
   // instead of being repeated in front of the text.
   const icons = { success: "✓", warning: "⚠", info: "ℹ" };
   const icon = icons[type] || "";
+  // M13: the message text reached insertAdjacentHTML unescaped, so any server
+  // text that reached a toast became markup. Callers already pass text carrying
+  // database content — a product name out of Cart::validateStock(), for
+  // instance — so this is reachable as soon as one of those paths reports an
+  // error, not merely latent.
+  //
+  // Note the deliberate contrast with showConfirm() below: a toast has no
+  // markup contract, so its message is escaped. showConfirm's message is
+  // developer-authored HTML by design and is exempted explicitly in the linter.
   const html = `
-    <div id="${id}" class="toast text-bg-${type} border-0 mb-2" role="alert" aria-live="assertive" aria-atomic="true">
+    <div id="${escHtml(id)}" class="toast text-bg-${escHtml(type)} border-0 mb-2" role="alert" aria-live="assertive" aria-atomic="true">
       <div class="d-flex align-items-start">
         <div class="toast-body fw-semibold" style="font-size:.875rem;">
-          ${icon ? icon + " " : ""}${message}
+          ${icon ? icon + " " : ""}${escHtml(String(message ?? ""))}
         </div>
         <button type="button" class="btn-close btn-close-white m-2 flex-shrink-0" data-bs-dismiss="toast" aria-label="Close"></button>
       </div>
@@ -72,6 +87,20 @@ function showToast(message, type = "success") {
 
 // ── Confirm Modal ────────────────────────────────────────────
 // Usage: showConfirm({ title, message, confirmText, confirmClass, onConfirm })
+//
+// CONTRACT: `message` is trusted HTML, unlike showToast's message.
+//
+// The modal is written with insertAdjacentHTML because callers embed developer
+// markup in it — `suspend <strong>@alice</strong>` — and escaping it wholesale
+// would print those tags as literal text. Every untrusted fragment inside a
+// message must therefore be escaped BY THE CALLER before it gets here. The
+// inline onclick= callers use jsstr(), which escapes for the JS literal and
+// then htmlspecialchars(), so they satisfy the contract; user_view.php:805 does
+// it explicitly with escHtml().
+//
+// This is a deliberate exemption and is listed as such in tests/TemplateLintTest
+// rather than being waved through by a distance heuristic. Any new caller that
+// passes raw database text into `message` is a stored-XSS bug.
 function showConfirm(opts) {
   const id = "confirmModal_" + Date.now();
   const {
@@ -84,7 +113,7 @@ function showConfirm(opts) {
   } = opts;
 
   const html = `
-    <div class="modal fade" id="${id}" tabindex="-1" aria-modal="true" role="dialog">
+    <div class="modal fade" id="${escHtml(id)}" tabindex="-1" aria-modal="true" role="dialog">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header">

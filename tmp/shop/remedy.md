@@ -1252,6 +1252,122 @@ Two of my own assertions were wrong on first run and are recorded rather than qu
 ### Done when
 
 The documented cart mechanics match the actual behaviour, and no claim in an inline comment contradicts the code.
+**Met 2026-10-10** — see below.
+
+### Execution record — 2026-10-10
+
+#### M10 — the storefront could not sell more than one unit
+
+`43c0928` replaced the product-card stepper with `<input type="hidden" value="1">` and hard-disabled the button for
+anything already in the cart, so a buyer could add exactly one of each product and could not top the cart up from the
+storefront at all. Restored as a real stepper with `max="<?= $avail ?>"`, and the button now reads **Add more** when
+the product is already in the cart rather than being dead.
+
+The client control is a convenience and never the authority: `Cart::addItem()` rejects `quantity < 1` and re-checks
+the **cumulative** quantity against availability server-side.
+
+#### M8 — the double-submit guard was placebo
+
+```js
+// a double click must not fire two POSTs
+if (this.dataset.busy) return;
+this.dataset.busy = '1';
+```
+
+Nothing called `preventDefault()` and nothing disabled the button, so both clicks submitted. The comment asserted a
+guarantee the code did not provide.
+
+Now hooked on the form's `submit` event rather than the button's `click` — Enter in a text field submits without ever
+touching the button — with the button disabled and a busy label. **Only the button is disabled, never the form:** a
+disabled control's name/value pair is omitted from the POST, which would have stripped every address field the buyer
+had just typed. A `pageshow` handler clears the flag on a BFCache restore, which would otherwise strand a dead button.
+
+#### M9 — the drawer leaked a live Checkout link at ₱0.00
+
+`refreshDrawer()` replaced `#cartItemsContainer` but not its sibling `#cartFooter`, so an emptied cart still offered a
+working Checkout button. The actions are now hidden and a note explains why — done by visibility rather than by
+replacing `innerHTML`, so the totals nodes `updateFooter()` writes to survive.
+
+The same function hardcoded `'<?= APP_URL ?>'`, which silently drops the `?imp=` impersonation token: a superadmin
+browsing as a member would lose the impersonated session on navigation. Now `link_to('shop')`.
+
+#### M13 — `showToast()` was an XSS sink, and the linter that should have caught it was not
+
+`${message}` was interpolated into `insertAdjacentHTML` unescaped. Callers pass text carrying database content — a
+product name out of `Cart::validateStock()` — so this was reachable the moment one of those paths reported an error,
+rather than merely latent. `${type}` was also unescaped inside a `class` attribute; it is now drawn from an
+allow-list *and* escaped.
+
+Fixing it exposed something worse. **The RULE-5 linter had been passing for the wrong reasons:**
+
+- It cleared any interpolation whose ±400-character neighbourhood happened to contain an unrelated `escHtml()` call, or
+  the word `textContent`. That is how `showConfirm()`'s genuinely unescaped `${message}` and `${title}` survived.
+- Its proximity test was a fixed ±6 line window. Once `showToast()` grew explanatory comments, the message line sat
+  **8 lines** above its `insertAdjacentHTML` call, dropped out of the window, and reverting the escaping passed the
+  suite.
+
+A rule that depends on how far a line sits from a keyword is not a rule. The escape check is now local to the
+interpolation's own line, and JS files are checked in full rather than through a window.
+
+Rewriting it this way initially made the rule a **complete no-op** — reverting `showToast()`'s escaping passed. The
+cause was my first attempt at the exemption: a `file + identifier` exemption, which read as equivalent to what it
+replaced but silently covered `showToast`'s `message` too, since it has one too. The exemption is now scoped to
+`showConfirm`'s function body. Both directions are mutation-verified: reverting the toast escaping fails, and
+unescaping the exempted `title` passes.
+
+`showConfirm()`'s `message` is left alone deliberately — it is a **trusted-HTML contract**, not an oversight. Callers
+embed developer markup (`suspend <strong>@alice</strong>`) and escaping it wholesale would print those tags as
+literal text. Every untrusted fragment must be escaped by the caller; the inline `onclick=` callers use `jsstr()`,
+which escapes for the JS literal *and* runs `htmlspecialchars()`, and usernames are separately validated. The contract
+is now documented in the function's docblock and the exemption is explicit and greppable rather than an accident of
+distance.
+
+#### In-flight locks on the cart controls
+
+Repeated clicks fired N POSTs against one row with last-write-wins on the server and no ordering guarantee on the way
+back, so responses could land out of order and render a quantity that disagreed with the badge. Locks are keyed **per
+cart-item row**, so editing one line never blocks another, and both branches now have a `.catch()` — previously a
+network failure left the input showing a value the server never stored.
+
+#### Accessibility sweep
+
+- Nine checkout fields had `<label>` with no `for`, so the inputs had **no accessible name at all** — a screen reader
+  announced "edit text, blank" for the entire delivery block, address included.
+- The quantity steppers are literally `-` and `+`; they now name the product they step.
+- `aria-labelledby="mobileSidebarLabel"` pointed at an id that existed nowhere, so the offcanvas announced itself as
+  unlabelled. An unresolvable ARIA reference is worse than none — it is a promise the page does not keep.
+- The admin status filters are links that navigate by URL, so they get `aria-current="page"` and explicitly **not**
+  `role="tablist"`, which would promise tabpanels that do not exist and break arrow-key navigation.
+- `#toastContainer` is defined in `footer.php` and created by `app.js` only if absent — the plan listed this as a
+  duplicate-id hazard, but the existing `getElementById` guard already handles it correctly. No change needed.
+
+#### E-wallet gating and form-state preservation
+
+The e-wallet option was checked by default regardless of balance. A member with an empty wallet could select it, fill
+in every address field, press Place order, and have the whole form discarded by the failure redirect. The option is
+now disabled at render time when the balance is short and no longer pre-selected in that case; the server still
+re-checks inside the transaction.
+
+All four failure paths in `placeOrder()` — including the two early validation redirects — now stash the form first, and
+`shop_checkout_old_input()` restores it for exactly one render through a **whitelist**, so this cannot become a
+general-purpose "echo the POST back" hole. Profile-prefilled fields prefer what the buyer actually typed.
+
+#### Two traps this phase walked into, both recorded because they recur
+
+- A `//` comment containing a literal PHP close tag ends PHP mode. Everything after it silently becomes inline HTML
+  and the parser reports an unclosed brace hundreds of lines away — twice, the second time in the very comment
+  warning about the first.
+- Two assertions matched their own explanatory comments: one naming the attribute it forbade (`role="tablist"`), one
+  naming the interpolation it forbade (`${message}`). Both are now stripped or reworded, because a lint rule that
+  reads its own documentation will eventually forbid the documentation.
+
+| Suite | Assertions | Failures |
+|---|---|---|
+| `SchemaDriftTest.php` | 25 | 0 |
+| `ShopStateMachineTest.php` | 258 | 0 |
+| `TemplateLintTest.php` | 28 | 0 |
+| `ViewRenderTest.php` | 73 | 0 |
+| **Total** | **384** | **0** |
 
 ---
 

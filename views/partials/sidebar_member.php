@@ -153,6 +153,11 @@ function renderSidebarNav($nav, $cp, $user, $view, $initial, $name)
 <div class="offcanvas offcanvas-start" tabindex="-1" id="mobileSidebar" aria-labelledby="mobileSidebarLabel"
   style="width:var(--sidebar-w)!important;background:var(--sidebar-bg)!important;">
   <div class="offcanvas-header d-flex align-items-center" style="padding:.5rem 0 0;border:none;">
+    <!-- Phase 8.6: aria-labelledby pointed at #mobileSidebarLabel, which does
+         not exist anywhere in the codebase — a dangling reference, so the
+         offcanvas announced itself as unlabelled. Visually hidden rather than
+         removed so the header layout is untouched. -->
+    <h2 class="visually-hidden mb-0" id="mobileSidebarLabel">Main navigation</h2>
     <button type="button" class="btn-close btn-close-white ms-auto me-3 mt-2"
       data-bs-dismiss="offcanvas" aria-label="Close"></button>
   </div>

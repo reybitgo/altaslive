@@ -64,9 +64,9 @@
                       <td class="text-end font-mono"><?= number_format((float) $item['unit_price'], 2) ?></td>
                       <td class="text-center">
                         <div class="input-group input-group-sm justify-content-center" style="width:120px;margin:0 auto;">
-                          <button class="btn border cart-qty-btn" data-dir="down" type="button">−</button>
+                          <button class="btn border cart-qty-btn" data-dir="down" type="button" aria-label="Decrease quantity of <?= $item['product_name'] ?>">−</button>
                           <input type="number" class="form-control text-center cart-qty-input" data-item-id="<?= (int) $item['id'] ?>" value="<?= (int) $item['quantity'] ?>" min="1" max="<?= (int) $item['stock'] ?>">
-                          <button class="btn border cart-qty-btn" data-dir="up" type="button">+</button>
+                          <button class="btn border cart-qty-btn" data-dir="up" type="button" aria-label="Increase quantity of <?= $item['product_name'] ?>">+</button>
                         </div>
                       </td>
                       <td class="text-end font-mono fw-semibold"><?= number_format((float) $item['unit_price'] * (int) $item['quantity'], 2) ?></td>

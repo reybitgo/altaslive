@@ -27,11 +27,17 @@ $tabs = array_merge(['payment_review', 'payment_failed', 'paid', 'packing', 'rea
       </form>
     </div>
 
-    <!-- Status tabs -->
+    <!-- Status tabs. Phase 8.6: these navigate by URL rather than swapping
+         panels, so they are links inside a nav, not ARIA tabs. role="tablist"
+         would promise tabpanels that do not exist and would break keyboard
+         arrow-key navigation. aria-current="page" is what actually tells a
+         screen reader which one is selected. -->
     <ul class="nav nav-tabs flex-wrap mb-3" style="font-size:.82rem;">
       <?php foreach ($tabs as $t): ?>
         <li class="nav-item">
-          <a class="nav-link <?= $status === $t ? 'active' : '' ?>" href="<?= link_to('admin_shop_orders', ['status' => $t]) ?>">
+          <a class="nav-link <?= $status === $t ? 'active' : '' ?>"
+             href="<?= link_to('admin_shop_orders', ['status' => $t]) ?>"
+             <?= $status === $t ? 'aria-current="page"' : '' ?>>
             <?= $status === 'all' ? 'All' : e(shop_status_label($status)) ?>
             <span class="badge bg-<?= $counts[$t] ?? 0 > 0 ? 'primary' : 'secondary' ?> ms-1"><?= $counts[$t] ?? 0 ?></span>
           </a>

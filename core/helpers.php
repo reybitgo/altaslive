@@ -546,6 +546,66 @@ function clean_reference(mixed $raw, int $max = 40): string
 }
 
 /**
+ * Remember what the buyer typed at checkout so a failed attempt does not throw
+ * it away (Phase 8.7).
+ *
+ * placeOrder() validates server-side and redirects back to the checkout page on
+ * failure. Every field the member had filled in — the delivery address, the
+ * contact numbers — was simply gone, so fixing one validation error meant
+ * retyping the lot. Stashed for exactly one render, then consumed.
+ *
+ * Only the whitelisted address fields are kept. Nothing is read from the array
+ * that is not listed here, so this cannot become a general-purpose "echo the
+ * POST back" hole.
+ *
+ * @return array<string,string>
+ */
+function shop_checkout_old_input(): array
+{
+    $allowed = [
+        'billing_name', 'billing_phone',
+        'shipping_name', 'shipping_phone', 'shipping_address',
+        'shipping_city', 'shipping_province', 'shipping_postal',
+        'notes_member', 'payment_method',
+    ];
+
+    $old = $_SESSION['shop_checkout_old'] ?? [];
+    unset($_SESSION['shop_checkout_old']);   // one render only
+    if (!is_array($old)) return [];
+
+    $clean = [];
+    foreach ($allowed as $k) {
+        if (isset($old[$k]) && is_scalar($old[$k])) {
+            $clean[$k] = (string) $old[$k];
+        }
+    }
+    return $clean;
+}
+
+/**
+ * Stash the checkout form so a redirect back can repopulate it. See
+ * shop_checkout_old_input().
+ */
+function shop_checkout_remember_input(array $post): void
+{
+    $allowed = [
+        'billing_name', 'billing_phone',
+        'shipping_name', 'shipping_phone', 'shipping_address',
+        'shipping_city', 'shipping_province', 'shipping_postal',
+        'notes_member', 'payment_method',
+    ];
+    $clean = [];
+    foreach ($allowed as $k) {
+        if (isset($post[$k]) && is_scalar($post[$k])) {
+            $clean[$k] = (string) $post[$k];
+        }
+    }
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        $_SESSION['shop_checkout_old'] = $clean;
+    }
+}
+
+/**
  * Rows per page, from an ALLOW-LIST (decision D5).
  *
  * This reads a user-supplied query parameter straight into a SQL LIMIT.

@@ -217,22 +217,70 @@ foreach ($phpFiles as $file) {
         $ident = $m[1][array_search($hit, $m[0], true)][0];
         $lineNo = substr_count(substr($src, 0, $hit[1]), "\n") + 1;
 
-        // Inside a window of +/-6 lines from a sink?
-        $near = false;
-        for ($l = $lineNo - 6; $l <= $lineNo + 6; $l++) {
-            if (isset($sinkLines[$l])) { $near = true; break; }
+        // Is this interpolation plausibly reaching a sink?
+        //
+        // This used to be a fixed +/-6 line window around a sink. That is a
+        // guess about formatting, and it silently failed: showToast()'s message
+        // line drifted 8 lines above its insertAdjacentHTML call once the file
+        // grew comments, dropped out of the window, and reverting its escaping
+        // passed the suite. A lint rule that depends on how far a line sits from
+        // a keyword is not a lint rule.
+        //
+        // JS: the whole file is checked. These files are small and any
+        // interpolation into a template literal in a file that also writes to
+        // the DOM deserves to be escaped or explicitly exempted.
+        // PHP views: the window is kept, because `${...}` in a view is far more
+        // often an unrelated PHP string interpolation.
+        $near = str_ends_with($rel, '.js');
+        if (!$near) {
+            for ($l = $lineNo - 6; $l <= $lineNo + 6; $l++) {
+                if (isset($sinkLines[$l])) { $near = true; break; }
+            }
         }
         if (!$near) {
             continue;
         }
-        // Already escaped somewhere in the window?
-        $window = substr($src, max(0, $hit[1] - 400), 800);
-        if (stripos($window, 'escHtml(' . $ident) !== false
-            || stripos($window, 'escHtml(' . ltrim($ident, '$') . ')') !== false
-            || stripos($window, 'textContent') !== false
+        // Already escaped?
+        //
+        // This used to search a +/-400 character window around the hit for the
+        // string "escHtml(<ident>)", and to skip the hit entirely if the window
+        // contained "textContent" anywhere. Both were wrong in the same
+        // direction: an unrelated escHtml() or textContent 200 characters away
+        // silently cleared a real sink. That is how showConfirm()'s unescaped
+        // ${message} and ${title} survived review — the escHtml() calls beside
+        // them in the same template literal happened to sit in the window.
+        //
+        // The check is now local to the interpolation's own line, and the one
+        // genuine exemption is declared explicitly below instead of being
+        // reached by accident.
+        $lineText = explode("\n", $src)[$lineNo - 1] ?? '';
+        if (stripos($lineText, 'escHtml(' . $ident) !== false
+            || stripos($lineText, 'escHtml(' . ltrim($ident, '$') . ')') !== false
+            || preg_match('/\$\{\s*escHtml\(/', $lineText)
         ) {
             continue;
         }
+
+        // Deliberate, documented exemption: showConfirm()'s `message` and
+        // `title` are a trusted-HTML contract (see the docblock in app.js).
+        //
+        // Scoped to showConfirm's function BODY, not to the identifier name. A
+        // file+identifier exemption looked equivalent but was not: showToast
+        // has a `message` too, so the exemption quietly un-guarded it — and
+        // reverting showToast's escaping passed the suite. Verified by
+        // mutation, which is the only reason this is worth saying.
+        if ($rel === 'assets/js/app.js') {
+            $sc = strpos($src, 'function showConfirm(');
+            if ($sc !== false) {
+                $en = strpos($src, "\nfunction ", $sc + 10);
+                $end = $en === false ? strlen($src) : $en;
+                $bare = ltrim($ident, '$');
+                if ($hit[1] > $sc && $hit[1] < $end && in_array($bare, ['message', 'title'], true)) {
+                    continue;
+                }
+            }
+        }
+
         $unEscapedSinks[] = $rel . ':' . $lineNo . ' ' . $expr;
     }
 }
@@ -247,6 +295,116 @@ echo "  C5b backlog (tracked, exempt): " . count($known) . " site(s)\n";
 foreach ($known as $k) {
     echo "    - {$k}\n";
 }
+
+T::group('Accessibility invariants');
+
+/**
+ * Phase 8.6. Every visible form control needs an accessible name.
+ *
+ * A `<label>` with no `for` renders correctly and is read by nobody: the input
+ * it visually belongs to has no programmatic name, so a screen reader announces
+ * "edit text, blank". Nine checkout fields were in that state, including the
+ * delivery address — the one field on the page that actually matters.
+ */
+test('every checkout field has a label bound to it by id', function (): void {
+    $src = (string) file_get_contents(REPO_ROOT . '/views/member/checkout.php');
+
+    // label[for] -> the id must exist on a control.
+    preg_match_all('/<label[^>]*\bfor="([A-Za-z0-9_]+)"/', $src, $m);
+    $dangling = [];
+    foreach ($m[1] as $id) {
+        if (!preg_match('/\bid="' . preg_quote($id, '/') . '"/', $src)) {
+            $dangling[] = $id;
+        }
+    }
+    T::ok($dangling === [], 'no checkout label points at a missing id', implode(', ', $dangling));
+    // 9 delivery/billing fields. The payment-method labels are not counted
+    // here: their `for` is an interpolated per-method id, which a static id
+    // pattern cannot match. That one is asserted separately below.
+    //
+    // (Note for the next editor: never write a literal PHP close tag in a
+    // line comment in this file. It ends PHP mode even inside a "//" comment,
+    // so the rest of the file silently becomes inline HTML and the parser
+    // reports an unclosed brace hundreds of lines away. Block comments are
+    // unaffected.)
+    T::ok(count($m[1]) >= 9, 'checkout labels are actually present', 'count=' . count($m[1]));
+    // The payment-method label and its radio both build their id from the same
+    // per-method key, so they are matched by prefix rather than by a static id
+    // pattern. (A regex with [^>]* cannot do this: the label's own class
+    // attribute contains an interpolated PHP close tag, so the character class
+    // stops at that ">" long before reaching `for=`.)
+    T::ok(str_contains($src, 'for="pm_'), 'the dynamic payment-method label is bound to its radio');
+    T::ok(str_contains($src, 'id="pm_'), 'the payment-method radios carry the matching id prefix');
+
+    // The delivery fields specifically, so a future template rewrite cannot
+    // quietly drop them again.
+    foreach (['shipping_name', 'shipping_address', 'shipping_city', 'billing_name', 'notes_member'] as $f) {
+        T::ok(
+            (bool) preg_match('/<label[^>]*for="' . $f . '"/', $src),
+            "the {$f} field has a bound label"
+        );
+    }
+});
+
+test('aria references resolve to real elements', function (): void {
+    // aria-labelledby="mobileSidebarLabel" pointed at an id that existed
+    // nowhere, so the offcanvas announced itself as unlabelled. An unresolvable
+    // ARIA reference is worse than none: it is a promise the page does not keep.
+    $files = [
+        REPO_ROOT . '/views/partials/sidebar_member.php',
+        REPO_ROOT . '/views/partials/sidebar_admin.php',
+        REPO_ROOT . '/views/partials/cart_offcanvas.php',
+        REPO_ROOT . '/views/partials/settings_offcanvas.php',
+    ];
+    $dangling = [];
+    foreach ($files as $f) {
+        $src = (string) file_get_contents($f);
+        preg_match_all('/aria-labelledby="([A-Za-z0-9_]+)"/', $src, $m);
+        foreach ($m[1] as $id) {
+            if (!preg_match('/\bid="' . preg_quote($id, '/') . '"/', $src)) {
+                $dangling[] = basename($f) . '#' . $id;
+            }
+        }
+    }
+    T::ok($dangling === [], 'every aria-labelledby resolves within its file', implode(', ', $dangling));
+});
+
+test('icon-only controls carry an accessible name', function (): void {
+    // The quantity steppers are literally "-" and "+". Without aria-label a
+    // screen reader announces "minus, button" with no indication of what it
+    // steps or which line it belongs to.
+    foreach (['views/partials/cart_offcanvas.php', 'views/member/cart.php'] as $rel) {
+        $src = (string) file_get_contents(REPO_ROOT . '/' . $rel);
+        preg_match_all('/<button[^>]*class="[^"]*cart-qty-btn[^"]*"[^>]*>/', $src, $m);
+        T::ok(count($m[0]) > 0, "{$rel} renders quantity steppers", 'count=' . count($m[0]));
+
+        $unlabelled = [];
+        foreach ($m[0] as $tag) {
+            if (!str_contains($tag, 'aria-label=')) {
+                $unlabelled[] = trim($tag);
+            }
+        }
+        T::ok($unlabelled === [], "every stepper in {$rel} has an aria-label", implode(' ', $unlabelled));
+    }
+});
+
+test('the selected status tab is marked with aria-current', function (): void {
+    // Deliberately NOT role="tablist": these links navigate by URL rather than
+    // swapping panels, so ARIA tabs would promise tabpanels that do not exist.
+    $src = (string) file_get_contents(REPO_ROOT . '/views/admin/shop_orders.php');
+    T::ok(
+        str_contains($src, 'aria-current="page"'),
+        'the active status tab is exposed to assistive tech'
+    );
+    // Comments are stripped first. An earlier version of this assertion matched
+    // its OWN explanatory comment, which named the attribute it was forbidding —
+    // the same self-trip that hit the XSS rule over a `${message}` in a comment.
+    $markup = (string) preg_replace('/<!--.*?-->/s', '', $src);
+    T::ok(
+        !str_contains($markup, 'role="tablist"'),
+        'URL-navigating filters are not mislabelled as ARIA tabs'
+    );
+});
 
 T::group('Loading invariants');
 

@@ -74,17 +74,30 @@
                   </div>
                   <?php if (!$soldOut): ?>
                     <?php $inCart = $cartId && isset($cartItems[(int) $p['id']]); ?>
+                    <?php $inCartQty = $inCart ? (int) $cartItems[(int) $p['id']]['quantity'] : 0; ?>
                     <form method="post" action="<?= link_to('add_to_cart') ?>" data-product-id="<?= (int) $p['id'] ?>"<?= $inCart ? ' data-in-cart="1"' : '' ?>>
                       <?= csrf_field() ?>
                       <input type="hidden" name="product_id" value="<?= (int) $p['id'] ?>">
-                      <input type="hidden" name="quantity" value="1">
-                      <button type="submit" class="btn btn-primary shop-add-btn w-100"<?= $inCart ? ' disabled' : '' ?>>
-                        <?= $inCart ? 'Already in cart' : 'Add to cart' ?>
+                      <?php /* M10: 43c0928 replaced this with a hidden value="1" and hard-disabled
+                               the button for anything already in the cart, so a buyer could only
+                               ever add one unit and could not top the cart up from the
+                               storefront at all. Restored as a real stepper.
+                               max is $avail, but Cart::addItem() re-checks cumulatively
+                               (existing + requested > available) and throws, so this control
+                               is a convenience and never the authority. */ ?>
+                      <div class="input-group input-group-sm mb-2">
+                        <span class="input-group-text">Qty</span>
+                        <input type="number" name="quantity" class="form-control shop-qty-input"
+                               min="1" max="<?= (int) $avail ?>" value="1"
+                               aria-label="Quantity to add for <?= e($p['name']) ?>">
+                      </div>
+                      <button type="submit" class="btn btn-primary shop-add-btn w-100">
+                        <?= $inCart ? 'Add more' : 'Add to cart' ?>
                       </button>
                     </form>
                     <?php if ($inCart): ?>
-                      <div class="text-success small shop-already-in-cart" role="status">
-                        Item already in the cart
+                      <div class="text-success small shop-already-in-cart mt-1" role="status">
+                        <?= $inCartQty ?> already in the cart
                       </div>
                     <?php endif; ?>
                   <?php endif; ?>

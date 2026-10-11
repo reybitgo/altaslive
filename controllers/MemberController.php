@@ -1346,10 +1346,12 @@ class MemberController
             'notes_member'      => trim((string) ($_POST['notes_member'] ?? '')),
         ];
         if ($addr['billing_name'] === '' || $addr['shipping_name'] === '' || $addr['shipping_address'] === '') {
+            shop_checkout_remember_input($_POST);
             flash('error', 'Please fill in the recipient name and delivery address.');
             redirect('/?page=checkout');
         }
         if (($_POST['terms'] ?? '') !== '1') {
+            shop_checkout_remember_input($_POST);
             flash('error', 'Please accept the terms to place your order.');
             redirect('/?page=checkout');
         }
@@ -1413,10 +1415,14 @@ class MemberController
             redirect('/?page=shop_order&id=' . $orderId);
         } catch (InvalidArgumentException | RuntimeException $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
+            // Phase 8.7: every one of these failures used to redirect to a blank
+            // checkout form, discarding the address the member had just typed.
+            shop_checkout_remember_input($_POST);
             flash('error', $e->getMessage());
             redirect('/?page=checkout');
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
+            shop_checkout_remember_input($_POST);
             flash('error', 'Could not place the order. Please try again.');
             redirect('/?page=checkout');
         }

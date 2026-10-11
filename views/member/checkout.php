@@ -16,7 +16,7 @@
     <h4 class="mb-1">Checkout</h4>
     <p class="text-muted" style="font-size:.8rem;">Review your order and fill in the delivery details.</p>
 
-    <form method="post" action="<?= link_to('place_order') ?>">
+    <form method="post" action="<?= link_to('place_order') ?>" id="checkoutForm">
       <?= csrf_field() ?>
       <input type="hidden" name="idem" value="<?= e(uniqid('', true)) ?>">
 
@@ -28,44 +28,44 @@
             <div class="card-body">
               <div class="row g-2">
                 <div class="col-md-6">
-                  <label class="form-label">Recipient name *</label>
-                  <input type="text" name="shipping_name" class="form-control" maxlength="120" required
-                         value="<?= e(Auth::user()['full_name'] ?? '') ?>">
+                  <label class="form-label" for="shipping_name">Recipient name *</label>
+                  <input type="text" id="shipping_name" name="shipping_name" class="form-control" maxlength="120" required
+                         value="<?= e($old['shipping_name'] ?? (Auth::user()['full_name'] ?? '')) ?>">
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label">Recipient phone</label>
-                  <input type="text" name="shipping_phone" class="form-control" maxlength="40"
-                         value="<?= e(Auth::user()['mobile'] ?? '') ?>">
+                  <label class="form-label" for="shipping_phone">Recipient phone</label>
+                  <input type="text" id="shipping_phone" name="shipping_phone" class="form-control" maxlength="40"
+                         value="<?= e($old['shipping_phone'] ?? (Auth::user()['mobile'] ?? '')) ?>">
                 </div>
                 <div class="col-12">
-                  <label class="form-label">Delivery address *</label>
-                  <input type="text" name="shipping_address" class="form-control" maxlength="255" placeholder="House / street / barangay" required>
+                  <label class="form-label" for="shipping_address">Delivery address *</label>
+                  <input type="text" id="shipping_address" name="shipping_address" class="form-control" maxlength="255" placeholder="House / street / barangay" required value="<?= e($old['shipping_address'] ?? '') ?>">
                 </div>
                 <div class="col-md-5">
-                  <label class="form-label">City</label>
-                  <input type="text" name="shipping_city" class="form-control" maxlength="80">
+                  <label class="form-label" for="shipping_city">City</label>
+                  <input type="text" id="shipping_city" name="shipping_city" class="form-control" maxlength="80" value="<?= e($old['shipping_city'] ?? '') ?>">
                 </div>
                 <div class="col-md-5">
-                  <label class="form-label">Province</label>
-                  <input type="text" name="shipping_province" class="form-control" maxlength="80">
+                  <label class="form-label" for="shipping_province">Province</label>
+                  <input type="text" id="shipping_province" name="shipping_province" class="form-control" maxlength="80" value="<?= e($old['shipping_province'] ?? '') ?>">
                 </div>
                 <div class="col-md-2">
-                  <label class="form-label">Postal</label>
-                  <input type="text" name="shipping_postal" class="form-control" maxlength="20">
+                  <label class="form-label" for="shipping_postal">Postal</label>
+                  <input type="text" id="shipping_postal" name="shipping_postal" class="form-control" maxlength="20" value="<?= e($old['shipping_postal'] ?? '') ?>">
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label">Billing name</label>
-                  <input type="text" name="billing_name" class="form-control" maxlength="120"
-                         value="<?= e(Auth::user()['full_name'] ?? '') ?>">
+                  <label class="form-label" for="billing_name">Billing name</label>
+                  <input type="text" id="billing_name" name="billing_name" class="form-control" maxlength="120"
+                         value="<?= e($old['billing_name'] ?? (Auth::user()['full_name'] ?? '')) ?>">
                   <div class="form-text">Name shown on the payment records.</div>
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label">Billing phone</label>
-                  <input type="text" name="billing_phone" class="form-control" maxlength="40">
+                  <label class="form-label" for="billing_phone">Billing phone</label>
+                  <input type="text" id="billing_phone" name="billing_phone" class="form-control" maxlength="40" value="<?= e($old['billing_phone'] ?? '') ?>">
                 </div>
                 <div class="col-12">
-                  <label class="form-label">Delivery notes</label>
-                  <textarea name="notes_member" class="form-control" rows="2" maxlength="500" placeholder="Landmarks, preferred times…"></textarea>
+                  <label class="form-label" for="notes_member">Delivery notes</label>
+                  <textarea id="notes_member" name="notes_member" class="form-control" rows="2" maxlength="500" placeholder="Landmarks, preferred times…"><?= e($old['notes_member'] ?? '') ?></textarea>
                 </div>
               </div>
             </div>
@@ -74,17 +74,44 @@
           <div class="card">
             <div class="card-header"><span class="card-title">💳 Payment method</span></div>
             <div class="card-body">
+              <?php
+              // Phase 8.7: the e-wallet option used to be checked by default
+              // with no regard for the balance, so a member with nothing in
+              // wallet could pick it, fill in every address field, press Place
+              // order, and have the whole form discarded by the failure path.
+              $ewalletBalance = Ewallet::balance(Auth::id());
+              $ewalletEnough  = $ewalletBalance + 0.005 >= (float) $cartTotals['total_price'];
+              // Anything the buyer typed on a failed attempt comes back with
+              // them (see shop_checkout_old_input()).
+              $old = shop_checkout_old_input();
+              ?>
               <?php foreach ($paymentMethods as $key => $label): ?>
                 <div class="form-check mb-2">
+                  <?php
+                  $isEwallet = $key === 'ewallet';
+                  $blocked   = $isEwallet && !$ewalletEnough;
+                  $chosen    = $old['payment_method'] ?? ($isEwallet ? 'ewallet' : '');
+                  ?>
                   <input class="form-check-input" type="radio" name="payment_method" id="pm_<?= e($key) ?>"
-                         value="<?= e($key) ?>" <?= $key === 'ewallet' ? 'checked' : '' ?> required>
-                  <label class="form-check-label" for="pm_<?= e($key) ?>"><?= e($label) ?>
-                    <?php if ($key === 'ewallet'): ?>
-                      <span class="text-muted" style="font-size:.78rem;">— balance <?= fmt_money(Ewallet::balance(Auth::id())) ?></span>
+                         value="<?= e($key) ?>"
+                         <?= $chosen === $key ? 'checked' : '' ?>
+                         <?= $blocked ? 'disabled data-requires-balance="1"' : '' ?>
+                         required>
+                  <label class="form-check-label<?= $blocked ? ' text-muted' : '' ?>" for="pm_<?= e($key) ?>"><?= e($label) ?>
+                    <?php if ($isEwallet): ?>
+                      <span class="text-muted" style="font-size:.78rem;">— balance <?= fmt_money($ewalletBalance) ?></span>
+                      <?php if ($blocked): ?>
+                        <span class="d-block text-danger" style="font-size:.78rem;">
+                          Not enough e-wallet balance for this order — add funds or choose another method.
+                        </span>
+                      <?php endif; ?>
                     <?php endif; ?>
                   </label>
                 </div>
               <?php endforeach; ?>
+              <div id="walletShortfall" class="text-danger small d-none">
+                Your e-wallet balance does not cover this order.
+              </div>
               <div class="form-text">E-wallet orders are paid instantly. For other methods you'll upload a payment proof after placing the order.</div>
             </div>
           </div>
@@ -115,7 +142,7 @@
               </div>
             </div>
             <div class="card-footer">
-              <button type="submit" class="btn btn-primary w-100" id="placeOrderBtn">Place order</button>
+              <button type="submit" class="btn btn-primary w-100" id="placeOrderBtn" data-busy-label="Placing order…">Place order</button>
               <a href="<?= link_to('cart') ?>" class="btn btn-link btn-sm w-100 mt-2" style="text-decoration:none;">← Back to cart</a>
             </div>
           </div>
@@ -125,11 +152,55 @@
   </div>
 </div>
 <script>
-// Single-submit guard for the idempotency story: even without the server key,
-// a double click must not fire two POSTs.
-document.getElementById('placeOrderBtn')?.addEventListener('click', function () {
-  if (this.dataset.busy) return;
-  this.dataset.busy = '1';
-});
+// Single-submit guard (M8).
+//
+// This previously only set a dataset flag and returned early on the second
+// click, which stopped nothing: the listener never called preventDefault() and
+// never disabled the button, so both clicks still submitted the form. The
+// comment above it claimed the opposite.
+//
+// The form submit event is the right hook, not click — Enter in a text field
+// submits without a click on the button at all.
+(function () {
+  var form = document.getElementById('checkoutForm');
+  var btn  = document.getElementById('placeOrderBtn');
+  if (!form || !btn) return;
+
+  // E-wallet is disabled at render time when the balance is short. This is a
+  // convenience only — placeOrder() re-checks the balance server-side inside
+  // the transaction — but it stops the member filling in the whole form only
+  // to be rejected at the last step.
+  var wallet = document.querySelector('input[name="payment_method"][data-requires-balance="1"]');
+  var shortfall = document.getElementById('walletShortfall');
+  if (wallet && shortfall && wallet.checked) {
+    // A disabled radio cannot stay checked; make sure nothing is pre-selected
+    // into an invalid state, and say why.
+    wallet.checked = false;
+    shortfall.classList.remove('d-none');
+  }
+
+  var sent = false;
+  form.addEventListener('submit', function (e) {
+    if (wallet && wallet.checked) {
+      e.preventDefault();
+      shortfall.classList.remove('d-none');
+      return;
+    }
+    if (sent) { e.preventDefault(); return; }
+    sent = true;
+    // Disable only the button, NOT the form: a disabled control's name/value
+    // is omitted from the POST, which would strip every address field the
+    // buyer just typed along with the payload.
+    btn.disabled = true;
+    if (btn.dataset.busyLabel) btn.textContent = btn.dataset.busyLabel;
+  });
+
+  // BFCache restores keep the DOM but drop the flag, stranding a dead button.
+  window.addEventListener('pageshow', function (e) {
+    if (!e.persisted) return;
+    sent = false;
+    btn.disabled = false;
+  });
+})();
 </script>
 <?php require 'views/partials/footer.php'; ?>

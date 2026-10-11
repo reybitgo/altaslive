@@ -37,9 +37,9 @@ $itemCount  = (int) $cartTotals['total_items'];
               <div class="small text-muted"><?= number_format((float) $item['unit_price'], 2) ?> PHP</div>
               <div class="d-flex align-items-center justify-content-between mt-2">
                 <div class="input-group input-group-sm" style="width:110px">
-                  <button class="btn btn-sm border cart-qty-btn" data-dir="down" type="button">-</button>
+                  <button class="btn btn-sm border cart-qty-btn" data-dir="down" type="button" aria-label="Decrease quantity of <?= $item['product_name'] ?>">-</button>
                   <input type="number" class="form-control text-center cart-qty-input" data-item-id="<?= (int) $item['id'] ?>" value="<?= (int) $item['quantity'] ?>" min="1" max="<?= (int) $item['stock'] ?>">
-                  <button class="btn btn-sm border cart-qty-btn" data-dir="up" type="button">+</button>
+                  <button class="btn btn-sm border cart-qty-btn" data-dir="up" type="button" aria-label="Increase quantity of <?= $item['product_name'] ?>">+</button>
                 </div>
                 <button class="btn btn-sm btn-link text-danger cart-remove-btn" data-item-id="<?= (int) $item['id'] ?>" type="button">Remove</button>
               </div>
@@ -56,7 +56,9 @@ $itemCount  = (int) $cartTotals['total_items'];
           <span>Total</span>
           <span id="cartTotalPrice"><?= number_format((float) $cartTotals['total_price'], 2) ?> PHP</span>
         </div>
-        <a href="<?= link_to('checkout') ?>" class="btn btn-primary w-100">Checkout</a>          <a href="<?= link_to('cart') ?>" class="btn btn-link btn-sm w-100 mt-2" style="text-decoration:none;">View full cart</a>
+        <div class="text-muted small text-center d-none" id="cartEmptyNote">Nothing to check out yet.</div>
+        <a href="<?= link_to('checkout') ?>" class="btn btn-primary w-100" id="cartCheckoutBtn">Checkout</a>
+        <a href="<?= link_to('cart') ?>" class="btn btn-link btn-sm w-100 mt-2" id="cartViewFullBtn" style="text-decoration:none;">View full cart</a>
       </div>
     <?php endif; ?>
   </div>
@@ -90,8 +92,23 @@ $itemCount  = (int) $cartTotals['total_items'];
       '<div class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-muted p-4">' +
       '<div style="font-size:3rem;line-height:1">🛒</div>' +
       '<p class="mt-3 mb-2">Your cart is empty</p>' +
-      '<a href="' + '<?= APP_URL ?>' + '/?page=shop" class="btn btn-primary btn-sm">Browse Products</a>' +
+      // link_to() rather than a hardcoded APP_URL (M9): the impersonation
+      // ?imp= token rides on the URL, so a literal origin drops it and the
+      // superadmin silently loses the impersonated session.
+      '<a href="<?= e(link_to('shop')) ?>" class="btn btn-primary btn-sm">Browse Products</a>' +
       '</div>';
+    // M9: the footer is a SIBLING of the container, and only the container was
+    // being replaced — so an emptied cart still offered a live "Checkout" link
+    // reading 0.00. Taking the buyer to an empty checkout is the bug; hide the
+    // actions and say why. Done by visibility, not by replacing innerHTML, so
+    // the totals nodes updateFooter() writes to survive.
+    var checkoutBtn = document.getElementById('cartCheckoutBtn');
+    var viewBtn     = document.getElementById('cartViewFullBtn');
+    var note        = document.getElementById('cartEmptyNote');
+    if (checkoutBtn) checkoutBtn.classList.add('d-none');
+    if (viewBtn)     viewBtn.classList.add('d-none');
+    if (note)        note.classList.remove('d-none');
+
     updateFooter(0);
     updateTopbarBadge(0);
     document.getElementById('offcanvasCount').textContent = 0;
@@ -114,11 +131,24 @@ $itemCount  = (int) $cartTotals['total_items'];
   var drawerEl = document.getElementById('cartOffcanvas');
   function inDrawer(el) { return !!(drawerEl && drawerEl.contains(el)); }
 
+  // Per-row in-flight lock (Phase 8.5).
+  //
+  // Repeated clicks used to fire N POSTs against the same row with
+  // last-write-wins on the server and no ordering guarantee on the way back,
+  // so responses could land out of order and render a stale quantity — the
+  // badge and the input disagreeing with each other. The lock is keyed per
+  // cart-item row, not global, so editing one line never blocks another.
+  var busyRows = new Set();
+  function rowBusy(row) { return busyRows.has(row); }
+  function lockRow(row) { busyRows.add(row); }
+  function unlockRow(row) { busyRows.delete(row); }
+
   document.addEventListener('click', function (e) {
     var qtyBtn = e.target.closest('.cart-qty-btn');
     if (qtyBtn) {
       if (!inDrawer(qtyBtn)) return;
       var wrap  = qtyBtn.closest('.cart-item');
+      if (rowBusy(wrap)) return;          // a request for this row is still open
       var input = wrap.querySelector('.cart-qty-input');
       var cur   = parseInt(input.value, 10) || 1;
       var stock = parseInt(input.max, 10) || 0;  // server-rendered stock ceiling
@@ -136,6 +166,8 @@ $itemCount  = (int) $cartTotals['total_items'];
         next = Math.max(1, cur - 1);
       }
       input.value = next;
+      lockRow(wrap);
+      qtyBtn.disabled = true;
       post('<?= link_to('update_cart_item') ?>', {item_id: wrap.dataset.itemId, quantity: next})
         .then(function (res) {
           if (!res.ok) {
@@ -147,6 +179,14 @@ $itemCount  = (int) $cartTotals['total_items'];
           updateFooter(res.subtotal);
           updateTopbarBadge(res.count);
           document.getElementById('offcanvasCount').textContent = res.count;
+        })
+        .catch(function () {
+          input.value = input.dataset.qty || input.defaultValue;
+          if (window.showToast) showToast('Could not reach the server. Your change was not saved.', 'error');
+        })
+        .then(function () {
+          unlockRow(wrap);
+          qtyBtn.disabled = false;
         });
       return;
     }
@@ -155,6 +195,9 @@ $itemCount  = (int) $cartTotals['total_items'];
     if (rm) {
       if (!inDrawer(rm)) return;
       var row = rm.closest('.cart-item');
+      if (rowBusy(row)) return;
+      lockRow(row);
+      rm.disabled = true;
       post('<?= link_to('remove_cart_item') ?>', {item_id: row.dataset.itemId})
         .then(function (res) {
           if (!res.ok) { if (window.showToast) showToast(res.error || 'Remove failed', 'error'); return; }
@@ -165,6 +208,13 @@ $itemCount  = (int) $cartTotals['total_items'];
           if (!document.querySelector('#cartItemsContainer .cart-item')) {
             refreshDrawer();
           }
+        })
+        .catch(function () {
+          if (window.showToast) showToast('Could not reach the server. Nothing was removed.', 'error');
+        })
+        .then(function () {
+          unlockRow(row);
+          rm.disabled = false;
         });
     }
   });
