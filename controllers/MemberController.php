@@ -1386,10 +1386,24 @@ class MemberController
                 if (!Ewallet::debitInternal(Auth::id(), $total, $orderId, 'shop_order', "Shop order {$order['order_no']}")) {
                     throw new RuntimeException('Insufficient e-wallet balance for ' . fmt_money($total) . '.');
                 }
-                $pdo->commit();
 
-                ShopOrder::markPaid($orderId, 'system', null);
+                // Phase 6.1: the paid transition now runs INSIDE this
+                // transaction rather than after it. It used to be called after
+                // $pdo->commit(), so any failure inside markPaid() — a stock
+                // conflict at reservation, a database error — left the money
+                // debited and its ledger row committed against a `pending`
+                // order, with the cart never cleared. The catch block below
+                // could not undo it: rolling back an already-committed
+                // transaction is a no-op, so the buyer saw "Could not place the
+                // order" while their balance was already reduced.
+                //
+                // transition() is transaction-aware (Phase 6.1) and joins this
+                // unit instead of opening its own.
+                if (!ShopOrder::markPaid($orderId, 'system', null)) {
+                    throw new RuntimeException('Could not confirm the order payment. No funds have been taken.');
+                }
                 Cart::clear((int) $cart['id']);
+                $pdo->commit();
                 flash('success', 'Order placed and paid. Thank you!');
                 redirect('/?page=shop_order&id=' . $orderId);
             }

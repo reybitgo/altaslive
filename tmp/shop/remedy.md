@@ -978,7 +978,112 @@ non-withdrawable funds first, and the idempotency + replay guards are sound. The
 ### Done when
 
 No shop path can move money without a matching ledger row, and every movement is inside a transaction that also
-records the state change.
+records the state change. **Met 2026-10-10** — see below.
+
+### Execution record — 2026-10-10
+
+> **This phase had been skipped.** It carried no execution record and no commit, even though Phase 7 lists it as a
+> prerequisite and the sequencing diagram calls Phases 0–6 "strictly sequential". Found while planning Phase 8, not
+> by a test.
+
+#### 6.1 — `placeOrder()` debited money outside the unit that recorded the order
+
+The live defect, confirmed by reading the code rather than the plan:
+
+```php
+Ewallet::debitInternal(...);                    // money debited, ledger row written
+$pdo->commit();                                 // COMMITTED
+ShopOrder::markPaid($orderId, 'system', null);  // outside the transaction
+Cart::clear(...);                               // never reached on failure
+```
+
+Any failure inside `markPaid()` — a stock conflict at reservation, a database error — left the member debited against
+a `pending` order with their cart intact. The `catch` block could not undo it: **rolling back an already-committed
+transaction is a no-op**, so the buyer was shown "Could not place the order" while their balance was already reduced.
+
+`transition()` is now transaction-aware (`$ownsTxn`, the same pattern `createFromCart()` already used) so the paid
+transition joins the caller's unit instead of opening its own, and `markPaid()` returning `false` now raises rather
+than being ignored. Order, debit, paid transition and cart clear are one commit.
+
+Two consequences of making `transition()` transaction-aware, both handled:
+
+- **A refusal must not roll back the caller's transaction.** `markDelivered`/`markPaid` guard blocks now read
+  `if ($ownsTxn) $pdo->rollBack();`. Unconditional, a refused transition would have discarded the caller's
+  uncommitted work.
+- **The stock-conflict audit row is only written when we own the transaction.** It is deliberately written *after* the
+  rollback so it survives; under a caller's transaction the refusal is the caller's to report.
+
+#### 6.2 — M4: proof of delivery was written after the status committed
+
+`markDelivered()` called `transition()` — which committed — and *then* called `ShopShipment::savePod()`. A POD write
+that failed left an order sitting in `delivered` with no proof of delivery and nothing to retry from: the status was
+durable, the evidence was not. POD is the compliance artifact for the entire fulfilment leg, so it now moves through
+the transition's `applySideEffects()` hook, inside the same transaction. `markDelivered()` hands the POD over and
+does nothing after the call.
+
+#### 6.3 — refund payout ordering: confirmed sound, not rewritten
+
+The plan asked this be verified rather than assumed, and it is: `ShopRefund::markPaid()` already wraps both the
+credit and the status write in one transaction, and `Ewallet::credit()` opens no transaction of its own, so the
+credit cannot escape the unit. Both facts are now asserted rather than assumed.
+
+#### 6.5 — M6: the payout route was decided by free text
+
+`str_contains(strtolower($destination), 'wallet')` decided who got credited, on an unconstrained `VARCHAR(120)`.
+`shop_refunds.method ENUM('ewallet','cash','bank','manual')` existed and was **never read**. Now the enum decides;
+only an explicit `ewallet` method credits the wallet.
+
+The mutation run showed the heuristic was fragile in *both* directions, not just the one the plan named: with it
+restored, a cash payout whose destination text read "Cash payout to GCash wallet later" credited the wallet, **and**
+an `ewallet` refund whose destination read "back to GCash" credited nothing.
+
+#### 6.6 — ledger reconciliation
+
+Every order's `ewallet_ledger` movement is reconciled against its state: exactly one debit equal to the order total
+for an e-wallet checkout, none for any other method, and credits fully explained by *processed* `method='ewallet'`
+refunds.
+
+**The first version of this test was worthless and passed by asserting nothing.** It swept all orders "at the end of
+the suite" — but `test()` calls `resetState()` before *and* after every case, so it found an empty `shop_orders`
+table and reported `orders=0`. A reconciliation check that never looks at anything always agrees. It now builds its
+own four money paths inside the test.
+
+#### 6.7 — Strategy C, machine-enforced
+
+Zero `Commission::` calls and zero PV / point-value strings in shop code, and no direct `shop_orders.status` UPDATE
+outside `ShopOrder.php`. `git diff core/Commission.php` is empty.
+
+Scoped deliberately: an earlier version scanned every model and controller and flagged `AdminController`, which
+legitimately drives the commission admin pages. Strategy C forbids the *shop* from borrowing the binary engine, not
+the reverse.
+
+#### An idempotency test that was passing for the wrong reason
+
+Mutation-testing the refund guard produced a surprise: **disabling the `rowCount` guard entirely left the suite
+green.**
+
+The sequential replay assertions were being caught by the early `status !== 'approved'` check, which runs before the
+transaction opens. The guard that actually matters is the concurrent one — two admins opening the same approved
+refund in the same instant — which is defended by `UPDATE ... WHERE id = ? AND status = 'approved'` plus the
+rowCount check, so the loser's UPDATE matches zero rows and its transaction, including the credit already issued
+inside it, rolls back.
+
+A single-process test **cannot** reproduce that race: with one connection the loser always re-reads `processed` and
+short-circuits at the early check. Rather than leave a test whose name overstates what it proves, the sequential
+assertions are kept for what they genuinely cover and the race guard is asserted structurally — with the limitation
+written into the test itself, so the next reader is not misled.
+
+| Suite | Assertions | Failures |
+|---|---|---|
+| `SchemaDriftTest.php` | 25 | 0 |
+| `ShopStateMachineTest.php` | 258 | 0 |
+| `TemplateLintTest.php` | 12 | 0 |
+| `ViewRenderTest.php` | 73 | 0 |
+| **Total** | **368** | **0** |
+
+Every fix this phase was mutation-verified — each was re-introduced and the suite watched to fail. Three of those
+runs found defects in my own tests, not in the code: the scoped-commit blind spot in the 6.1 ordering assertion, the
+empty-table reconciliation sweep, and the idempotency test passing for the wrong reason.
 
 ---
 

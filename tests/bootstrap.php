@@ -277,7 +277,62 @@ public static function pendingOrder(int $memberId, int $productId, int $qty = 1,
         return $orderId;
     }
 
-    public static function itemState(int $orderId, ?int $productId = null): string
+        /**
+         * A fully shipped order: pending -> paid -> packing -> ready_to_ship ->
+         * shipped, walking the real transition matrix rather than writing the
+         * status directly, plus an active shipment row. Used by the M4 POD
+         * test, which needs a genuine active shipment to write against.
+         */
+        public static function shippedOrder(int $memberId, int $productId, int $qty = 1): int
+        {
+            $orderId = self::pendingOrder($memberId, $productId, $qty);
+            $adminId = self::admin();
+            foreach (['paid', 'packing', 'ready_to_ship'] as $to) {
+                T::ok(
+                    ShopOrder::transition($orderId, $to, 'admin', $adminId),
+                    "shippedOrder fixture: {$to} accepted"
+                );
+            }
+            T::ok(
+                ShopOrder::transition($orderId, 'shipped', 'admin', $adminId),
+                'shippedOrder fixture: shipped accepted'
+            );
+            ShopShipment::create($orderId, ['seq' => 1]);
+            return $orderId;
+        }
+
+        /** A cancelled order with its reservation released, ready for a refund. */
+        public static function cancelledOrder(int $memberId, int $productId, int $qty = 1): int
+        {
+            $orderId = self::pendingOrder($memberId, $productId, $qty);
+            T::ok(
+                ShopOrder::transition($orderId, 'cancelled', 'customer', $memberId),
+                'cancelledOrder fixture: cancelled accepted'
+            );
+            return $orderId;
+        }
+
+        /**
+         * An open refund against an order.
+         *
+         * `$destination` is free text on purpose: it is the field the M6 defect
+         * used to make the payout decision, so tests must be able to set it to
+         * something misleading.
+         */
+        public static function refund(
+            int $orderId,
+            float $amount,
+            string $method = 'ewallet',
+            string $destination = null
+        ): int {
+            db()->prepare(
+                "INSERT INTO shop_refunds (order_id, amount, cause, destination, method, status)
+                 VALUES (?, ?, 'admin_cancel', ?, ?, 'open')"
+            )->execute([$orderId, $amount, $destination, $method]);
+            return (int) db()->lastInsertId();
+        }
+
+        public static function itemState(int $orderId, ?int $productId = null): string
     {
         $sql = "SELECT reservation_state FROM shop_order_items WHERE order_id = ?";
         $p = [$orderId];

@@ -133,19 +133,31 @@ public const BLOCKING_STATUSES = ['open', 'approved'];
         }
         self::assertNotSelfReview((int) $refund['member_id']);
 
-        $pdo = db();
-        $pdo->beginTransaction();
-        try {
-            $destination = strtolower((string) ($refund['destination'] ?? ''));
-            if ($destination === 'ewallet' || str_contains($destination, 'wallet')) {
-                Ewallet::credit(
-                    (int) $refund['member_id'],
-                    (float) $refund['amount'],
-                    (int) $refund['order_id'],
-                    'shop_order',
-                    'Shop order refund (receipt ' . $receiptRef . ')'
-                );
-            }
+            $pdo = db();
+            $pdo->beginTransaction();
+            try {
+                // M6 (Phase 6.5): decide from the `method` ENUM, not from free
+                // text. This used to be
+                //   str_contains(strtolower($destination), 'wallet')
+                // which is fragile in both directions: a destination of
+                // "Cash payout to GCash wallet later" would credit an e-wallet
+                // for a cash payout, and "bank transfer" would not. The column
+                // carries no constraint, so any admin typo changed who got paid.
+                //
+                // shop_refunds.method is ENUM('ewallet','cash','bank','manual')
+                // and was defined but never read — that is the contract. Only an
+                // explicit e-wallet method credits the wallet; everything else is
+                // settled out of band and closed as processed.
+                $method = (string) ($refund['method'] ?? '');
+                if ($method === 'ewallet') {
+                    Ewallet::credit(
+                        (int) $refund['member_id'],
+                        (float) $refund['amount'],
+                        (int) $refund['order_id'],
+                        'shop_order',
+                        'Shop order refund (receipt ' . $receiptRef . ')'
+                    );
+                }
 
             $st = $pdo->prepare(
                 "UPDATE shop_refunds SET status = 'processed', processed_by = ?, processed_at = NOW(), receipt_ref = ? WHERE id = ? AND status = 'approved'"

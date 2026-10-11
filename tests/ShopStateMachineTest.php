@@ -816,4 +816,479 @@ test('a database error is not misreported as a stock conflict', function (): voi
     );
 });
 
+T::group('Phase 6 — money-flow atomicity');
+
+test('transition() joins a caller transaction instead of nesting one', function (): void {
+    $m  = Fixtures::member();
+    $oid = Fixtures::pendingOrder($m, Fixtures::product('__TX1__', 100.00, 5), 1);
+
+    $pdo = db();
+    T::ok(!$pdo->inTransaction(), 'no transaction is open before the test');
+
+    $pdo->beginTransaction();
+    // PDO throws "There is already an active transaction" on a nested begin.
+    // Before Phase 6.1 this line was a fatal for any caller that already had a
+    // unit open, which is precisely what placeOrder() needs.
+    $threw = null;
+    try {
+        ShopOrder::markPaid($oid, 'system', null);
+    } catch (Throwable $e) {
+        $threw = $e->getMessage();
+    }
+    T::ok($threw === null, 'markPaid inside an open transaction does not fatal', (string) $threw);
+    T::ok($pdo->inTransaction(), 'the caller still owns the transaction afterwards');
+    $pdo->rollBack();
+    T::ok(!$pdo->inTransaction(), 'the transaction closes cleanly');
+});
+
+test('a refusal inside a caller transaction does not discard the caller work', function (): void {
+    $m   = Fixtures::member();
+    $pid = Fixtures::product('__TX2__', 100.00, 5);
+    $oid = Fixtures::pendingOrder($m, $pid, 1);
+
+    $pdo = db();
+    $pdo->beginTransaction();
+    // Illegal source status makes the transition refuse (false, not throw).
+    $pdo->prepare("UPDATE shop_orders SET status = 'cancelled' WHERE id = ?")->execute([$oid]);
+    $ok = ShopOrder::markPaid($oid, 'system', null);
+    T::ok($ok === false, 'markPaid refuses from an illegal source status');
+    // The refusal rolled nothing back, because the transaction is not ours to
+    // end. If it had, the caller's own uncommitted work would be gone.
+    T::ok(
+        $pdo->inTransaction(),
+        'the refusal leaves the caller transaction open'
+    );
+    T::eq(
+        'cancelled',
+        Fixtures::statusOf($oid),
+        "the caller's uncommitted change is still visible"
+    );
+    $pdo->rollBack();
+});
+
+test('failed e-wallet checkout persists nothing: no order, no debit, no cleared cart', function (): void {
+    $m     = Fixtures::member(5000.00);
+    $pid   = Fixtures::product('__TX3__', 250.00, 10);
+    $cart  = Fixtures::cartWith($m, $pid, 2);
+    $addr  = ['billing_name' => 'TX', 'shipping_name' => 'TX', 'shipping_address' => '1 St'];
+    $before = (float) Fixtures::scalar('SELECT ewallet_balance FROM users WHERE id = ?', [$m]);
+    $pdo   = db();
+
+    // Replicate placeOrder()'s unit exactly: create + debit + paid, one
+    // transaction. The paid transition is forced to refuse by parking the
+    // order in a status the matrix will not move from.
+    $pdo->beginTransaction();
+    $orderId = ShopOrder::createFromCart($m, $cart, $addr, 'ewallet', 'IDEM-TX3');
+    $pdo->prepare("UPDATE shop_orders SET status = 'cancelled' WHERE id = ?")->execute([$orderId]);
+    $total = (float) Fixtures::scalar('SELECT total_price FROM shop_orders WHERE id = ?', [$orderId]);
+    $debit = Ewallet::debitInternal($m, $total, $orderId, 'shop_order', 'tx');
+    T::ok($debit, 'the debit itself succeeds');
+    T::ok(
+        ShopOrder::markPaid($orderId, 'system', null) === false,
+        'the paid transition then refuses'
+    );
+    // This is the controller's catch block.
+    $pdo->rollBack();
+
+    T::eq(
+        0,
+        (int) Fixtures::scalar('SELECT COUNT(*) FROM shop_orders WHERE id = ?', [$orderId]),
+        'the order row is gone'
+    );
+    T::eq(
+        0,
+        (int) Fixtures::scalar(
+            "SELECT COUNT(*) FROM ewallet_ledger WHERE ref_type = 'shop_order' AND reference_id = ?",
+            [$orderId]
+        ),
+        'no e-wallet debit row survived'
+    );
+    T::eq(
+        $before,
+        (float) Fixtures::scalar('SELECT ewallet_balance FROM users WHERE id = ?', [$m]),
+        'the balance is exactly what it was'
+    );
+    T::eq(
+        2,
+        (int) Fixtures::scalar(
+            'SELECT COALESCE(SUM(quantity), 0) FROM cart_items WHERE cart_id = ? AND product_id = ?',
+            [$cart, $pid]
+        ),
+        'the cart still holds both units'
+    );
+    T::eq(10, Fixtures::stockOf($pid), 'stock is untouched');
+});
+
+test('placeOrder() marks paid BEFORE it commits', function (): void {
+    // The controller cannot be invoked here — redirect() is `never`/exit — so
+    // the ordering that caused the defect is asserted structurally. The old
+    // code read commit(); markPaid(); cart-clear, which left money debited
+    // against a pending order whenever markPaid threw.
+    $src  = (string) file_get_contents(REPO_ROOT . '/controllers/MemberController.php');
+    $fn   = strpos($src, 'public function placeOrder()');
+    $next = strpos($src, 'public function ', ($fn ?: 0) + 10);
+    $body = substr($src, (int) $fn, (int) ($next - $fn));
+
+    // Scope to the e-wallet branch ONLY. An earlier version of this test
+    // searched the whole method, which passed even with the original bug
+    // because placeOrder() has a second, unrelated $pdo->commit() further down
+    // for the non-e-wallet path — so "some commit comes after markPaid" was
+    // true no matter where the money path actually committed.
+    $b0 = strpos($body, "if (\$method === 'ewallet')");
+    $b1 = strpos($body, "'Order placed and paid", (int) $b0);
+    T::ok($b0 !== false && $b1 !== false, 'the e-wallet branch can be located');
+    $branch = substr($body, (int) $b0, (int) $b1 - (int) $b0);
+
+    $pay   = strpos($branch, 'ShopOrder::markPaid($orderId');
+    $clear = strpos($branch, 'Cart::clear(');
+    $com   = strpos($branch, '$pdo->commit();', $pay === false ? 0 : $pay);
+
+    T::ok($pay !== false, 'the e-wallet branch calls markPaid');
+    T::ok($com !== false, 'the e-wallet branch commits');
+    T::ok($pay < $com, 'markPaid runs BEFORE the commit, so debit and paid are one atomic unit');
+    T::ok($clear !== false && $clear < $com, 'the cart is cleared before the commit, not after it');
+
+    // No commit may sit between the debit and the paid transition — that gap
+    // is the entire defect.
+    $debit = strpos($branch, 'Ewallet::debitInternal(');
+    T::ok($debit !== false, 'the e-wallet branch debits');
+    $gap = substr($branch, (int) $debit, (int) $pay - (int) $debit);
+    T::ok(
+        !str_contains($gap, '$pdo->commit();'),
+        'nothing commits between the debit and the paid transition'
+    );
+
+    // A refused payment must not leave the buyer thinking funds moved.
+    T::ok(
+        str_contains($branch, 'No funds have been taken.'),
+        'a refused payment tells the buyer no funds moved'
+    );
+});
+
+test('M4 — proof of delivery is written inside the transition, not after it', function (): void {
+    $m    = Fixtures::member();
+    $oid  = Fixtures::shippedOrder($m, Fixtures::product('__POD__', 100.00, 5));
+    $ship = (int) Fixtures::scalar(
+        "SELECT id FROM shop_shipments WHERE order_id = ? AND state = 'active' ORDER BY seq DESC LIMIT 1",
+        [$oid]
+    );
+    T::ok($ship > 0, 'the order has an active shipment');
+
+    T::ok(
+        ShopOrder::markDelivered($oid, Fixtures::admin(), 'J. Doe', 'shop_proofs/pod.jpg'),
+        'the delivered transition is accepted'
+    );
+    T::eq('delivered', Fixtures::statusOf($oid), 'the order is delivered');
+
+    $pod = Fixtures::scalar('SELECT pod_receiver FROM shop_shipments WHERE id = ?', [$ship]);
+    T::eq('J. Doe', (string) $pod, 'the POD receiver is stored on the shipment');
+
+    // Structural: the write must no longer live in markDelivered() after the
+    // transition returns. Ordering is the whole defect, so it is asserted.
+    $src = (string) file_get_contents(REPO_ROOT . '/models/ShopOrder.php');
+    $fn  = strpos($src, 'public static function markDelivered');
+    $nx  = strpos($src, 'public static function reship', $fn);
+    $body = substr($src, (int) $fn, (int) $nx - (int) $fn);
+
+    T::ok(
+        !str_contains($body, 'ShopShipment::savePod('),
+        'markDelivered() no longer calls savePod itself'
+    );
+    T::ok(
+        !str_contains($body, 'ShopShipment::activeFor('),
+        'markDelivered() no longer looks the shipment up after the fact'
+    );
+    T::ok(
+        str_contains($body, "'pod'         => [")
+        || (bool) preg_match("/'pod'\s*=>\s*\[/", $body),
+        'markDelivered() hands the POD to the transition instead'
+    );
+    T::ok(
+        str_contains($src, "\$to === 'delivered' && isset(\$opts['pod'])"),
+        'the POD write lives in the transition side-effect hook'
+    );
+});
+
+test('ShopRefund::markPaid is one transaction: credit and status move together', function (): void {
+    // Phase 6.3 asked this be confirmed, not rewritten: the method already
+    // wraps both statements. What had to be re-verified is that the credit
+    // cannot escape the transaction.
+    $src = (string) file_get_contents(REPO_ROOT . '/models/Ewallet.php');
+    $fn  = strpos($src, 'public static function credit');
+    $nx  = strpos($src, 'public static function ', ($fn ?: 0) + 10);
+    $credit = substr($src, (int) $fn, (int) $nx - (int) $fn);
+
+    T::ok(
+        !str_contains($credit, 'beginTransaction'),
+        'Ewallet::credit() opens no transaction of its own, so it cannot commit early'
+    );
+    T::ok(
+        !str_contains($credit, '->commit('),
+        'Ewallet::credit() never commits the caller work'
+    );
+});
+
+test('a refund cannot be paid twice', function (): void {
+    $m   = Fixtures::member();
+    $oid = Fixtures::cancelledOrder($m, Fixtures::product('__RF1__', 300.00, 5), 1);
+    $admin = Fixtures::admin();
+
+    $rid = Fixtures::refund($oid, 300.00, 'ewallet');
+    $before = (float) Fixtures::scalar('SELECT ewallet_balance FROM users WHERE id = ?', [$m]);
+
+    T::ok(ShopRefund::approve($rid, $admin), 'the refund is approved');
+    T::ok(ShopRefund::markPaid($rid, $admin, 'RCPT-1'), 'the first payout succeeds');
+
+    $after = (float) Fixtures::scalar('SELECT ewallet_balance FROM users WHERE id = ?', [$m]);
+    T::eq($before + 300.00, $after, 'the wallet was credited exactly once');
+
+    // Every replay must be a no-op.
+    T::ok(ShopRefund::markPaid($rid, $admin, 'RCPT-1') === false, 'the second payout is refused');
+    T::ok(ShopRefund::markPaid($rid, $admin, 'RCPT-2') === false, 'a third attempt is refused too');
+
+    T::eq(
+        $after,
+        (float) Fixtures::scalar('SELECT ewallet_balance FROM users WHERE id = ?', [$m]),
+        'the balance is unchanged by the replays'
+    );
+    T::eq(
+        1,
+        (int) Fixtures::scalar(
+            "SELECT COUNT(*) FROM ewallet_ledger WHERE user_id = ? AND type = 'credit' AND ref_type = 'shop_order' AND amount = 300.00",
+            [$m]
+        ),
+        'exactly one credit row exists for the refund'
+    );
+    T::eq('processed', (string) Fixtures::scalar('SELECT status FROM shop_refunds WHERE id = ?', [$rid]), 'the refund is processed');
+
+    // WHAT THIS DOES NOT PROVE — stated because the distinction decides whether
+    // the guard below is load-bearing.
+    //
+    // The sequential replays above are caught by the early
+    // `status !== 'approved'` check, which runs before the transaction opens.
+    // Disabling the rowCount guard entirely leaves every assertion above
+    // PASSING — verified by mutation. So those assertions do NOT exercise the
+    // race guard.
+    //
+    // The guard that actually matters is the concurrent one: two admins opening
+    // the same approved refund at the same instant. That is defended by
+    //   UPDATE ... WHERE id = ? AND status = 'approved'
+    // plus rowCount checking, so the loser's UPDATE matches zero rows and its
+    // transaction — including the credit already issued inside it — rolls back.
+    // A single-process test cannot reproduce it: with one connection the loser
+    // always re-reads 'processed' and short-circuits at the early check. It is
+    // asserted structurally below instead.
+    $src = (string) file_get_contents(REPO_ROOT . '/models/ShopRefund.php');
+    T::ok(
+        str_contains($src, "WHERE id = ? AND status = 'approved'"),
+        'the payout UPDATE is conditional on the refund still being approved'
+    );
+    T::ok(
+        (bool) preg_match('/rowCount\(\)\s*!==\s*1/', $src),
+        'a zero-row UPDATE rolls back rather than reporting success'
+    );
+    T::ok(
+        str_contains($src, "\$pdo->beginTransaction();"),
+        'the credit and the status move inside one transaction'
+    );
+});
+
+test('M6 — the refund payout route comes from the method enum, not free text', function (): void {
+    $admin = Fixtures::admin();
+
+    // A cash payout whose destination text mentions a wallet must NOT credit.
+    $m1 = Fixtures::member();
+    $o1 = Fixtures::cancelledOrder($m1, Fixtures::product('__RF2__', 200.00, 5), 1);
+    $r1 = Fixtures::refund($o1, 200.00, 'cash', 'Cash payout to GCash wallet later');
+    $b1 = (float) Fixtures::scalar('SELECT ewallet_balance FROM users WHERE id = ?', [$m1]);
+    T::ok(ShopRefund::approve($r1, $admin), 'cash refund approved');
+    T::ok(ShopRefund::markPaid($r1, $admin, 'RCPT-CASH'), 'the cash payout is processed');
+    T::eq(
+        $b1,
+        (float) Fixtures::scalar('SELECT ewallet_balance FROM users WHERE id = ?', [$m1]),
+        'free text mentioning a wallet no longer triggers a credit'
+    );
+    T::eq(0, (int) Fixtures::scalar("SELECT COUNT(*) FROM ewallet_ledger WHERE user_id = ? AND type = 'credit' AND amount = 200.00", [$m1]), 'no ledger credit for a cash payout');
+
+    // An e-wallet refund with unrelated destination text still credits.
+    $m2 = Fixtures::member();
+    $o2 = Fixtures::cancelledOrder($m2, Fixtures::product('__RF3__', 200.00, 5), 1);
+    $r2 = Fixtures::refund($o2, 200.00, 'ewallet', 'back to GCash');
+    $b2 = (float) Fixtures::scalar('SELECT ewallet_balance FROM users WHERE id = ?', [$m2]);
+    T::ok(ShopRefund::approve($r2, $admin), 'e-wallet refund approved');
+    T::ok(ShopRefund::markPaid($r2, $admin, 'RCPT-WALLET'), 'the e-wallet payout is processed');
+    T::eq(
+        $b2 + 200.00,
+        (float) Fixtures::scalar('SELECT ewallet_balance FROM users WHERE id = ?', [$m2]),
+        'the e-wallet method still credits'
+    );
+
+    // And the string heuristic is gone from the source entirely.
+    $src = (string) file_get_contents(REPO_ROOT . '/models/ShopRefund.php');
+    T::ok(
+        !str_contains($src, "str_contains(\$destination, 'wallet')"),
+        'the free-text wallet check is removed'
+    );
+});
+
+T::group('Phase 6 — ledger reconciliation and Strategy C');
+
+test('every shop order reconciles against the e-wallet ledger', function (): void {
+    // Phase 6.6.
+    //
+    // The sweep must build its own fixtures: test() calls resetState() before
+    // AND after every case, so a "sweep everything at the end" test would find
+    // an empty shop_orders table and pass by asserting nothing. That is the
+    // failure mode of a reconciliation check — it always agrees, because it
+    // never looks at anything.
+    $admin = Fixtures::admin();
+    $paidMember = Fixtures::member(5000.00);
+
+    // 1. e-wallet checkout: exactly one debit for exactly the order total.
+    $p1 = Fixtures::product('__RC1__', 120.00, 5);
+    $c1 = Fixtures::cartWith($paidMember, $p1, 2);
+    $addr = ['billing_name' => 'RC', 'shipping_name' => 'RC', 'shipping_address' => '1 St'];
+    $o1 = ShopOrder::createFromCart($paidMember, $c1, $addr, 'ewallet', 'IDEM-RC1');
+    $total1 = (float) Fixtures::scalar('SELECT total_price FROM shop_orders WHERE id = ?', [$o1]);
+    T::ok(Ewallet::debitInternal($paidMember, $total1, $o1, 'shop_order', 'rc'), 'the e-wallet debit is taken');
+    T::ok(ShopOrder::markPaid($o1, 'system', null), 'the e-wallet order is marked paid');
+
+    // 2. gcash checkout: money never touches the wallet.
+    $o2 = Fixtures::pendingOrder($paidMember, Fixtures::product('__RC2__', 90.00, 5), 1);
+
+    // 3. a refunded e-wallet order: exactly one credit.
+    $m3 = Fixtures::member();
+    $o3 = Fixtures::cancelledOrder($m3, Fixtures::product('__RC3__', 80.00, 5), 1);
+    $r3 = Fixtures::refund($o3, 80.00, 'ewallet');
+    ShopRefund::approve($r3, $admin);
+    ShopRefund::markPaid($r3, $admin, 'RCPT-A');
+
+    // 4. a refunded cash order: no credit at all.
+    $m4 = Fixtures::member();
+    $o4 = Fixtures::cancelledOrder($m4, Fixtures::product('__RC4__', 70.00, 5), 1);
+    $r4 = Fixtures::refund($o4, 70.00, 'cash', 'paid out at the branch');
+    ShopRefund::approve($r4, $admin);
+    ShopRefund::markPaid($r4, $admin, 'RCPT-B');
+
+    // Now sweep every order that exists.
+    $orders = db()->query("SELECT id, total_price, payment_method FROM shop_orders ORDER BY id")->fetchAll();
+    T::ok(count($orders) >= 4, 'the sweep has orders to inspect', 'count=' . count($orders));
+
+    $problems = [];
+    foreach ($orders as $o) {
+        $oid   = (int) $o['id'];
+        $debit = (float) Fixtures::scalar(
+            "SELECT COALESCE(SUM(amount), 0) FROM ewallet_ledger
+              WHERE ref_type = 'shop_order' AND reference_id = ? AND type = 'debit'",
+            [$oid]
+        );
+        $debitCount = (int) Fixtures::scalar(
+            "SELECT COUNT(*) FROM ewallet_ledger
+              WHERE ref_type = 'shop_order' AND reference_id = ? AND type = 'debit'",
+            [$oid]
+        );
+        $credit = (float) Fixtures::scalar(
+            "SELECT COALESCE(SUM(amount), 0) FROM ewallet_ledger
+              WHERE ref_type = 'shop_order' AND reference_id = ? AND type = 'credit'",
+            [$oid]
+        );
+
+        if ($o['payment_method'] === 'ewallet') {
+            if ($debitCount !== 1) {
+                $problems[] = "order {$oid}: {$debitCount} debits, expected 1";
+            }
+            if (abs($debit - (float) $o['total_price']) >= 0.005) {
+                $problems[] = "order {$oid}: debited {$debit}, total is {$o['total_price']}";
+            }
+        } elseif ($debitCount !== 0) {
+            $problems[] = "order {$oid}: {$o['payment_method']} order took a wallet debit";
+        }
+
+        // Credits must be fully explained by processed e-wallet refunds.
+        $expected = (float) Fixtures::scalar(
+            "SELECT COALESCE(SUM(amount), 0) FROM shop_refunds
+              WHERE order_id = ? AND status = 'processed' AND method = 'ewallet'",
+            [$oid]
+        );
+        if (abs($credit - $expected) >= 0.005) {
+            $problems[] = "order {$oid}: credited {$credit}, processed e-wallet refunds total {$expected}";
+        }
+    }
+    T::ok($problems === [], 'every order reconciles', implode('; ', $problems));
+});
+
+test('Strategy C — shop code never reaches into the commission engine', function (): void {
+    // Scoped to SHOP code. An earlier version scanned every model and
+    // controller and flagged AdminController, which legitimately drives the
+    // commission admin pages. Strategy C forbids the shop from borrowing the
+    // binary engine, not the reverse.
+    $shopFiles = [];
+    foreach (glob(REPO_ROOT . '/models/*.php') ?: [] as $f) {
+        $b = basename($f);
+        if (str_starts_with($b, 'Shop') || $b === 'Cart.php' || $b === 'Product.php') {
+            $shopFiles[$b] = (string) file_get_contents($f);
+        }
+    }
+
+    // Controllers contribute only their shop methods.
+    foreach (glob(REPO_ROOT . '/controllers/*.php') ?: [] as $f) {
+        $src = (string) file_get_contents($f);
+        if (preg_match_all('/function\s+(\w*[sS]hop\w*)\s*\(/', $src, $m, PREG_OFFSET_CAPTURE)) {
+            foreach ($m[1] as [$name, $off]) {
+                $end = strpos($src, "\n    public function ", $off);
+                $shopFiles[basename($f) . '::' . $name] = substr(
+                    $src,
+                    (int) $off,
+                    ($end === false ? strlen($src) : (int) $end) - (int) $off
+                );
+            }
+        }
+    }
+    T::ok(count($shopFiles) > 5, 'shop surface was located', 'files=' . count($shopFiles));
+
+    $hits = [];
+    foreach ($shopFiles as $name => $src) {
+        if (preg_match('/\bCommission::/', $src)) {
+            $hits[] = $name;
+        }
+    }
+    T::ok($hits === [], 'no shop code calls Commission::', implode(', ', $hits));
+
+    $pv = [];
+    foreach ($shopFiles as $name => $src) {
+        if (preg_match('/PV[1-4]|point_value|pair_value/i', $src)) {
+            $pv[] = $name;
+        }
+    }
+    T::ok($pv === [], 'no PV / point-value strings in shop code', implode(', ', $pv));
+});
+
+test('Strategy C — shop_orders.status is only written through the state machine', function (): void {
+    $offenders = [];
+    foreach (array_merge(
+        glob(REPO_ROOT . '/models/*.php') ?: [],
+        glob(REPO_ROOT . '/controllers/*.php') ?: []
+    ) as $f) {
+        $base = basename($f);
+        if ($base === 'ShopOrder.php') continue; // transition() / resume() live here
+
+        $src = (string) file_get_contents($f);
+        // A direct write of the status column outside the state machine.
+        if (preg_match('/UPDATE\s+shop_orders\s+SET\s+(?:[^;]*,\s*)?status\s*=/i', $src)) {
+            $offenders[] = $base;
+        }
+    }
+    T::ok(
+        $offenders === [],
+        'no direct shop_orders.status UPDATE outside ShopOrder.php',
+        implode(', ', $offenders)
+    );
+
+    $order = (string) file_get_contents(REPO_ROOT . '/models/ShopOrder.php');
+    T::ok(
+        substr_count($order, 'UPDATE shop_orders') >= 1,
+        'ShopOrder.php still owns the conditional status write'
+    );
+});
+
 exit(T::summary());

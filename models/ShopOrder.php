@@ -150,7 +150,16 @@ class ShopOrder
 
         $rule = self::TRANSITIONS[$to];
         $pdo  = db();
-        $pdo->beginTransaction();
+
+        // Transaction-aware (Phase 6.1): adopt the caller's transaction when one
+        // is already open — placeOrder() wraps create + debit + paid in a single
+        // unit, so that path must reach into this method rather than around it.
+        // Otherwise own one, as before. PDO throws on a nested beginTransaction,
+        // which is why this cannot simply be unconditional.
+        $ownsTxn = !$pdo->inTransaction();
+        if ($ownsTxn) {
+            $pdo->beginTransaction();
+        }
 
         try {
             // 1. Lock the row.
@@ -158,7 +167,7 @@ class ShopOrder
             $st->execute([$orderId]);
             $order = $st->fetch();
             if (!$order) {
-                $pdo->rollBack();
+                if ($ownsTxn) $pdo->rollBack();
                 return false;
             }
 
@@ -173,18 +182,18 @@ class ShopOrder
             //      apply to everyone.
             $fromList = $rule['from'][$actorType] ?? $rule['from'];
             if (!in_array($effective, $fromList, true)) {
-                $pdo->rollBack();
+                if ($ownsTxn) $pdo->rollBack();
                 return false;
             }
             if (!in_array($actorType, $rule['actors'], true)) {
-                $pdo->rollBack();
+                if ($ownsTxn) $pdo->rollBack();
                 return false;
             }
 
             // 6. Named guards — any false refuses the transition.
             foreach (($opts['guards'] ?? []) as $guard) {
                 if (!$guard($order, $opts)) {
-                    $pdo->rollBack();
+                    if ($ownsTxn) $pdo->rollBack();
                     return false;
                 }
             }
@@ -219,12 +228,12 @@ class ShopOrder
             $st = $pdo->prepare($sql);
             $st->execute($params);
             if ($st->rowCount() !== 1) {
-                $pdo->rollBack();
+                if ($ownsTxn) $pdo->rollBack();
                 return false;
             }
 
             // 9. Side effects for the target status.
-            self::applySideEffects($pdo, $orderId, $to, $order);
+            self::applySideEffects($pdo, $orderId, $to, $order, $opts);
 
             // 10. Append-only audit row (same transaction).
             ShopOrderEvent::log(
@@ -241,7 +250,12 @@ class ShopOrder
                 ]
             );
 
-            $pdo->commit();
+            // Commit only a transaction we opened. When we adopted the caller's,
+            // committing here would end the caller's unit early — placeOrder()
+            // still has the cart clear and the ledger assertion to do.
+            if ($ownsTxn) {
+                $pdo->commit();
+            }
             return true;
         } catch (StockConflictException $e) {
             // Handoff stock conflict (§0.3): the transition is REFUSED, not an
@@ -255,19 +269,24 @@ class ShopOrder
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            $from = $order['status'] ?? null;
-            ShopOrderEvent::log(
-                $orderId,
-                $from,
-                $from ?? $to,
-                $actorType,
-                $actorId,
-                [
-                    'reason_code' => 'stock_conflict',
-                    'note'        => 'Handoff refused — insufficient stock for one or more lines',
-                    'source'      => $opts['source'] ?? 'ui',
-                ]
-            );
+            // The audit row is written AFTER the rollback on purpose, so it
+            // survives. That is only safe when we owned the transaction; if the
+            // caller's is still open the refusal is the caller's to report.
+            if ($ownsTxn) {
+                $from = $order['status'] ?? null;
+                ShopOrderEvent::log(
+                    $orderId,
+                    $from,
+                    $from ?? $to,
+                    $actorType,
+                    $actorId,
+                    [
+                        'reason_code' => 'stock_conflict',
+                        'note'        => 'Handoff refused — insufficient stock for one or more lines',
+                        'source'      => $opts['source'] ?? 'ui',
+                    ]
+                );
+            }
             return false;
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) {
@@ -282,7 +301,7 @@ class ShopOrder
      * the stock deduction at courier handoff (shipped), deadline stamps, and
      * hold-field cleanup. All statements assume an open transaction on $pdo.
      */
-    private static function applySideEffects(PDO $pdo, int $orderId, string $to, array $order): void
+    private static function applySideEffects(PDO $pdo, int $orderId, string $to, array $order, array $opts = []): void
     {
         // Reservation-state move, scoped to the states it is legal from (§0.3).
         if (isset(self::RESERVATION_ON[$to])) {
@@ -298,6 +317,28 @@ class ShopOrder
             );
             // Placeholder order: SET ? then WHERE order_id ? then IN-list values.
             $st->execute(array_merge([$move['to'], $orderId], $move['from']));
+        }
+
+        // M4 (Phase 6.2): proof of delivery is written HERE, inside the
+        // transition's transaction.
+        //
+        // It used to be written by markDelivered() *after* transition() had
+        // already committed. A POD write that failed - a constraint violation,
+        // a dropped connection - therefore left an order sitting in `delivered`
+        // with no proof of delivery and nothing to retry from: the status was
+        // durable, the evidence was not. Proof of delivery is the compliance
+        // artifact for the whole fulfilment leg, so it must move atomically
+        // with the status that claims it exists.
+        if ($to === 'delivered' && isset($opts['pod']) && is_array($opts['pod'])) {
+            $pod = $opts['pod'];
+            $st = $pdo->prepare(
+                "SELECT id FROM shop_shipments WHERE order_id = ? AND state = 'active' ORDER BY seq DESC LIMIT 1"
+            );
+            $st->execute([$orderId]);
+            $shipmentId = $st->fetchColumn();
+            if ($shipmentId) {
+                ShopShipment::savePod((int) $shipmentId, $pod);
+            }
         }
 
         // Re-upload after rejection (payment_failed → payment_review) brings
@@ -1056,24 +1097,19 @@ class ShopOrder
             return false; // POD required (S27)
         }
 
-        // POD facts live on shop_shipments (§2.3), written by savePod after the
-        // transition commits — the order row itself carries no POD columns.
-        $ok = self::transition($orderId, 'delivered', 'admin', $adminId, [
+        // POD facts live on shop_shipments (§2.3), written by applySideEffects
+        // inside the transition's transaction - the order row itself carries no
+        // POD columns (M4, Phase 6.2).
+        return self::transition($orderId, 'delivered', 'admin', $adminId, [
             'reason_code' => 'delivered',
             'note'        => $podReceiver ? "Received by {$podReceiver}" : 'POD photo stored',
+            'pod'         => [
+                'pod_receiver'      => $podReceiver,
+                'pod_image'         => $podImage,
+                'delivered_at'      => date('Y-m-d H:i:s'),
+                'report_window_end' => date('Y-m-d H:i:s', time() + max(1, (int) setting('shop_report_window_days', '5')) * 86400),
+            ],
         ]);
-        if ($ok) {
-            $s = ShopShipment::activeFor($orderId);
-            if ($s) {
-                ShopShipment::savePod((int) $s['id'], [
-                    'pod_receiver'      => $podReceiver,
-                    'pod_image'         => $podImage,
-                    'delivered_at'      => date('Y-m-d H:i:s'),
-                    'report_window_end' => date('Y-m-d H:i:s', time() + max(1, (int) setting('shop_report_window_days', '5')) * 86400),
-                ]);
-            }
-        }
-        return $ok;
     }
 
     /**
