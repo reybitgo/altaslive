@@ -1444,8 +1444,8 @@ test('the admin delete flow: modal when free, toast when referenced', function (
     // class. Asserting the guard and the classList.add is what actually
     // distinguishes working from broken.
     T::ok(
-        str_contains($view, "if (form.dataset.blocked === '1')"),
-        'a blocked product short-circuits before any request is made'
+        str_contains($view, "if (action === 'delete' && form.dataset.blocked === '1')"),
+        'a blocked delete short-circuits before any request is made'
     );
     T::ok(
         str_contains($view, "showToast(form.dataset.reason"),
@@ -1483,6 +1483,80 @@ test('the admin delete flow: modal when free, toast when referenced', function (
         !str_contains((string) preg_replace('#//[^\n]*#', '', $app), 'modal-dialog-centered modal-dialog-centered'),
         'the dialog class is not doubled up'
     );
+});
+
+test('disabling a product hides it from the shop and is reversible', function (): void {
+    $m   = Fixtures::member();
+    $pid = Fixtures::product('__DIS__', 60.00, 5);
+    $cartId = (int) Cart::getOrCreate($m)['id'];
+
+    T::ok(Product::setStatus($pid, 'inactive'), 'a product can be disabled');
+    T::eq('inactive', (string) Fixtures::scalar('SELECT status FROM products WHERE id = ?', [$pid]), 'the row is inactive');
+
+    // The two things that make disabling mean anything.
+    $storefront = array_map('intval', array_column(Product::active(), 'id'));
+    T::ok(!in_array($pid, $storefront, true), 'a disabled product leaves the storefront');
+    T::throws(
+        InvalidArgumentException::class,
+        static fn() => Cart::addItem($cartId, $pid, 1),
+        'a disabled product cannot be added to a cart'
+    );
+
+    // And it must not damage history: an existing order line is untouched.
+    $oid = Fixtures::pendingOrder($m, $pid, 2);
+    T::ok(Product::setStatus($pid, 'active'), 'a product can be enabled again');
+    T::eq('active', (string) Fixtures::scalar('SELECT status FROM products WHERE id = ?', [$pid]), 'the row is active again');
+    T::ok(
+        in_array($pid, array_map('intval', array_column(Product::active(), 'id')), true),
+        'it returns to the storefront'
+    );
+    T::eq(
+        2,
+        (int) Fixtures::scalar('SELECT quantity FROM shop_order_items WHERE order_id = ? AND product_id = ?', [$oid, $pid]),
+        'the existing order line is untouched by the catalog change'
+    );
+
+    T::ok(Cart::addItem($cartId, $pid, 1), 'it can be added to a cart once re-enabled');
+
+    // A typo must not reach the enum and come back as a 500.
+    T::throws(
+        InvalidArgumentException::class,
+        static fn() => Product::setStatus($pid, 'discontinued'),
+        'an unknown status is refused'
+    );
+    T::ok(Product::setStatus(999999, 'inactive') === false, 'an unknown product is refused');
+});
+
+test('the Disable button reuses the delete modal, toast and in-place update', function (): void {
+    $view = (string) file_get_contents(REPO_ROOT . '/views/admin/shop_products.php');
+    $ctrl = (string) file_get_contents(REPO_ROOT . '/controllers/AdminController.php');
+
+    // The row-level Disable/Enable toggle was removed; status changes go
+    // through the edit modal's Status dropdown. The endpoint stays — a
+    // registered, admin-only route costs nothing and keeps non-JS posts and
+    // any direct status post working.
+    T::ok(!str_contains($view, "'Disable' : 'Enable'"), 'the row-level Disable button is gone from the view');
+    T::ok(!str_contains($view, 'data-action="status"'), 'no status form is rendered per row');
+    T::ok(str_contains($view, 'name="status"'), 'the edit modal still offers the Status field');
+
+    T::ok(str_contains($view, '.js-product-action-form'), 'the delete form handler is present');
+    T::ok(!str_contains($view, 'js-delete-product-form'), 'the old delete-only handler name is gone');
+    T::ok(str_contains($view, 'function copyFor('), 'the modal wording is chosen per action');
+    T::ok(!str_contains($view, 'function applyStatus('), 'no in-place status updater is left behind');
+
+    // The wording must state that delete is not reversible.
+    T::ok(str_contains($view, 'This cannot be undone'), 'the delete modal still says it is permanent');
+
+    // Route + endpoint, admin-only, CSRF-checked, and sharing the AJAX contract.
+    $routes = (string) file_get_contents(REPO_ROOT . '/index.php');
+    T::ok(str_contains($routes, "'admin_product_status'"), 'the route exists');
+    T::ok(
+        (bool) preg_match("/'admin_product_status'\s*=>\s*\['AdminController',\s*'productStatus',\s*'admin'\]/", $routes),
+        'the route is admin-only'
+    );
+    T::ok(str_contains($ctrl, 'public function productStatus'), 'the endpoint exists');
+    T::ok(str_contains($ctrl, 'json_response([\'ok\' => $ok, \'message\' => $msg, \'status\' => $status])'), 'it returns the new status so the row can update');
+    T::ok(str_contains($view, 'data-role="status-badge"'), 'the status badge is addressable for the in-place update');
 });
 
 exit(T::summary());

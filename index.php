@@ -370,6 +370,7 @@ $routes = [
     'shop_confirm_receipt'        => ['MemberController', 'confirmShopReceipt','member'],
     // â”€â”€ Admin Shop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     'admin_shop'                  => ['AdminController',  'shopProducts',      'admin'],
+    'admin_product_status'         => ['AdminController',  'productStatus',     'admin'],
     'admin_save_product'          => ['AdminController',  'saveShopProduct',   'admin'],
     'admin_delete_product'        => ['AdminController',  'deleteShopProduct', 'admin'],
     'admin_shop_orders'           => ['AdminController',  'shopOrders',        'admin'],

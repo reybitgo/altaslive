@@ -1025,7 +1025,49 @@ class AdminController
         redirect('/?page=admin_shop');
     }
 
-    public function deleteShopProduct(): void
+        /**
+         * Enable / disable a product without deleting it.
+         *
+         * The reversible counterpart to deleteShopProduct(). Shares its AJAX
+         * contract — ?ajax=1 answers JSON, anything else redirects with a flash
+         * — so the page can update in place and a non-JS post still works.
+         */
+        public function productStatus(): void
+        {
+            Auth::guard('admin');
+            csrf_verify();
+
+            $id     = (int) ($_POST['product_id'] ?? 0);
+            $status = (string) ($_POST['status'] ?? '');
+            $name   = (string) ($_POST['name'] ?? 'this product');
+            $name   = mb_substr($name, 0, 160);
+
+            $wantsJson = (($_GET['ajax'] ?? '') === '1')
+                || str_contains(strtolower((string) ($_SERVER['HTTP_ACCEPT'] ?? '')), 'application/json')
+                || strtolower((string) ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'xmlhttprequest';
+
+            try {
+                Product::setStatus($id, $status);
+                $ok  = true;
+                $msg = $status === 'inactive'
+                    ? "'{$name}' is now disabled. It is hidden from the shop and members cannot add it to a cart."
+                    : "'{$name}' is now enabled and visible in the shop.";
+            } catch (Throwable $e) {
+                error_log('[shop] productStatus failed: ' . $e->getMessage());
+                $ok  = false;
+                $msg = $e instanceof InvalidArgumentException
+                    ? $e->getMessage()
+                    : 'Could not update the product status. Please try again.';
+            }
+
+            if ($wantsJson) {
+                json_response(['ok' => $ok, 'message' => $msg, 'status' => $status]);
+            }
+            flash($ok ? 'success' : 'error', $msg);
+            redirect('/?page=admin_shop' . ($_POST['edit_id'] ?? '' ? '&edit=' . (int) $_POST['edit_id'] : ''));
+        }
+
+        public function deleteShopProduct(): void
     {
         Auth::guard('admin');
         csrf_verify();

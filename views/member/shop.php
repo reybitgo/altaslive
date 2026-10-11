@@ -34,11 +34,8 @@
         <?php
           $cartItems = [];
           if ($cartId) {
-            $raw = Cart::getItems($cartId);
-            foreach ($raw as $row) {
-              $cartItems[(int) $row['product_id']] = [
-                'quantity' => (int) $row['quantity'],
-              ];
+            foreach (Cart::getItems($cartId) as $row) {
+              $cartItems[(int) $row['product_id']] = true;   // presence only; the card just renders "Already in cart"
             }
           }
           // One batched query for the whole catalog instead of two per card (M7).
@@ -74,32 +71,18 @@
                   </div>
                   <?php if (!$soldOut): ?>
                     <?php $inCart = $cartId && isset($cartItems[(int) $p['id']]); ?>
-                    <?php $inCartQty = $inCart ? (int) $cartItems[(int) $p['id']]['quantity'] : 0; ?>
-                    <form method="post" action="<?= link_to('add_to_cart') ?>" data-product-id="<?= (int) $p['id'] ?>"<?= $inCart ? ' data-in-cart="1"' : '' ?>>
+                    <form method="post" action="<?= link_to('add_to_cart') ?>" data-product-id="<?= (int) $p['id'] ?>">
                       <?= csrf_field() ?>
                       <input type="hidden" name="product_id" value="<?= (int) $p['id'] ?>">
-                      <?php /* M10: 43c0928 replaced this with a hidden value="1" and hard-disabled
-                               the button for anything already in the cart, so a buyer could only
-                               ever add one unit and could not top the cart up from the
-                               storefront at all. Restored as a real stepper.
-                               max is $avail, but Cart::addItem() re-checks cumulatively
-                               (existing + requested > available) and throws, so this control
-                               is a convenience and never the authority. */ ?>
-                      <div class="input-group input-group-sm mb-2">
-                        <span class="input-group-text">Qty</span>
-                        <input type="number" name="quantity" class="form-control shop-qty-input"
-                               min="1" max="<?= (int) $avail ?>" value="1"
-                               aria-label="Quantity to add for <?= e($p['name']) ?>">
-                      </div>
-                      <button type="submit" class="btn btn-primary shop-add-btn w-100">
-                        <?= $inCart ? 'Add more' : 'Add to cart' ?>
+                      <?php /* The card adds exactly one unit per click (the
+                               controller defaults quantity to 1). Adjusting a
+                               line up/down is the cart page's job — it has the
+                               real stepper — so no Qty field is offered here. */ ?>
+                      <button type="submit" class="btn btn-primary shop-add-btn w-100"
+                              <?= $inCart ? 'aria-disabled="true" disabled' : '' ?>>
+                        <?= $inCart ? 'Already in cart' : 'Add to cart' ?>
                       </button>
                     </form>
-                    <?php if ($inCart): ?>
-                      <div class="text-success small shop-already-in-cart mt-1" role="status">
-                        <?= $inCartQty ?> already in the cart
-                      </div>
-                    <?php endif; ?>
                   <?php endif; ?>
                 </div>
               </div>

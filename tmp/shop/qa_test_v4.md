@@ -150,19 +150,19 @@ shipped  →  out_for_delivery  →  delivered  →  completed
 
 1. Go to <http://localhost/altaslive/?page=shop>.
 2. Find **QA Widget** (₱100.00).
-3. You will see a **Qty** box on the card, with a number in it, and an **Add to cart** button.
-4. Leave Qty at `1`. Click **Add to cart**.
+3. You will see an **Add to cart** button on the card (no Qty box — the card always adds one unit per click).
+4. Click **Add to cart**.
 5. **PASS if:**
    - a green message **"Added to cart."** appears,
    - the 🛒 cart icon at the top shows a badge with **1**,
    - the cart drawer slides in from the right showing QA Widget,
-   - the card's button now reads **Add more** (still clickable), and under it says *"1 already in the cart"*.
+   - the card's button now reads **Already in cart** (disabled); no quantity notice is shown under it.
 
-> **What changed on 2026-10-10:** this card used to be a dead end — once a product was in your cart, the button was
-> disabled and you could never buy a second one from the shop page. The Qty stepper and the **Add more** button were
-> restored. If you see a disabled "Already in cart" button, you are looking at an older build — report it.
+> **What changed on 2026-10-11:** the card's Qty stepper was removed — the card always adds exactly one unit per click,
+> and once the product is in your cart the button reads disabled **Already in cart**. To buy more than one, open the
+> cart (drawer or `?page=cart`) and use the quantity stepper there.
 
-6. Set the card's **Qty** to `2` and click **Add more**.
+6. Open the drawer, set the QA Widget line's quantity to `2` (use the **+** button or type it), and click **Update**.
 7. **PASS if** the drawer badge and the 🛒 badge both read **2**, and the drawer shows a subtotal of `200.00 PHP`.
 8. Click **View full cart** in the drawer.
 9. **PASS if** you land on the cart page (`?page=cart`) and it lists **QA Widget**, quantity **2**, line total **200.00**.
@@ -177,7 +177,7 @@ The shop must never let you order more items than exist. Let's prove it refuses.
 
 1. **In Window W**, click **Edit** on `QA Widget`, set **Stock** to `2`, click **Update Product**.
 2. **In Window M**, go back to the shop page (press F5 to refresh).
-3. Click **Add more** on the card — or open the cart and set the quantity to `3`.
+3. Open the cart and set the quantity to `3` (the card's button is disabled once the item is in the cart).
 4. **PASS if** a red message appears saying exactly:
 
    ```
@@ -215,8 +215,10 @@ You will place **two** orders: one paying with the e-wallet, one paying by hand 
    - City, Province, Postal
    - Billing name, Billing phone
 4. Choose a payment method.
-5. Tick the **terms** checkbox.
-6. Click **Place order**.
+5. **Before ticking terms:** the **Place order** button should be greyed out, reading
+   *"Tick the terms checkbox to place your order"*. Try clicking it — nothing submits.
+6. Tick the **terms** checkbox.
+7. **PASS if** the button turns solid blue, reads **Place order**, and clicking it places the order.
 
 > **If your e-wallet balance is too low:** the **E-Wallet** radio button will be *greyed out* and a red note will say
 > your balance does not cover the order. That is correct behaviour (new as of 2026-10-10) — pick another method, or ask
@@ -490,8 +492,8 @@ Five minutes. It catches things only a human can.
 
 1. Open the shop page and press **Tab** repeatedly from the top of the page.
    - **PASS if** focus moves through the links and buttons in a sensible order and you can always see where focus is.
-2. Click into the **Qty** box on a product card. If you have a screen reader, tab to the **+** button and confirm it
-   announces something like *"Increase quantity of QA Widget"*.
+2. Tab to a product card's **Add to cart** button — it should be a single, clearly labelled control (the card has no
+   Qty box; quantity is adjusted in the cart).
    - Without a screen reader, use the browser's accessibility inspector (Chrome: F12 → Elements → right-click an
      element → Inspect Accessibility).
 3. **PASS if** every field on the checkout page has a real label attached to it. A quick way to check: click the grey
@@ -518,7 +520,7 @@ developer something true. A ticked box you did not check is worse than no box at
 - [ ] Expired pending orders auto-cancelled; **payment_review orders were NEVER expired**.
 - [ ] `shop_enabled=0` closed the shop; re-enabled it.
 - [ ] Cart and drawer badges always matched the real cart contents; an empty cart showed "Cart is empty" and no Checkout button.
-- [ ] The product card offered a **Qty stepper** and an enabled **Add more** button (not a dead "Already in cart").
+- [ ] The product card offered a single **Add to cart** button with no Qty stepper, and read disabled **Already in cart** once the item was in the cart.
 - [ ] Repeated clicks on one cart row never left the quantity and the badge disagreeing.
 - [ ] With a balance below the order total, the **E-Wallet radio was disabled** with an explanatory note.
 - [ ] A failed checkout **kept the delivery address** that had been typed.

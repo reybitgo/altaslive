@@ -62,6 +62,30 @@ class Product {
         return $out;
     }
 
+    /**
+     * Flip a product between active and inactive.
+     *
+     * Disabling is the reversible half of deleting: the product leaves the
+     * storefront (Product::active() filters on status) and Cart::addItem()
+     * refuses it, while existing orders keep their line items untouched —
+     * the historical order is not edited by a catalog change.
+     *
+     * The status is validated here rather than at the call site so the enum
+     * can never be handed a value MySQL would truncate, which is the same
+     * failure shape as defect H4.
+     */
+    public static function setStatus(int $id, string $status): bool
+    {
+        if (!in_array($status, ['active', 'inactive'], true)) {
+            throw new InvalidArgumentException('Unknown product status: ' . $status);
+        }
+        if (!self::find($id)) return false;
+
+        $st = db()->prepare('UPDATE products SET status = ? WHERE id = ? AND status <> ?');
+        $st->execute([$status, $id, $status]);
+        return true;
+    }
+
     public static function availableStock(int $productId): int {
         $product = self::find($productId);
         if (!$product) return 0;

@@ -98,7 +98,7 @@
             <?php if (!empty($items) && !$stockErrors): ?>
               <a href="<?= link_to('checkout') ?>" class="btn btn-primary w-100" id="checkoutBtn">Proceed to checkout</a>
             <?php elseif (!empty($stockErrors)): ?>
-              <button class="btn btn-primary w-100" disabled>Fix stock issues to continue</button>
+              <button class="btn btn-primary w-100" disabled>Out of stock</button>
             <?php endif; ?>
           </div>
         </div>

@@ -138,5 +138,27 @@ ok(/class="btn-close btn-close-white flex-shrink-0"/.test(html), "the close butt
 ok(html.includes("Insufficient stock."), "the message text is present");
 ok(!html.includes("<script"), "the message is escaped");
 
+// ── the admin product page script ─────────────────────────────────────────
+// Its handler is an inline <script> in the view, so it is checked here by
+// source rather than executed: it depends on fetch and on the CSRF token the
+// page renders, neither of which exist in this stub. The parts that decide
+// behaviour are the guards and the copy, and those are greppable.
+const view = fs.readFileSync(
+  path.join(__dirname, "..", "..", "views", "admin", "shop_products.php"),
+  "utf8"
+);
+ok(!/js-delete-product-form/.test(view), "the delete-only handler name is fully retired");
+ok(/\.js-product-action-form/.test(view), "the delete form handler is present");
+ok(
+  /if \(action === 'delete' && form\.dataset\.blocked === '1'\)/.test(view),
+  "the blocked short-circuit applies to delete"
+);
+ok(!/data-action="status"/.test(view), "the row-level Disable/Enable button and its status handler are gone");
+ok(!/function applyStatus\(/.test(view), "no status-flip updater is left behind");
+ok(
+  /var CSRF = '<\?= e\(csrf_token\(\)\) \?>'/.test(view),
+  "the CSRF token is emitted with e() inside a script block, not js()"
+);
+
 console.log(failures === 0 ? "\nJS OK" : `\nJS FAILED (${failures})`);
 process.exit(failures === 0 ? 0 : 1);

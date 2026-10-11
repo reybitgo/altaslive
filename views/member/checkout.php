@@ -54,8 +54,8 @@
                   <input type="text" id="shipping_postal" name="shipping_postal" class="form-control" maxlength="20" value="<?= e($old['shipping_postal'] ?? '') ?>">
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label" for="billing_name">Billing name</label>
-                  <input type="text" id="billing_name" name="billing_name" class="form-control" maxlength="120"
+                  <label class="form-label" for="billing_name">Billing name *</label>
+                  <input type="text" id="billing_name" name="billing_name" class="form-control" maxlength="120" required
                          value="<?= e($old['billing_name'] ?? (Auth::user()['full_name'] ?? '')) ?>">
                   <div class="form-text">Name shown on the payment records.</div>
                 </div>
@@ -80,7 +80,7 @@
               // wallet could pick it, fill in every address field, press Place
               // order, and have the whole form discarded by the failure path.
               $ewalletBalance = Ewallet::balance(Auth::id());
-              $ewalletEnough  = $ewalletBalance + 0.005 >= (float) $cartTotals['total_price'];
+              $ewalletEnough  = $ewalletBalance + 0.005 >= (float) $totals['total_price'];
               // Anything the buyer typed on a failed attempt comes back with
               // them (see shop_checkout_old_input()).
               $old = shop_checkout_old_input();
@@ -142,7 +142,14 @@
               </div>
             </div>
             <div class="card-footer">
-              <button type="submit" class="btn btn-primary w-100" id="placeOrderBtn" data-busy-label="Placing order…">Place order</button>
+              <?php /* The button is disabled until the terms checkbox is ticked.
+                       admin-checked server-side too (placeOrder() refuses
+                       without terms=1), this is the UI convenience that stops
+                       the member pressing an order they haven't agreed to. JS
+                       below binds the checkbox to this button's disabled state. */ ?>
+              <button type="submit" class="btn btn-primary w-100" id="placeOrderBtn" data-busy-label="Placing order…" disabled
+                      data-terms-label="Tick the terms checkbox to place your order"
+                      aria-describedby="terms">Place order</button>
               <a href="<?= link_to('cart') ?>" class="btn btn-link btn-sm w-100 mt-2" style="text-decoration:none;">← Back to cart</a>
             </div>
           </div>
@@ -166,6 +173,24 @@
   var btn  = document.getElementById('placeOrderBtn');
   if (!form || !btn) return;
 
+  // Terms gate (M8/bis): Place order stays disabled until the checkbox is
+  // ticked. placeOrder() still refuses server-side without terms=1, so this
+  // is a convenience, not the authority. The page (re)renders with the button
+  // already disabled (previous failed attempts come back un-ticked), and a
+  // BFCache restore re-derives the state from the checkbox below.
+  var terms = document.getElementById('terms');
+  var termsLabelText = 'Place order';
+  var termsHintText = btn.dataset.termsLabel || 'Tick the terms checkbox to place your order';
+  function syncTermsGate() {
+    var ok = terms && terms.checked;
+    btn.disabled = !ok || sent;
+    btn.textContent = ok || sent ? termsLabelText : termsHintText;
+  }
+  if (terms) {
+    terms.addEventListener('change', syncTermsGate);
+    syncTermsGate();
+  }
+
   // E-wallet is disabled at render time when the balance is short. This is a
   // convenience only — placeOrder() re-checks the balance server-side inside
   // the transaction — but it stops the member filling in the whole form only
@@ -186,6 +211,13 @@
       shortfall.classList.remove('d-none');
       return;
     }
+    if (!terms || !terms.checked) {
+      // Belt and braces: a form submit can be scripted without the checkbox,
+      // so refuse it here too rather than relying on the disabled attribute.
+      e.preventDefault();
+      syncTermsGate();
+      return;
+    }
     if (sent) { e.preventDefault(); return; }
     sent = true;
     // Disable only the button, NOT the form: a disabled control's name/value
@@ -199,7 +231,7 @@
   window.addEventListener('pageshow', function (e) {
     if (!e.persisted) return;
     sent = false;
-    btn.disabled = false;
+    syncTermsGate();   // re-derives disabled + label from the checkbox state
   });
 })();
 </script>

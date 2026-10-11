@@ -1345,9 +1345,22 @@ class MemberController
             'shipping_postal'   => trim((string) ($_POST['shipping_postal'] ?? '')),
             'notes_member'      => trim((string) ($_POST['notes_member'] ?? '')),
         ];
-        if ($addr['billing_name'] === '' || $addr['shipping_name'] === '' || $addr['shipping_address'] === '') {
+        // All three are required; the message names whichever are actually
+        // blank so a member with only Billing name empty is not told to
+        // "fill in the recipient name" they already typed.
+        $missing = [];
+        if ($addr['billing_name'] === '') {
+            $missing[] = 'billing name';
+        }
+        if ($addr['shipping_name'] === '') {
+            $missing[] = 'recipient name';
+        }
+        if ($addr['shipping_address'] === '') {
+            $missing[] = 'delivery address';
+        }
+        if ($missing) {
             shop_checkout_remember_input($_POST);
-            flash('error', 'Please fill in the recipient name and delivery address.');
+            flash('error', 'Please fill in the ' . implode(', ', $missing) . '.');
             redirect('/?page=checkout');
         }
         if (($_POST['terms'] ?? '') !== '1') {
