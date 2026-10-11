@@ -31,6 +31,28 @@ public const BLOCKING_STATUSES = ['open', 'approved'];
      */
     public const CAUSES = ['admin_cancel', 'delivery_failure', 'customer_dispute', 'other'];
 
+    /**
+     * shop_refunds.method values — the payout route. Kept in step with the
+     * ENUM in install.sql.
+     *
+     * This is the field that decides whether markPaid() credits the e-wallet.
+     * It used to be inferred from the free-text `destination` column — a
+     * substring test for the word "wallet" — which M6 removed precisely
+     * because an unconstrained VARCHAR cannot carry that decision safely.
+     *
+     * Adding the parameter exposed a gap: the admin refund form collects
+     * `destination` but never sent `method`, so every refund created from the
+     * UI fell back to the column default 'ewallet' — meaning a GCash refund
+     * silently paid into the member's wallet. The model was right and the UI
+     * was lying. It now sends an explicit method.
+     *
+     * The four values below are exactly the install.sql ENUM. Do not add a
+     * fifth here without a matching migration: an option the ENUM rejects is
+     * "Data truncated for column 'method'", which is the same 500 that defect
+     * H4 was about. GCash and every other non-wallet route use 'manual'.
+     */
+    public const METHODS = ['ewallet', 'cash', 'bank', 'manual'];
+
     public static function forOrder(int $orderId): array
     {
         $st = db()->prepare("SELECT * FROM shop_refunds WHERE order_id = ? ORDER BY created_at ASC, id ASC");
@@ -88,7 +110,8 @@ public const BLOCKING_STATUSES = ['open', 'approved'];
         string $cause,
         ?string $destination = null,
         ?string $promisedAt = null,
-        ?int $requestedBy = null
+        ?int $requestedBy = null,
+        string $method = 'ewallet'
     ): int {
         self::assertNotSelfReview(self::buyerOf($orderId));
         // Without this guard an unrecognised cause reaches MySQL and dies with
@@ -98,11 +121,17 @@ public const BLOCKING_STATUSES = ['open', 'approved'];
         if (!in_array($cause, self::CAUSES, true)) {
             throw new InvalidArgumentException('Unknown refund cause: ' . $cause);
         }
+        // Same reasoning for the payout route: a typo here would otherwise be
+        // silently truncated by MySQL, and the refund would default to a wallet
+        // credit the admin did not ask for.
+        if (!in_array($method, self::METHODS, true)) {
+            throw new InvalidArgumentException('Unknown refund method: ' . $method);
+        }
         $st = db()->prepare(
-            "INSERT INTO shop_refunds (order_id, amount, cause, destination, promised_at, requested_by, status)
-             VALUES (?, ?, ?, ?, ?, ?, 'open')"
+            "INSERT INTO shop_refunds (order_id, amount, cause, destination, method, promised_at, requested_by, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'open')"
         );
-        $st->execute([$orderId, $amount, $cause, $destination, $promisedAt, $requestedBy]);
+        $st->execute([$orderId, $amount, $cause, $destination, $method, $promisedAt, $requestedBy]);
         return (int) db()->lastInsertId();
     }
 

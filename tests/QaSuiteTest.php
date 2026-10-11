@@ -502,6 +502,78 @@ qa('QA-10', 'Cross-member access to proofs and orders is refused', function (): 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// QA-11  The refund payout route chosen by the admin is the one that runs
+// ─────────────────────────────────────────────────────────────────────────────
+qa('QA-11', 'Refund payout route: only an e-wallet route credits the wallet', function (): void {
+    // Added after Phase 6/M6 changed payout routing from the free-text
+    // `destination` column to the typed `method` enum. The model changed and
+    // the admin form did not: it still collected `destination`, never sent a
+    // `method`, and so every refund created from the UI defaulted to 'ewallet'.
+    // A GCash refund therefore paid into the member's wallet. The automated
+    // suite covers the model; this case covers the round trip the admin
+    // actually performs, which is where the gap lived.
+    $admin = Fixtures::admin();
+
+    foreach ([
+        ['ewallet', true],
+        ['cash',    false],
+        ['bank',    false],
+        ['manual',  false],
+    ] as [$method, $shouldCredit]) {
+        $m = Fixtures::member();
+        $o = Fixtures::cancelledOrder($m, Fixtures::product('__R' . $method . '__', 40.00, 5), 1);
+
+        // Exactly what the admin form posts.
+        $rid = ShopRefund::create(
+            $o,
+            40.0,
+            'admin_cancel',
+            'GCash account 0917-1234',   // destination: a note, NOT the route
+            null,
+            $admin,
+            $method
+        );
+
+        $stored = (string) Fixtures::scalar('SELECT method FROM shop_refunds WHERE id = ?', [$rid]);
+        T::eq($method, $stored, "QA-11: a {$method} refund stores its route as {$method}");
+
+        $before = (float) Fixtures::scalar('SELECT ewallet_balance FROM users WHERE id = ?', [$m]);
+        T::ok(ShopRefund::approve($rid, $admin), "QA-11: the {$method} refund is approved");
+        T::ok(ShopRefund::markPaid($rid, $admin, 'R-' . strtoupper($method)), "QA-11: the {$method} payout is processed");
+
+        $after = (float) Fixtures::scalar('SELECT ewallet_balance FROM users WHERE id = ?', [$m]);
+        if ($shouldCredit) {
+            T::eq($before + 40.0, $after, 'QA-11: the e-wallet route credits the wallet');
+        } else {
+            T::eq($before, $after, "QA-11: the {$method} route does NOT credit the wallet");
+            T::eq(
+                0,
+                (int) Fixtures::scalar("SELECT COUNT(*) FROM ewallet_ledger WHERE user_id = ? AND type = 'credit'", [$m]),
+                "QA-11: the {$method} payout writes no ledger row"
+            );
+        }
+        T::eq(
+            'processed',
+            (string) Fixtures::scalar('SELECT status FROM shop_refunds WHERE id = ?', [$rid]),
+            "QA-11: the {$method} refund still closes as processed"
+        );
+    }
+
+    // The destination note must never resurrect the old behaviour.
+    $m2 = Fixtures::member();
+    $o2 = Fixtures::cancelledOrder($m2, Fixtures::product('__RNOTE__', 40.00, 5), 1);
+    $r2 = ShopRefund::create($o2, 40.0, 'admin_cancel', 'credited to their wallet please', null, $admin, 'cash');
+    $b2 = (float) Fixtures::scalar('SELECT ewallet_balance FROM users WHERE id = ?', [$m2]);
+    ShopRefund::approve($r2, $admin);
+    ShopRefund::markPaid($r2, $admin, 'R-NOTE');
+    T::eq(
+        $b2,
+        (float) Fixtures::scalar('SELECT ewallet_balance FROM users WHERE id = ?', [$m2]),
+        'QA-11: a note mentioning a wallet cannot force a credit'
+    );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Results table
 // ─────────────────────────────────────────────────────────────────────────────
 echo "\n";

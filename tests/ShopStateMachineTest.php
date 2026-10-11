@@ -1123,11 +1123,99 @@ test('M6 — the refund payout route comes from the method enum, not free text',
         'the e-wallet method still credits'
     );
 
-    // And the string heuristic is gone from the source entirely.
-    $src = (string) file_get_contents(REPO_ROOT . '/models/ShopRefund.php');
+    // And the string heuristic is gone from the source entirely. (Comments are
+    // stripped first: the docblock above explains what was removed and quoting
+    // it verbatim would make this assertion fail on its own documentation.)
+    $src  = (string) file_get_contents(REPO_ROOT . '/models/ShopRefund.php');
+    $code = (string) preg_replace('#/\*.*?\*/#s', '', $src);
+    $code = (string) preg_replace('#//[^\n]*#', '', $code);
     T::ok(
-        !str_contains($src, "str_contains(\$destination, 'wallet')"),
+        !str_contains($code, "str_contains(\$destination"),
         'the free-text wallet check is removed'
+    );
+
+    // The payout route must be an explicit, typed choice — and the choices the
+    // UI offers must be exactly the ones the column accepts. Offering a value
+    // outside the ENUM is "Data truncated for column 'method'", the same 500
+    // shape as defect H4.
+    $enum = (string) Fixtures::scalar(
+        "SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'shop_refunds' AND COLUMN_NAME = 'method'"
+    );
+    T::ok($enum !== '', 'the refund method column exists');
+    preg_match_all("/'([a-z_]+)'/", $enum, $em);
+    $enumValues = $em[1];
+    T::ok(
+        $enumValues === ShopRefund::METHODS,
+        'ShopRefund::METHODS matches the column ENUM exactly',
+        'enum=' . implode(',', $enumValues) . ' const=' . implode(',', ShopRefund::METHODS)
+    );
+
+    $form = (string) file_get_contents(REPO_ROOT . '/views/admin/shop_order.php');
+    preg_match('/<select[^>]*name="method".*?<\/select>/s', $form, $sel);
+    T::ok(!empty($sel[0]), 'the admin refund form offers a payout route');
+    preg_match_all('/value="([a-z_]+)"/', $sel[0] ?? '', $opts);
+    $formValues = $opts[1];
+    sort($enumValues);
+    sort($formValues);
+    T::ok(
+        $formValues === $enumValues,
+        'every payout route the form offers is one the column accepts',
+        'form=' . implode(',', $formValues)
+    );
+
+    // And the route must actually reach the row — not be silently defaulted.
+    $mm = Fixtures::member();
+    $oo = Fixtures::cancelledOrder($mm, Fixtures::product('__MM__', 50.00, 5), 1);
+    $rr = ShopRefund::create($oo, 50.0, 'admin_cancel', 'GCash account 0917', null, null, 'manual');
+    T::eq(
+        'manual',
+        (string) Fixtures::scalar('SELECT method FROM shop_refunds WHERE id = ?', [$rr]),
+        'a non-wallet payout route is stored, not coerced to ewallet'
+    );
+    $beforeBal = (float) Fixtures::scalar('SELECT ewallet_balance FROM users WHERE id = ?', [$mm]);
+    $aid = Fixtures::admin();
+    ShopRefund::approve($rr, $aid);
+    T::ok(ShopRefund::markPaid($rr, $aid, 'MM-1'), 'the manual payout is processed');
+    T::eq(
+        $beforeBal,
+        (float) Fixtures::scalar('SELECT ewallet_balance FROM users WHERE id = ?', [$mm]),
+        'a manual-route refund does not credit the wallet'
+    );
+
+    T::throws(
+        InvalidArgumentException::class,
+        static fn() => ShopRefund::create($oo, 10.0, 'admin_cancel', null, null, null, 'gcash'),
+        'an unknown payout route is refused rather than truncated by MySQL'
+    );
+
+    // The controller wiring, which is where the gap actually lived. QA-11 calls
+    // ShopRefund::create() directly, so it cannot catch a controller that
+    // forgets to forward the route — and that omission is precisely the bug:
+    // every UI-created refund silently defaulted to an e-wallet credit.
+    $ctrl = (string) file_get_contents(REPO_ROOT . '/controllers/AdminController.php');
+    $fn   = strpos($ctrl, 'public function orderRefund()');
+    $nx   = strpos($ctrl, 'public function ', ($fn ?: 0) + 10);
+    $body = substr($ctrl, (int) $fn, (int) $nx - (int) $fn);
+
+    T::ok(
+        str_contains($body, "\$_POST['method']"),
+        'orderRefund() forwards the payout route from the form'
+    );
+    $call = strpos($body, 'ShopRefund::create(');
+    T::ok($call !== false, 'orderRefund() creates a refund');
+    // Bound the search by the call's own closing paren, not a fixed byte count:
+    // an explanatory comment inside the argument list is longer than any window
+    // worth guessing at.
+    $close = strpos($body, ');', (int) $call);
+    $seg   = substr($body, (int) $call, ($close === false ? strlen($body) : (int) $close) - (int) $call);
+    T::ok(
+        str_contains($seg, "\$_POST['method']"),
+        'the route is passed INTO create(), not merely read nearby'
+    );
+    T::ok(
+        !str_contains($seg, "'ewallet');"),
+        'the call does not hardcode the route back to the column default'
     );
 });
 

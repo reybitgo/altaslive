@@ -1348,7 +1348,13 @@ default:
                         (string) ($_POST['cause'] ?? 'admin_cancel'),
                         trim((string) ($_POST['destination'] ?? '')) ?: null,
                         ($_POST['promised_at'] ?? '') ?: null,
-                        Auth::id());
+                        Auth::id(),
+                        // The payout route is explicit (Phase 6 / M6). It used to
+                        // be inferred from `destination`, which the admin form
+                        // still collected — so an admin typing "gcash" got a
+                        // wallet credit once the inference was removed, because
+                        // nothing sent `method` and the column default took over.
+                        (string) ($_POST['method'] ?? 'ewallet'));
                     flash('success', 'Refund task opened.');
                     break;
 

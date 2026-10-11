@@ -401,7 +401,21 @@ $needConfirm = ['cancelled', 'returned_to_sender', 'payment_failed', 'on_hold'];
                 <option value="customer_dispute">customer_dispute</option>
                 <option value="other">other</option>
               </select>
-              <input type="text" name="destination" class="form-control form-control-sm mb-1" placeholder="Destination (ewallet / gcash / …)" maxlength="120">
+              <?php /* Phase 6 / M6: this is the field that decides where the money
+                       goes. It was previously inferred from `destination`, which
+                       meant the box below had no effect on the payout at all and
+                       silently decided it instead. Both are now explicit. */ ?>
+              <label class="form-label mb-1" style="font-size:.72rem;" for="refundMethod">Payout route</label>
+              <select name="method" id="refundMethod" class="form-select form-select-sm mb-1">
+                <option value="ewallet">E-wallet — credits the member's wallet automatically</option>
+                <option value="cash">Cash — settled manually, no wallet credit</option>
+                <option value="bank">Bank transfer — settled manually, no wallet credit</option>
+                <option value="manual">GCash / other — settled manually, no wallet credit</option>
+              </select>
+              <input type="text" name="destination" class="form-control form-control-sm mb-1" placeholder="Destination note (account no., branch…)" maxlength="120">
+              <div class="form-text mb-1" style="font-size:.7rem;">
+                Only <strong>E-wallet</strong> credits the wallet when the refund is paid out. The note is for your records.
+              </div>
               <button type="submit" class="btn btn-sm btn-outline-primary w-100">Open refund task</button>
             </form>
           </div>
