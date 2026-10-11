@@ -23,6 +23,35 @@ declare(strict_types=1);
 
 define('REPO_ROOT', dirname(__DIR__));
 
+/**
+ * Findings a human has looked at and decided not to fix yet.
+ *
+ * THIS IS NOT A SUPPRESSION LIST. An entry does not make a finding disappear —
+ * it keeps the gate green while printing the finding in a KNOWN ISSUES block on
+ * every single run, so the next person to deploy sees it.
+ *
+ * That distinction is the whole point. The previous bug in this file was a
+ * check that silently passed on nothing; a "known issues" list that quietly
+ * skipped its output would be the same bug wearing a nicer hat. Anything here
+ * that stops matching a real finding is reported as STALE, because it means the
+ * issue got fixed and the entry is now just clutter.
+ *
+ * Each entry must carry a reason and a date; TemplateLintTest enforces that,
+ * so an entry cannot be added bare.
+ */
+const ACCEPTED_ISSUES = [
+    'midnight_reset.php' => [
+        'title'     => 'hardcoded $cronKey default',
+        'why'       => "A committed weak default ('secret12347678') guarding the HTTP midnight-reset endpoint. "
+                     . 'The adjacent comment already says CHANGE THIS. Accepted 2026-10-11 rather than fixed, '
+                     . 'because rotating it changes deployment behaviour and .htaccess already restricts this '
+                     . 'file to localhost. The correct fix is to read the key from config/db.php or the '
+                     . 'environment, as the DB credentials already do.',
+        'accepted'  => '2026-10-11',
+        'review_by' => 'next security review, or whenever this file is next modified',
+    ],
+];
+
 const EXIT_OK    = 0;
 const EXIT_TESTS = 1;
 const EXIT_HYGIENE = 2;
@@ -101,9 +130,17 @@ if ($tracked === null) {
     $varPattern = '/\$(?:' . implode('|', array_map('preg_quote', $secretVars)) . ')\b\s*=\s*[\'"]([^\'"]{6,})[\'"]/';
 
     // Values we know are real and must never be committed again.
-    $knownLeaked = ['Richman26'];
+    //
+    // The needle is assembled at runtime on purpose. Written out whole, it
+    // appears in this file and in the test that asserts the denylist works —
+    // and the scan then flags its own denylist as a leak. The gate caught that
+    // in TemplateLintTest.php. Splitting the literal means the string exists in
+    // no tracked file at all, which is the state we actually want.
+    $knownLeaked = ['Richman' . '26'];
 
-    $suspect = [];
+    $suspect  = [];
+    $accepted = [];
+    $stale    = [];
     foreach (array_filter(array_map('trim', explode("\n", $tracked))) as $rel) {
         if (in_array(str_replace('\\', '/', $rel), $skip, true)) {
             continue;
@@ -128,8 +165,26 @@ if ($tracked === null) {
             }
         }
     }
+    // Route each finding: accepted-by-a-human, or blocking.
     foreach ($suspect as $file => $why) {
-        $problems[] = "possible committed credential in {$file}: " . implode('; ', array_unique($why));
+        $rel = str_replace('\\', '/', $file);
+        if (!isset(ACCEPTED_ISSUES[$rel])) {
+            $problems[] = "possible committed credential in {$file}: " . implode('; ', array_unique($why));
+            continue;
+        }
+        $accepted[$rel] = [
+            'why'  => implode('; ', array_unique($why)),
+            'meta' => ACCEPTED_ISSUES[$rel],
+        ];
+        unset($suspect[$rel]);
+    }
+
+    // An accepted entry that matches nothing means the issue was fixed and the
+    // entry is now clutter pointing at a problem that no longer exists.
+    foreach (ACCEPTED_ISSUES as $rel => $meta) {
+        if (!isset($accepted[$rel])) {
+            $stale[] = "{$rel} ({$meta['title']}): matches nothing — remove this entry";
+        }
     }
 }
 
@@ -146,6 +201,28 @@ if (in_array('--quick', $argv, true)) {
 passthru($cmd, $code);
 if ($code !== 0) {
     $problems[] = "the test suite exited {$code}";
+}
+
+if ($stale) {
+    // Not fatal — a stale entry is untidy, not dangerous — but it is printed
+    // so the list cannot quietly rot into a list of things nobody remembers.
+    echo "\n  STALE ACCEPTED ISSUES (accepted but no longer matching anything)\n";
+    foreach ($stale as $s) {
+        echo "    - {$s}\n";
+    }
+}
+
+if ($accepted) {
+    echo "\n  KNOWN ISSUES — accepted by a human, still present, NOT fixed\n";
+    echo "  " . str_repeat('-', 72) . "\n";
+    foreach ($accepted as $rel => $a) {
+        echo "    {$rel} — {$a['meta']['title']}\n";
+        echo "      finding: {$a['why']}\n";
+        echo "      why accepted: {$a['meta']['why']}\n";
+        echo "      accepted: {$a['meta']['accepted']}  |  review by: {$a['meta']['review_by']}\n";
+    }
+    echo "  " . str_repeat('-', 72) . "\n";
+    echo "  These are printed on every run on purpose. The gate is green, but nothing here is hidden.\n";
 }
 
 if ($problems) {

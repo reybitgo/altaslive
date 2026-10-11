@@ -488,6 +488,120 @@ test('every UI string the manual QA doc names actually exists', function (): voi
     }
 });
 
+T::group('Pre-deploy gate hygiene');
+
+/**
+ * ACCEPTED_ISSUES is a place where a security finding could be buried, so it
+ * is held to the standard the finding itself was held to.
+ */
+test('every accepted pre-deploy issue carries a reason, a date and a review trigger', function (): void {
+    $src = (string) file_get_contents(REPO_ROOT . '/tests/predeploy.php');
+
+    T::ok(
+        (bool) preg_match('/const ACCEPTED_ISSUES\s*=\s*\[/', $src),
+        'the accepted-issues list exists and is explicit'
+    );
+    T::ok(
+        str_contains($src, 'ACCEPTED_ISSUES[$rel]'),
+        'findings are routed through the list rather than deleted'
+    );
+
+    // An entry with no justification is just a suppression with extra steps.
+    T::ok(
+        (bool) preg_match_all("/'why'\s*=>/", $src, $m),
+        'each entry states why it is accepted'
+    );
+    T::ok(
+        (bool) preg_match_all("/'accepted'\s*=>/", $src, $d),
+        'each entry is dated'
+    );
+    T::ok(
+        (bool) preg_match_all("/'review_by'\s*=>/", $src, $r),
+        'each entry says when it will be revisited'
+    );
+    T::ok(
+        count($d[0]) === count($r[0]),
+        'no entry can be dated without also saying when it is reviewed'
+    );
+
+    // The list must never be a silent filter: an accepted finding is printed
+    // on every run, and an entry that stops matching is called out as stale.
+    T::ok(
+        str_contains($src, 'KNOWN ISSUES'),
+        'accepted findings are printed, not silently skipped'
+    );
+    T::ok(
+        str_contains($src, 'STALE'),
+        'an accepted entry that no longer matches is reported as stale'
+    );
+
+    // The bug this file was written to prevent: a check that runs on nothing.
+    $code = (string) preg_replace('#/\*.*?\*/#s', '', $src);
+    T::ok(
+        !str_contains((string) preg_replace('#//[^\n]*#', '', $code), 'shell_exec('),
+        'the gate does not shell out via shell_exec, which is disabled in this PHP'
+    );
+    T::ok(
+        str_contains($src, 'the credential scan did not run'),
+        'an unavailable git blocks the gate instead of passing it'
+    );
+});
+
+test('the credential scan is precise enough to be useful', function (): void {
+    $src = (string) file_get_contents(REPO_ROOT . '/tests/predeploy.php');
+    // Comments are stripped first. The docblocks name the false positives and
+    // the disabled function on purpose, so asserting on the raw text matches the
+    // explanation rather than the code — the fourth time this suite has caught
+    // itself doing that.
+    $code = (string) preg_replace('#/\*.*?\*/#s', '', $src);
+    $code = (string) preg_replace('#//[^\n]*#', '', $code);
+
+    T::ok(
+        !str_contains($code, 'shell_exec('),
+        'the gate does not shell out via shell_exec, which is disabled in this PHP'
+    );
+    T::ok(
+        (bool) preg_match('/\$secretVars\s*=/', $code),
+        'credential variables are matched by an explicit name list'
+    );
+    T::ok(
+        str_contains($code, '$knownLeaked'),
+        'values known to have leaked are denied outright'
+    );
+    T::ok(
+        str_contains($src, "'Richman' . '26'"),
+        'the leaked value is on the denylist, split so no file holds it whole'
+    );
+    T::ok(
+        !str_contains($src, 'Richman' . '26'),
+        'the leaked value appears contiguously nowhere in the gate'
+    );
+
+    // And the specific noise that broke the first attempt must not be back in
+    // the executable pattern. A broad "anything password-shaped" scan fired on
+    // all three of these plus about fifty more; a gate that is always red is a
+    // gate nobody runs.
+    foreach (['password_hash', 'btn.textContent', 'autocomplete'] as $noise) {
+        T::ok(
+            !str_contains($code, $noise),
+            "the noisy pattern is not back in the code: {$noise}"
+        );
+    }
+
+    // Documentation must not restate a secret. Writing the assignment into the
+    // plan doc made THIS the thing the scan flagged, which is how the habit of
+    // quoting secrets into a second tracked file gets caught.
+    $remedy = (string) file_get_contents(REPO_ROOT . '/tmp/shop/remedy.md');
+    T::ok(
+        !preg_match('/\$(?:dbPass|db_pass|cronKey|secret|apiKey|api_key)\b\s*=\s*[\'"][^\'"]{6,}[\'"]/', $remedy),
+        'the plan document does not quote a credential assignment'
+    );
+    T::ok(
+        !str_contains($remedy, 'secret12347678'),
+        'the plan document does not reproduce the accepted cron key literal'
+    );
+});
+
 T::group('Loading invariants');
 
 /**

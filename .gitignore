@@ -23,8 +23,9 @@ tmp/shop/backups/*
 # Credentials must never be committed, whatever the file extension. The QA
 # document at tmp/shop/qa_test_v2.md carried a live admin password in plain text
 # from commit 0e8efa9 until it was removed on 2026-10-10. Removing the line is
-# not enough on its own: the string is still in history, so the password has to
-# be rotated too. See tmp/shop/remedy.md.
+# not enough on its own: the string is still in history, so that password has
+# to be rotated too. .gitignore cannot reach history, and this comment is the
+# reminder.
 #
 # The patterns stay narrow on purpose - they want a credential-shaped filename.
 # Something broad like *password* would hide legitimate documentation about
@@ -33,3 +34,9 @@ tmp/shop/backups/*
 my.cnf
 .env
 .env.*
+
+# One committed secret is knowingly still in the tree: the $cronKey default in
+# midnight_reset.php. It is NOT fixed, only accepted - see ACCEPTED_ISSUES in
+# tests/predeploy.php, which prints it on every deploy rather than hiding it.
+# There is no ignore rule that can help here, because the secret is a literal
+# inside a tracked source file.

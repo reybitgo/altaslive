@@ -1516,6 +1516,32 @@ Mutation-verified: with the double-deduction guard disabled it exits **2**; rest
 Action #3 (schema drift across both install paths) is already covered by `SchemaDriftTest.php`'s migration-chain
 comparison, and #4 by the Strategy-C assertions added in Phase 6.7. Both re-run green.
 
+#### The committed cron key — accepted, not fixed
+
+`midnight_reset.php` assigns a weak hardcoded default to its `$cronKey` variable, guarding the HTTP
+midnight-reset endpoint. The literal is deliberately NOT reproduced here: quoting it would put a second copy of
+the secret in a second tracked file, and the pre-deploy scan would then flag this document as the leak rather
+than the source. Read the value from the file if you need it. The adjacent comment already says CHANGE THIS, so this is a known weakness rather than a forgotten
+secret. **Accepted 2026-10-11** rather than fixed: rotating it changes deployment behaviour, and `.htaccess`
+already restricts that file to localhost.
+
+The acceptance is deliberately *not* a suppression. `ACCEPTED_ISSUES` in `tests/predeploy.php` keeps the gate
+green while **printing the finding on every single run**, under a `KNOWN ISSUES` heading that ends with "the gate
+is green, but nothing here is hidden." A silent skip would be the same bug the file already had once — a check
+that reports success while proving nothing.
+
+Three properties, each mutation-verified:
+
+| Behaviour | Verified by | Result |
+|---|---|---|
+| A **new** unaccepted credential still blocks | injecting a second DB password variable | exit **2**, `PRE-DEPLOY BLOCKED` |
+| An accepted entry that no longer matches is **stale** | pointing an entry at `README.md` | printed as `STALE ... remove this entry`, exit 0 |
+| An entry cannot be added bare | `TemplateLintTest` requires `why`, `accepted`, `review_by` | suite fails without them |
+
+While adding the denylist for the value that leaked from `qa_test_v2.md`, the scan flagged **its own denylist**:
+the needle written out whole also appeared in the test asserting the denylist worked. The literal is now assembled
+at runtime (`'Richman' . '26'`) so it exists contiguously in no tracked file — which is the state actually wanted,
+and the gate that caught it is the reason to trust it now.
 **Phase 9 is untouched** — repository hygiene and documentation, including rewriting the three QA documents whose
 checkboxes have never been ticked.
 
