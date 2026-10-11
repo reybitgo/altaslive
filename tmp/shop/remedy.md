@@ -1440,6 +1440,87 @@ security-relevant.
 
 ---
 
+### Execution record — 2026-10-10
+
+`tmp/shop/qa_test_v2.md` is a checklist for a human with two browser windows, and Phase 9 records that its ten
+final checkboxes had never been ticked in any of its three versions — the cases had been written but never run by
+anyone. This phase runs them.
+
+**`tests/QaSuiteTest.php`** drives each case end to end through the models against the disposable test schema. The
+distinction from `ShopStateMachineTest` is the point: that suite tests one transition rule at a time, where a defect
+that only appears across a whole lifecycle — stock vanishing on a reship, a refund crediting twice — is invisible. This
+one walks each order from creation to its terminal state and asserts the stock and the wallet at every step.
+
+It is **not** a substitute for a human looking at the screen and is not recorded as one. What it replaces is the prior
+state, where nothing had been run at all.
+
+| Case | Scenario | Checks | Result |
+|---|---|---|---|
+| QA-1 | cart add / step / remove + cross-member cart isolation | 16 | **PASS** |
+| QA-2 | e-wallet happy path: cart → paid, one debit, stock reserved | 12 | **PASS** |
+| QA-3 | manual payment: proof upload, review, paid, mismatch refused | 10 | **PASS** |
+| QA-4 | refund lifecycle → processed, wallet credited exactly once | 10 | **PASS** |
+| QA-5 | delivery-failure → RTS → reship → complete, no double deduction | 15 | **PASS** |
+| QA-6 | hold / resume | 11 | **PASS** |
+| QA-7 | `payment_review` never expires | 7 | **PASS** |
+| QA-8 | shop on/off switch | 5 | **PASS** |
+| QA-9 | an admin cannot review their own order | 5 | **PASS** |
+| QA-10 | cross-member access to proofs and orders is refused | 5 | **PASS** |
+
+#### QA-5 is the case the defect profile was built around
+
+The double-stock-deduction guard is the `deducted_at IS NOT NULL` check inside `applySideEffects()`'s `shipped`
+branch — **not** the `reservation_state` filter on the line SELECT. Widening that filter to admit `'deducted'` lines
+changes nothing, because a reship legitimately resets the line to `reserved` first: at handoff the line is *always*
+`reserved`, and `deducted_at` is the only thing that remembers these specific goods already left the stock figure.
+
+That was found by mutation, not by reading. Replacing the guard with `if (false)` makes QA-5 fail with stock `3 → 1`:
+
+```
+FAIL QA-5: the second handoff did NOT deduct again — this is the double-deduction guard  (expected '3', got '1')
+FAIL QA-5: stock is still 3 after the entire failure/reship lifecycle               (expected '3', got '1')
+```
+
+#### Five cases failed on first run. Four were my bugs; one was a wrong assumption about the design.
+
+- `Cart::removeItem()` does not exist — it is `removeItemById($itemId, $cartId)`, cart-scoped by design.
+- `paginate()` returns `['data' => …]`, so the order rows are one level down.
+- The settings primary key is `key_name`, not `key`.
+- `markDeliveryFailed()` validates `fault` against `customer|carrier|shop`; I passed `courier`.
+- **QA-8 was a genuine bug in my own assertion, and a nasty one.** I read the switch with
+  `fetchColumn() ?: '1'`. The string `'0'` is falsy in PHP, so the elvis operator returned `'1'` — reporting the shop
+  as **open in exactly the state the case exists to detect**. `setting()` carries the same warning in its own body for
+  the related `fetchColumn() === false` case.
+
+Two cases were also passing for the wrong reason and had to be rewritten:
+
+- **QA-9 passed without testing anything.** `assertNotSelfReview()` keys off the **session** actor
+  (`Auth::isAdmin()` and `Auth::id()`), not off the `$adminId` argument. My first version passed the id but never
+  logged in, so the guard was skipped entirely and the case went green. It now logs in as the admin, asserts the
+  refusal, and then proves the refusal was about *identity* by showing a different admin may approve the same order.
+- **QA-6 asserted the opposite of the design.** A hold is a pause, not a lock: `transition()` resolves the effective
+  source from `previous_status`, so a member legitimately may cancel an order that is merely on hold. Separately,
+  `resume()` only accepts a target that is both a matrix target and admin-reachable, and `pending` is neither — it is an
+  initial state with no transition *into* it, so holding from `pending` cannot round-trip by design.
+
+#### Pre-deploy gate (action #5)
+
+`tests/predeploy.php` runs the suite and re-checks the two invariants that are cheap to satisfy and easy to break by
+accident: `core/Commission.php` must not have drifted from the `shop-pre-remediation` baseline, and no live credential
+may be committed outside `config/db.php`. Exit 0 to deploy, non-zero to stop.
+
+Mutation-verified: with the double-deduction guard disabled it exits **2**; restored, it exits **0**.
+
+#### Remaining in Phase 10
+
+Action #3 (schema drift across both install paths) is already covered by `SchemaDriftTest.php`'s migration-chain
+comparison, and #4 by the Strategy-C assertions added in Phase 6.7. Both re-run green.
+
+**Phase 9 is untouched** — repository hygiene and documentation, including rewriting the three QA documents whose
+checkboxes have never been ticked.
+
+---
+
 ## Sequencing
 
 ```
