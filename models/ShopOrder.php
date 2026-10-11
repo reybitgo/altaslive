@@ -243,29 +243,32 @@ class ShopOrder
 
             $pdo->commit();
             return true;
-        } catch (RuntimeException $e) {
-            if ($pdo->inTransaction()) {
-                $pdo->rollBack();
-            }
+        } catch (StockConflictException $e) {
             // Handoff stock conflict (§0.3): the transition is REFUSED, not an
             // error — roll back everything, then record a no-op audit row so
             // the attempt is visible in the timeline.
-            if ($e->getMessage() === 'stock_conflict') {
-                ShopOrderEvent::log(
-                    $orderId,
-                    $order['status'],
-                    $order['status'],
-                    $actorType,
-                    $actorId,
-                    [
-                        'reason_code' => 'stock_conflict',
-                        'note'        => 'Handoff refused — insufficient stock for one or more lines',
-                        'source'      => $opts['source'] ?? 'ui',
-                    ]
-                );
-                return false;
+            //
+            // Narrow on purpose. This used to be `catch (RuntimeException)`
+            // with a string compare on the message, but PDOException extends
+            // RuntimeException, so every database error was diverted here and
+            // misreported as a stock problem (Phase 7).
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
             }
-            throw $e;
+            $from = $order['status'] ?? null;
+            ShopOrderEvent::log(
+                $orderId,
+                $from,
+                $from ?? $to,
+                $actorType,
+                $actorId,
+                [
+                    'reason_code' => 'stock_conflict',
+                    'note'        => 'Handoff refused — insufficient stock for one or more lines',
+                    'source'      => $opts['source'] ?? 'ui',
+                ]
+            );
+            return false;
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
@@ -335,7 +338,7 @@ class ShopOrder
                 $heldElsewhere = (int) $r->fetchColumn();
 
                 if ($stock - $heldElsewhere < $qty) {
-                    throw new RuntimeException('stock_conflict');
+                    throw new StockConflictException();
                 }
             }
 
@@ -376,7 +379,7 @@ class ShopOrder
                 }
                 $dec->execute([$qty, (int) $line['product_id'], $qty]);
                 if ($dec->rowCount() !== 1) {
-                    throw new RuntimeException('stock_conflict');
+                    throw new StockConflictException();
                 }
                 $mark->execute([$orderId, (int) $line['product_id']]);
             }
@@ -750,7 +753,7 @@ class ShopOrder
         // this is what makes that true.
         $insertProof = static function () use (&$proofId, $orderId, &$image, $claim, $memberId): bool {
             $proofId = ShopPaymentProof::add($orderId, $image, [
-                'reference_no'  => $claim['reference_no'] ?? null,
+                'reference_no'  => clean_reference($claim['reference_no'] ?? '', 40) ?: null,
                 'amount'        => $claim['amount'] ?? null,
                 'transfer_date' => $claim['transfer_date'] ?? null,
                 'ip'            => $_SERVER['REMOTE_ADDR'] ?? null,
@@ -835,6 +838,12 @@ class ShopOrder
                     'Amount mismatch: claimed ' . fmt_money($amountSent)
                     . ' vs order total ' . fmt_money((float) $order['total_price']) . '.'
                 );
+            }
+            // Normalise at the boundary: the column is VARCHAR(40) and the only
+            // caller-facing constraint was a client-side maxlength (Phase 7).
+            $paymentReference = clean_reference($paymentReference, 40);
+            if ($paymentReference === '') {
+                throw new InvalidArgumentException('Payment reference contains no usable characters.');
             }
             if ($paymentReference !== null && $paymentReference !== '') {
                 // Uniqueness spans the whole transfer lifecycle: a reference on

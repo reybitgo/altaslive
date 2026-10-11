@@ -41,10 +41,12 @@
               ];
             }
           }
+          // One batched query for the whole catalog instead of two per card (M7).
+          $availById = Product::availableStockMap(array_column($products, 'id'));
         ?>
         <?php foreach ($products as $p):
           $img     = !empty($p['image_url']) ? APP_URL . '/uploads/' . e($p['image_url']) : null;
-          $avail   = Product::availableStock((int) $p['id']);
+          $avail   = $availById[(int) $p['id']] ?? 0;
           $soldOut = $avail <= 0;
         ?>
           <div class="col-6 col-md-4 col-lg-3">

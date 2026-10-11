@@ -1025,10 +1025,16 @@ class AdminController
         csrf_verify();
 
         $id = (int) ($_POST['product_id'] ?? 0);
-        $ok = Product::delete($id);
-        flash($ok ? 'success' : 'error', $ok
-            ? 'Product deleted.'
-            : 'Cannot delete product: it has existing shop orders.');
+        try {
+            $ok = Product::delete($id);
+            $msg = $ok ? 'Product deleted.' : 'Cannot delete product: it is still in an order or in someone\'s cart.';
+        } catch (Throwable $e) {
+            // Backstop: a constraint violation must never surface as a 500.
+            error_log('[shop] deleteShopProduct failed: ' . $e->getMessage());
+            $ok = false;
+            $msg = 'Cannot delete product: it is still referenced. Remove it from orders and carts first.';
+        }
+        flash($ok ? 'success' : 'error', $msg);
         redirect('/?page=admin_shop');
     }
 

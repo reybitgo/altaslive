@@ -1010,8 +1010,106 @@ records the state change.
 
 ### Done when
 
-No unbounded query parameter reaches a `LIMIT`, no uncaught exception type can produce a 500 from a shop page, and
-the storefront is a constant number of queries.
+✅ No unbounded query parameter reaches a `LIMIT`, no uncaught exception type can produce a 500 from a shop page,
+and the storefront is a constant number of queries. **Met 2026-10-10** — see below.
+
+### Execution record — 2026-10-10
+
+#### H5 — `per_page()` allow-list (decision D5)
+
+`max($min, (int)$_GET['per_page'])` fed a user-supplied value straight into a SQL `LIMIT` with no ceiling, so
+`?per_page=99999999` produced an unbounded `SELECT` on any list page. Replaced with an allow-list
+`[10, 25, 50, 100]`; anything unlisted degrades to the default rather than to an arbitrary number.
+
+Nine cases asserted, including the ones a bare ceiling would miss: integer overflow, negative, non-numeric, and an
+in-list value that is not a round number. Asserted separately that `per_page()` can never exceed the ceiling.
+
+> The version before that was `(int)(['per_page'] ?? $default)` — casting a literal *array* to `1`, so it always
+> returned the floor of 5 and the page-size control never worked at all. Three generations of this one function,
+> each broken differently.
+
+#### `Product::delete()` could 500
+
+It checked only `shop_order_items`. A product sitting in anyone's **cart** hit the `cart_items` foreign key and
+raised an uncaught `PDOException` on the admin products page. Now both referencing tables are checked, the controller
+has a `Throwable` backstop, and the flash explains the cart case instead of claiming only orders.
+
+A cart line is deliberately **not** auto-removed: that is a side effect the caller did not ask for, so the line blocks
+the delete and the admin removes it first. Asserted all four cases — unreferenced deletes, cart-referenced refused
+without an exception, order-referenced refused, and an unreferenced product still deleting normally afterwards.
+
+#### The stock-conflict catch was swallowing database errors
+
+`transition()` detected a stock conflict by string-comparing `$e->getMessage() === 'stock_conflict'` inside a
+`catch (RuntimeException)`. **`PDOException extends RuntimeException`**, so every database error — a dead
+connection, a constraint violation — was diverted into that branch, misreported as a stock problem, and the handler
+then read `$order['status']`, which is undefined if the throw happened before the row was fetched.
+
+Now a dedicated `core/StockConflictException.php`, with a docblock explaining exactly why the string comparison
+existed and why it was wrong. The catch is `catch (StockConflictException $e)`; everything else propagates. Asserted
+that the class hierarchy the old catch relied on is no longer in play, and that no `getMessage()` comparison remains.
+
+#### M7 — storefront N+1
+
+`views/member/shop.php` called `Product::availableStock()` inside the catalog loop: a `find()` plus a three-table
+join per card, so a 100-product catalog issued ~201 queries on page load. Added `Product::availableStockMap()` — two
+queries for the entire catalog regardless of size — and the view now computes availability once before the loop.
+
+Correctness is asserted rather than assumed: the batched map is compared against the per-product calculation for a
+reserved product, a plain product and a sold-out one, plus the empty-list and unknown-id edge cases.
+
+#### Server-side reference caps
+
+`payment_reference` and `reference_no` are `VARCHAR(40)` with only a client-side `maxlength` — which is not a
+constraint. New `clean_reference()` normalises to `[A-Z0-9_-]` and truncates to the column width, called from
+inside the model so every caller is covered. A reference with no usable characters now raises
+`InvalidArgumentException` instead of silently becoming `NULL`.
+
+Asserted end to end: a reference of `"  gc-123_ab'; DROP TABLE users;--  "` is stored confined to the safe
+character set, no statement separator, no whitespace, within 40 characters.
+
+#### M11 — `confirm_lock` removed
+
+The checkbox was never read server-side — a POST without it was accepted exactly like one with it. The cancel/proof
+race is decided by the conditional write inside `transition()`, so the checkbox was decoration implying a protection
+that did not exist. **Removed rather than enforced**: adding server enforcement for a promise the state machine
+already keeps would imply the protection depends on the box. The explanatory text is retained as a plain note in
+both upload forms. Zero `confirm_lock` references remain.
+
+**Suite result:**
+
+| Suite | Assertions | Failures |
+|---|---|---|
+| `SchemaDriftTest.php` | 25 | 0 |
+| `ShopStateMachineTest.php` | 189 | 0 |
+| `TemplateLintTest.php` | 12 | 0 |
+| `ViewRenderTest.php` | 73 | 0 |
+| **Total** | **299** | **0** |
+
+#### A loading bug the suite could not see
+
+`index.php` autoloads **only** `models/` and `controllers/`; everything in `core/` is loaded by explicit
+`require_once` lines. The new `StockConflictException` was therefore **not** loaded in production — the whole suite
+passed green while `transition()` would have fataled with "Class not found" on the first handoff request that hit a
+stock conflict.
+
+The test suite cannot catch this, because `tests/bootstrap.php` registers an autoloader that sweeps `core/` as well,
+so the class always resolves under test and never in production. Found by reading `index.php` before committing, not
+by a failing test.
+
+Added a lint invariant that sweeps the whole `core/` directory rather than just the current file, so the next class
+added is covered automatically. It also asserts the autoloader is **not** widened to cover `core/` — that shortcut
+would mask the next missing require instead of surfacing it.
+
+Mutation-verified: deleting the `require_once` line makes the suite fail with
+`missing: StockConflictException`. A rule that has never failed is not a rule.
+
+Two of my own assertions were wrong on first run and are recorded rather than quietly fixed:
+
+- The `per_page` table was built as associative arrays and destructured **positionally**, so `$in` received the
+  literal key `'per_page'` and the assertion compared the wrong things. The function was correct throughout.
+- The "no bare `catch (RuntimeException)`" assertion matched my own **explanatory comment**, which mentions the old
+  catch by name. Scoped to a real catch clause.
 
 ---
 

@@ -661,4 +661,159 @@ test('M3 — an APPROVED refund still blocks completion', function (): void {
     T::eq('completed', Fixtures::statusOf($oid), 'M3: order completes');
 });
 
+T::group('Phase 7 — input bounds, resilience, N+1');
+
+test('H5 — per_page is bounded by an allow-list', function (): void {
+    $cases = [
+        ['input' => '10000000', 'expect' => 10,  'why' => 'a huge value falls back to the default'],
+        ['input' => '99999999999999999999', 'expect' => 10, 'why' => 'integer overflow falls back'],
+        ['input' => '-5', 'expect' => 10,  'why' => 'negative falls back'],
+        ['input' => 'abc', 'expect' => 10,  'why' => 'non-numeric falls back'],
+        ['input' => '25', 'expect' => 25,  'why' => 'a listed value is honoured'],
+        ['input' => '50', 'expect' => 50,  'why' => 'a listed value is honoured'],
+        ['input' => '100', 'expect' => 100, 'why' => 'the maximum is honoured'],
+        ['input' => '75', 'expect' => 10,  'why' => 'an unlisted value falls back'],
+        ['input' => null, 'expect' => 10,  'why' => 'absent uses the default'],
+    ];
+    foreach ($cases as $c) {
+        $_GET = $c['input'] === null ? [] : ['per_page' => $c['input']];
+        $shown = $c['input'] === null ? '(absent)' : "'{$c['input']}'";
+        T::eq($c['expect'], per_page(), "H5: per_page({$shown}) - {$c['why']}");
+    }
+    $_GET = [];
+
+    // Nothing may exceed the largest allowed value.
+    $_GET = ['per_page' => (string) PHP_INT_MAX];
+    T::ok(per_page() <= 100, 'H5: per_page can never exceed the allow-list ceiling');
+    $_GET = [];
+});
+
+test('Product::delete is refused, not fatal, when a cart references it', function (): void {
+    $member = Fixtures::member();
+    $owner  = Fixtures::member();
+    $pid    = Fixtures::product('__DEL__', 10.00, 5);
+
+    // No references: deletion succeeds.
+    T::ok(Product::delete($pid), 'a product with no references deletes');
+
+    // In someone's cart: refused, no exception.
+    $pid2 = Fixtures::product('__DEL2__', 10.00, 5);
+    $cartId = (int) Cart::getOrCreate($member)['id'];
+    Cart::addItem($cartId, $pid2, 1);
+
+    $threw = null;
+    try {
+        $ok = Product::delete($pid2);
+    } catch (Throwable $e) {
+        $threw = get_class($e);
+        $ok = false;
+    }
+    T::ok($threw === null, 'a product in a cart does not raise a PDOException', (string) $threw);
+    T::ok($ok === false, 'a product in a cart is refused');
+    T::ok(Product::find($pid2) !== null, 'the referenced product still exists');
+
+    // In an order: refused too.
+    $pid3 = Fixtures::product('__DEL3__', 10.00, 5);
+    Fixtures::pendingOrder($owner, $pid3, 1);
+    T::ok(Product::delete($pid3) === false, 'a product in a shop order is refused');
+
+    // A product nobody references still deletes after all that.
+    $pid4 = Fixtures::product('__DEL4__', 10.00, 5);
+    T::ok(Product::delete($pid4), 'an unreferenced product still deletes normally');
+    T::ok(Product::find($pid4) === null, 'the deleted product is gone');
+});
+
+test('M7 — batched availability matches the per-product calculation', function (): void {
+    $a = Fixtures::product('__A__', 10.00, 5);
+    $b = Fixtures::product('__B__', 10.00, 5);
+    $c = Fixtures::product('__C__', 10.00, 0);   // sold out
+
+    $holder = Fixtures::member();
+    Fixtures::pendingOrder($holder, $a, 3);       // reserves 3 of A
+
+    $map = Product::availableStockMap([$a, $b, $c]);
+
+    T::ok(array_key_exists($a, $map), 'M7: the map covers a reserved product');
+    T::ok(array_key_exists($b, $map), 'M7: the map covers a plain product');
+    T::ok(array_key_exists($c, $map), 'M7: the map covers a sold-out product');
+
+    foreach ([$a, $b, $c] as $id) {
+        T::eq(
+            Product::availableStock($id),
+            $map[$id],
+            "M7: availableStockMap agrees with availableStock for product {$id}"
+        );
+    }
+    T::eq(2, $map[$a], 'M7: three reserved units leave two available');
+    T::eq(0, $map[$c], 'M7: a zero-stock product reports zero');
+    T::eq([], Product::availableStockMap([]), 'M7: an empty id list short-circuits');
+    T::eq([], Product::availableStockMap([999999]), 'M7: an unknown id is simply absent');
+});
+
+test('Phase 7 — payment references are normalised at the boundary', function (): void {
+    $MEMBER = Fixtures::member();
+    $ADMIN  = Fixtures::admin();
+    $pid    = Fixtures::product('__REF7__', 100.00, 10);
+    $cartId = (int) Cart::getOrCreate($MEMBER)['id'];
+    Cart::addItem($cartId, $pid, 1);
+    $addr = ['billing_name' => 'R7', 'shipping_name' => 'R7', 'shipping_address' => '1 St'];
+    $oid  = ShopOrder::createFromCart($MEMBER, $cartId, $addr, 'gcash', 'TEST-IDEM-R7');
+
+    ShopOrder::submitProof($oid, $MEMBER, 'shop_proofs/r7.jpg', [
+        'reference_no' => "  gc-123_ab'; DROP TABLE users;--  ",
+        'amount' => 100.0,
+    ]);
+
+    $stored = (string) Fixtures::scalar("SELECT reference_no FROM shop_payment_proofs WHERE order_id = ?", [$oid]);
+    T::ok($stored !== '', 'the reference survived as a non-empty value');
+    T::ok(!str_contains($stored, ';'), 'the reference carries no statement separator');
+    T::ok(!str_contains($stored, ' '), 'the reference carries no whitespace');
+    T::ok(
+        (bool) preg_match('/^[A-Z0-9_-]+$/', $stored),
+        'the reference is confined to the safe character set',
+        $stored
+    );
+    T::ok(mb_strlen($stored) <= 40, 'the reference fits the column width', (string) mb_strlen($stored));
+
+    // An input with nothing usable is rejected rather than silently emptied.
+    T::throws(
+        InvalidArgumentException::class,
+        static fn() => ShopOrder::markPaid($oid, 'admin', 1, 100.0, "!!!"),
+        'a reference with no usable characters is refused'
+    );
+
+    // Oversized input is truncated to the column width rather than 500-ing.
+    $long = str_repeat('A', 200);
+    T::eq(40, mb_strlen(clean_reference($long, 40)), 'an oversized reference is truncated to 40');
+});
+
+test('a database error is not misreported as a stock conflict', function (): void {
+    // The narrow catch means only StockConflictException takes the audit-event
+    // path; anything else propagates. Assert the class hierarchy that made the
+    // old string-compare catch dangerous is no longer relied upon.
+    T::ok(
+        is_subclass_of(StockConflictException::class, RuntimeException::class),
+        'StockConflictException is still a RuntimeException'
+    );
+    T::ok(
+        !is_subclass_of(PDOException::class, StockConflictException::class),
+        'a PDOException can never be mistaken for a stock conflict'
+    );
+
+    $src = (string) file_get_contents(REPO_ROOT . '/models/ShopOrder.php');
+    // Match a real catch clause, not the explanatory comment that mentions one.
+    T::ok(
+        !preg_match('/^\s*}\s*catch\s*\(\s*RuntimeException/m', $src),
+        'transition() no longer catches bare RuntimeException'
+    );
+    T::ok(
+        (bool) preg_match('/catch\s*\(\s*StockConflictException\s+\$e\s*\)/', $src),
+        'transition() catches StockConflictException specifically'
+    );
+    T::ok(
+        !str_contains($src, "getMessage() === 'stock_conflict'"),
+        'transition() no longer string-compares an exception message'
+    );
+});
+
 exit(T::summary());

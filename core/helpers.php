@@ -527,10 +527,45 @@ function _pagination_page_range(int $current, int $total): array
 }
 
 /** rows per page */
+/**
+ * Normalise a buyer- or admin-declared payment reference (defect, Phase 7).
+ *
+ * Defence in depth behind the C5/C5b escaping fixes. A GCash reference is
+ * alphanumeric, a USDT transaction hash is hex, so the safe character set is
+ * narrow and known. Truncating to the column width here means an oversized or
+ * hostile value cannot reach the database as a surprise - the previous code had
+ * only a client-side maxlength, which is not a constraint.
+ *
+ * @return string empty when the input carries no usable characters
+ */
+function clean_reference(mixed $raw, int $max = 40): string
+{
+    $s = strtoupper(trim((string) $raw));
+    $s = (string) preg_replace('/[^A-Z0-9_-]/', '', $s);
+    return mb_substr($s, 0, max(1, $max));
+}
+
+/**
+ * Rows per page, from an ALLOW-LIST (decision D5).
+ *
+ * This reads a user-supplied query parameter straight into a SQL LIMIT.
+ * The previous version was `max($min, (int)($_GET['per_page'] ?? $default))`
+ * with no ceiling, so ?per_page=99999999 produced an unbounded SELECT on any
+ * list page (defect H5). A bare ceiling is looser than it needs to be: an
+ * allow-list guarantees the page links can only ever emit a legal value, and a
+ * typo degrades to the default instead of to some arbitrary number.
+ *
+ * (The version before that was `(int)(['per_page'] ?? $default)`, which cast a
+ * literal array to 1 and therefore always returned the floor of 5.)
+ */
 function per_page(int $default = 10, int $min = 5): int
 {
+    static $allowed = [10, 25, 50, 100];
     $val = (int) ($_GET['per_page'] ?? $default);
-    return max($min, $val);
+    if (in_array($val, $allowed, true)) {
+        return $val;
+    }
+    return in_array($default, $allowed, true) ? $default : $allowed[0];
 }
 
 /** upload */

@@ -55,10 +55,6 @@ $overdue = $deadline && strtotime((string) $deadline) < time();
                     <div class="col-6"><label class="form-label">Amount sent</label><input type="number" name="amount_sent" class="form-control" step="0.01" value="<?= number_format((float) $order['total_price'], 2, '.', '') ?>"></div>
                     <div class="col-6"><label class="form-label">Transfer date</label><input type="date" name="transfer_date" class="form-control"></div>
                   </div>
-                  <div class="form-check mb-3">
-                    <input type="checkbox" class="form-check-input" id="confirmLock" name="confirm_lock" value="1" required>
-                    <label class="form-check-label" for="confirmLock" style="font-size:.82rem;">I understand submitting this proof ends my option to cancel this order.</label>
-                  </div>
                   <button type="submit" class="btn btn-primary">Submit proof</button>
                 </form>
               <?php elseif ($overdue): ?>
@@ -84,10 +80,7 @@ $overdue = $deadline && strtotime((string) $deadline) < time();
                   <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
                   <div class="mb-2"><label class="form-label">New proof image *</label><input type="file" name="proof_image" class="form-control" accept="image/*" required></div>
                   <div class="mb-2"><label class="form-label">Reference no.</label><input type="text" name="reference_no" class="form-control" maxlength="40"></div>
-                  <div class="form-check mb-3">
-                    <input type="checkbox" class="form-check-input" id="confirmLock2" name="confirm_lock" value="1" required>
-                    <label class="form-check-label" for="confirmLock2" style="font-size:.82rem;">Submitting this proof ends my option to cancel.</label>
-                  </div>
+                  <div class="text-muted mb-2" style="font-size:.75rem;">Submitting this proof ends your option to cancel.</div>
                   <button type="submit" class="btn btn-primary">Re-upload proof</button>
                 </form>
               <?php endif; ?>

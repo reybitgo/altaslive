@@ -29,6 +29,52 @@ class Product {
         if (!$product) return 0;
         return max(0, (int)$product['stock'] - self::reservedStock($productId));
     }
+    /**
+     * Available stock for many products in ONE query each, instead of two per
+     * product. The storefront renders a card per catalog row and used to call
+     * availableStock() inside that loop: a find() plus a three-table join per
+     * product, so a 100-product catalog issued ~201 queries on page load
+     * (defect M7).
+     *
+     * Returns product_id => available, omitting products that do not exist.
+     */
+    public static function availableStockMap(array $productIds): array {
+        $ids = array_values(array_unique(array_map('intval', $productIds)));
+        if (!$ids) return [];
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+
+        $stock = db()->prepare("SELECT id, stock FROM products WHERE id IN ({$ph})");
+        $stock->execute($ids);
+        $stockById = [];
+        foreach ($stock->fetchAll() as $row) {
+            $stockById[(int) $row['id']] = (int) $row['stock'];
+        }
+
+        // One query for every product's held quantity, rather than one per
+        // product. The status list is the same defensive second filter
+        // reservedStock() uses: reservation_state is the contract, the status
+        // list only makes a stale reservation on a cancelled order harmless.
+        $res = db()->prepare(
+            "SELECT oi.product_id AS pid, COALESCE(SUM(oi.quantity), 0) AS held
+               FROM shop_order_items oi
+               JOIN shop_orders o ON o.id = oi.order_id
+              WHERE oi.product_id IN ({$ph})
+                AND oi.reservation_state IN ('reserved','committed')
+                AND o.status IN ('pending','payment_review','payment_failed','paid','packing','ready_to_ship','on_hold')
+              GROUP BY oi.product_id"
+        );
+        $res->execute($ids);
+        $heldById = [];
+        foreach ($res->fetchAll() as $row) {
+            $heldById[(int) $row['pid']] = (int) $row['held'];
+        }
+
+        $out = [];
+        foreach ($stockById as $id => $absolute) {
+            $out[$id] = max(0, $absolute - ($heldById[$id] ?? 0));
+        }
+        return $out;
+    }
     public static function save(array $data, ?int $id = null): int {
         $pdo = db();
         // Explicit field list (plan §0.2): the two inert PV columns are never
@@ -63,13 +109,31 @@ class Product {
         }
         return $id;
     }
+    /**
+     * Delete a product, unless anything still references it.
+     *
+     * Both referencing tables are checked. Previously only shop_order_items
+     * was, so a product sitting in anyone's cart made the DELETE fail on the
+     * cart_items foreign key and surface as an uncaught PDOException — a 500
+     * on the admin products page (defect, Phase 7).
+     *
+     * A cart line is disposable: clearing the referencing carts' items here
+     * would be a side effect the caller did not ask for, so cart lines block
+     * the delete instead. The admin removes the item from the cart first.
+     */
     public static function delete(int $id): bool {
-        $st = db()->prepare('SELECT COUNT(*) FROM shop_order_items WHERE product_id = ?');
-        $st->execute([$id]);
-        $inUse = (int)$st->fetchColumn();
-        if ($inUse > 0) return false;
+        $st = db()->prepare(
+            "SELECT
+               (SELECT COUNT(*) FROM shop_order_items WHERE product_id = ?) AS orders,
+               (SELECT COUNT(*) FROM cart_items    WHERE product_id = ?) AS carts"
+        );
+        $st->execute([$id, $id]);
+        $row = $st->fetch() ?: ['orders' => 0, 'carts' => 0];
+        if ((int) $row['orders'] > 0 || (int) $row['carts'] > 0) return false;
+
         $product = self::find($id);
-        if ($product && !empty($product['image_url'])) {
+        if (!$product) return false;
+        if (!empty($product['image_url'])) {
             delete_uploaded_file($product['image_url']);
         }
         db()->prepare('DELETE FROM products WHERE id = ?')->execute([$id]);

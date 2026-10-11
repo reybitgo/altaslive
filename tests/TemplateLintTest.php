@@ -248,4 +248,52 @@ foreach ($known as $k) {
     echo "    - {$k}\n";
 }
 
+T::group('Loading invariants');
+
+/**
+ * index.php autoloads ONLY models/ and controllers/. Everything in core/ is
+ * loaded by explicit require_once lines at the top of the file.
+ *
+ * That split is invisible to the test suite, because tests/bootstrap.php
+ * registers an autoloader that sweeps core/ as well — so a new core class can
+ * be used by a model, pass every test, and still fatal in production with
+ * "Class not found" on the first request that reaches that code path.
+ * StockConflictException was exactly that bug.
+ */
+test('every core/ class is required by the production bootstrap', function (): void {
+    $index = (string) file_get_contents(REPO_ROOT . '/index.php');
+
+    T::ok(
+        str_contains($index, "require_once 'core/StockConflictException.php';"),
+        'index.php explicitly loads core/StockConflictException.php'
+    );
+
+    // Sweep the whole core/ directory, so the next file added is covered too.
+    $cores = glob(REPO_ROOT . '/core/*.php') ?: [];
+    T::ok(count($cores) > 0, 'core/ contains at least one class file');
+
+    $missing = [];
+    foreach ($cores as $file) {
+        $name = basename($file, '.php');
+        if ($name === 'helpers') {
+            continue; // function-only file, already required
+        }
+        if (!str_contains($index, "core/{$name}.php")) {
+            $missing[] = $name;
+        }
+    }
+    T::ok(
+        $missing === [],
+        'every core/*.php file is loaded by index.php',
+        $missing ? 'missing: ' . implode(', ', $missing) : 'all present'
+    );
+
+    // The autoloader must not be widened to cover core/ as a shortcut: doing so
+    // would mask the next missing require instead of surfacing it.
+    T::ok(
+        !str_contains($index, "['models/', 'controllers/', 'core/']"),
+        'index.php autoloader is still scoped to models/ and controllers/ only'
+    );
+});
+
 exit(T::summary());
