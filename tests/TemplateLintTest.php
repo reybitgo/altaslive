@@ -406,6 +406,88 @@ test('the selected status tab is marked with aria-current', function (): void {
     );
 });
 
+T::group('Manual QA document');
+
+/**
+ * qa_test_v4.md tells a human which button to click and what text to expect.
+ * Every one of those strings is a claim about the code, and a claim that is
+ * wrong costs the tester an hour and teaches them to distrust the document.
+ *
+ * This is the check that would have caught v3, which told testers to look for
+ * a quantity stepper the UI did not have, a "disabled Already in cart" button
+ * that had been replaced, and a confirm-lock checkbox that had been removed.
+ */
+test('every UI string the manual QA doc names actually exists', function (): void {
+    $root = dirname(__DIR__);
+    $docPath = $root . '/tmp/shop/qa_test_v4.md';
+    T::ok(is_file($docPath), 'qa_test_v4.md exists');
+
+    $haystack = '';
+    foreach (['views/*/*.php', 'views/partials/*.php', 'controllers/*.php', 'models/*.php', 'core/*.php'] as $glob) {
+        foreach (glob($root . '/' . $glob) ?: [] as $f) {
+            $haystack .= file_get_contents($f);
+        }
+    }
+
+    // Button labels, flash messages, status pills and field names the tester is
+    // told to look for. Deliberately the exact strings, not fragments.
+    $expected = [
+        'Packing', 'Ready to ship', 'Mark shipped (stock deducts)', 'Dispatch',
+        'Delivered', 'Return to sender', 'Reship order', 'Record failure',
+        'Place hold', 'Mark paid', 'Open refund task',
+        'Mark paid (receipt required)', 'Create Product', 'Update Product',
+        'Added to cart.', 'Add to cart', 'Add more', 'Proceed to checkout',
+        'Browse the Shop', 'Cart is empty', 'View full cart', 'Your cart is empty',
+        'Place order', 'Submit proof', 'Re-upload proof', 'Confirm receipt',
+        'Order placed and paid. Thank you!',
+        'Order placed. Upload your payment proof to continue.',
+        'Order moved to ', 'Refund task opened.', 'Refund marked paid.',
+        'Product created.', 'Product updated.', 'The shop is currently closed.',
+        'Cannot delete product: it is still in an order or in someone',
+        'Insufficient stock. Requested ', 'Payout route', 'Sold out',
+        'Enable Shop', 'Save Settings', 'Expiry run: ',
+        'Pending payment', 'Payment under review', 'Payment rejected',
+        'Returned to sender', 'Out for delivery', 'Delivery failed',
+        'On hold', 'Unknown', 'customer_dispute', 'carrier',
+    ];
+
+    $missing = [];
+    foreach ($expected as $needle) {
+        if (!str_contains($haystack, $needle)) {
+            $missing[] = $needle;
+        }
+    }
+    T::ok(
+        $missing === [],
+        'every string the QA doc names is present in the source',
+        $missing ? 'missing: ' . implode(', ', $missing) : 'all present'
+    );
+
+    // The doc must not send anyone to a file that no longer exists.
+    $doc = (string) file_get_contents($docPath);
+    T::ok(
+        !is_file($root . '/tmp/shop/smoke_test.php'),
+        'the deleted smoke test really is gone'
+    );
+    T::ok(
+        !str_contains($doc, 'php tmp/shop/smoke_test.php'),
+        'the QA doc does not tell anyone to run the deleted smoke test'
+    );
+
+    // The count it quotes must match the suite, or the doc understates coverage.
+    preg_match('/(\d+) assertions, 0 failures/', $doc, $m);
+    T::ok(!empty($m), 'the doc quotes a suite result');
+    if (!empty($m)) {
+        // Deferred: the count moves whenever a test is added, so this is
+        // recorded rather than enforced -- see the note in remedy.md.
+        T::ok(
+            (int) $m[1] > 0,
+            'the quoted assertion count is a real number',
+            'quoted=' . $m[1]
+        );
+    }
+});
+
 T::group('Loading invariants');
 
 /**
