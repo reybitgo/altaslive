@@ -1379,4 +1379,110 @@ test('Strategy C — shop_orders.status is only written through the state machin
     );
 });
 
+test('referenceMap explains why a product cannot be deleted', function (): void {
+    $m = Fixtures::member();
+    $free  = Fixtures::product('__REF_FREE__', 50.00, 5);
+    $bought = Fixtures::product('__REF_ORD__', 50.00, 5);
+    $carts = Fixtures::product('__REF_CART__', 50.00, 5);
+
+    // Batched for the whole "page" in one call, the way the admin view uses it.
+    $map = Product::referenceMap([$free, $bought, $carts]);
+    T::ok($map === [], 'nothing is referenced yet, so the map is empty');
+
+    Fixtures::cancelledOrder($m, $bought, 1);
+    $cartId = (int) Cart::getOrCreate($m)['id'];
+    Cart::addItem($cartId, $carts, 1);
+
+    $map = Product::referenceMap([$free, $bought, $carts]);
+    T::ok(!array_key_exists($free, $map), 'an unreferenced product is absent from the map');
+    T::eq(1, $map[$bought]['orders'] ?? 0, 'a bought product reports one order line');
+    T::eq(0, $map[$bought]['carts'] ?? 0, 'a bought product reports no cart lines');
+    T::eq(0, $map[$carts]['orders'] ?? 0, 'a cart-only product reports no order lines');
+    T::eq(1, $map[$carts]['carts'] ?? 0, 'a cart-only product reports one cart line');
+
+    // Both at once — the remedy text differs, so the map must distinguish them.
+    $both = Fixtures::product('__REF_BOTH__', 50.00, 5);
+    Fixtures::cancelledOrder($m, $both, 1);
+    Cart::addItem($cartId, $both, 1);
+    $map = Product::referenceMap([$both]);
+    T::eq(1, $map[$both]['orders'] ?? 0, 'a product in both reports its order');
+    T::eq(1, $map[$both]['carts'] ?? 0, 'a product in both reports its cart');
+
+    T::eq([], Product::referenceMap([]), 'an empty id list short-circuits');
+    T::eq([], Product::referenceMap([999999]), 'an unknown id is simply absent');
+});
+
+test('the admin delete flow: modal when free, toast when referenced', function (): void {
+    $m = Fixtures::member();
+    $blocked = Fixtures::product('__DELBLOCK__', 50.00, 5);
+    Fixtures::cancelledOrder($m, $blocked, 1);
+
+    $view = (string) file_get_contents(REPO_ROOT . '/views/admin/shop_products.php');
+    $ctrl = (string) file_get_contents(REPO_ROOT . '/controllers/AdminController.php');
+    $app  = (string) file_get_contents(REPO_ROOT . '/assets/js/app.js');
+
+    // Blocked products must be marked WITHOUT a request, so the button can
+    // explain itself instead of firing a doomed POST.
+    T::ok(str_contains($ctrl, 'Product::referenceMap('), 'the page resolves references once, batched');
+    T::ok(str_contains($view, 'data-blocked='), 'the row carries its blocked state');
+    T::ok(str_contains($view, 'data-reason='), 'the row carries the reason text');
+    T::ok(str_contains($view, 'aria-disabled="true"'), 'a referenced product uses aria-disabled');
+    T::ok(!str_contains($view, 'confirm(\'Delete'), 'the native confirm() dialog is gone');
+
+    // aria-disabled, not `disabled`: a truly disabled button is unfocusable
+    // and swallows the click, so the member would never learn why.
+    $blockedBtn = substr($view, strpos($view, 'disabled-look') ?: 0, 400);
+    T::ok(!preg_match('/<button[^>]*\sdisabled(\s|=|>)/', $blockedBtn), 'the button is not natively disabled');
+
+    // The blocked/modal/remove logic lives in the page's own inline script,
+    // not in app.js — only showConfirm()'s size support is shared code.
+    //
+    // These assert the WIRING, not just that a string appears somewhere. An
+    // earlier version checked for `showToast(form.dataset.reason` and
+    // `js-row-removing`, and both survived deleting the behaviour, because the
+    // toast line was still in the file and the CSS selector still named the
+    // class. Asserting the guard and the classList.add is what actually
+    // distinguishes working from broken.
+    T::ok(
+        str_contains($view, "if (form.dataset.blocked === '1')"),
+        'a blocked product short-circuits before any request is made'
+    );
+    T::ok(
+        str_contains($view, "showToast(form.dataset.reason"),
+        'a blocked delete shows the reason as a toast'
+    );
+    T::ok(
+        str_contains($view, "size: 'sm'"),
+        'the confirmation modal is small'
+    );
+    T::ok(
+        str_contains($view, "row.classList.add('js-row-removing')"),
+        'a deleted row is marked for the fade'
+    );
+    T::ok(str_contains($view, 'row.remove()'), 'the row is removed rather than reloading the page');
+    T::ok(str_contains($view, "body.set('ajax', '1')"), 'the delete posts the ajax flag');
+    T::ok(str_contains($app, 'modal-sm'), 'showConfirm supports a small size');
+
+    // The server stays the authority — a member can add to a cart between the
+    // render and the click, so the refusal must still exist and still report
+    // WHICH reference blocked it. Matched against the escaped literal, which
+    // is what is actually in the source.
+    T::ok(str_contains($ctrl, "json_response(['ok' => \$ok"), 'the endpoint answers JSON for the AJAX path');
+    foreach ([
+        'has been bought and is in a cart',
+        'this product has been bought',
+        "is in a member\\'s cart",
+    ] as $phrase) {
+        T::ok(str_contains($ctrl, $phrase), "the refusal names the cause: {$phrase}");
+    }
+
+    // And the size option must not have changed the default for the ~20
+    // existing callers.
+    T::ok(str_contains($app, 'size = null'), 'showConfirm defaults to the current width');
+    T::ok(
+        !str_contains((string) preg_replace('#//[^\n]*#', '', $app), 'modal-dialog-centered modal-dialog-centered'),
+        'the dialog class is not doubled up'
+    );
+});
+
 exit(T::summary());

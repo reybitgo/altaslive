@@ -962,9 +962,15 @@ class AdminController
         if (($_GET['edit'] ?? '') !== '') {
             $editProduct = Product::find((int) $_GET['edit']);
         }
-        $products = Product::allPaginated((int) ($_GET['pg'] ?? 1), per_page());
-        $pageTitle = 'Shop Products';
-        require 'views/admin/shop_products.php';
+            $products = Product::allPaginated((int) ($_GET['pg'] ?? 1), per_page());
+            // One batched query for the page, so the Delete button can explain
+            // itself without a request and without an N+1 (see
+            // Product::referenceMap). This is only the fast path: the server
+            // still refuses the delete, because a member can add the item to a
+            // cart between this render and the click.
+            $productRefs = Product::referenceMap(array_column($products['data'] ?? [], 'id'));
+            $pageTitle = 'Shop Products';
+            require 'views/admin/shop_products.php';
     }
 
     public function saveShopProduct(): void
@@ -1025,15 +1031,41 @@ class AdminController
         csrf_verify();
 
         $id = (int) ($_POST['product_id'] ?? 0);
+        $wantsJson = (($_GET['ajax'] ?? '') === '1')
+            || str_contains(strtolower((string) ($_SERVER['HTTP_ACCEPT'] ?? '')), 'application/json')
+            || strtolower((string) ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'xmlhttprequest';
+
         try {
             $ok = Product::delete($id);
-            $msg = $ok ? 'Product deleted.' : 'Cannot delete product: it is still in an order or in someone\'s cart.';
+            if ($ok) {
+                $msg = 'Product deleted.';
+            } else {
+                // Say WHICH reference is blocking it. The remedies differ: an
+                // order is a permanent record, a cart line the member can
+                // empty. A single "cannot delete" made both look equally
+                // permanent.
+                $ref = Product::referenceMap([$id]);
+                $r   = $ref[$id] ?? ['orders' => 0, 'carts' => 0];
+                $msg = match (true) {
+                    $r['orders'] > 0 && $r['carts'] > 0
+                        => 'Cannot delete: this product has been bought and is in a cart.',
+                    $r['orders'] > 0
+                        => 'Cannot delete: this product has been bought.',
+                    default
+                        => 'Cannot delete: this product is in a member\'s cart.',
+                };
+            }
         } catch (Throwable $e) {
             // Backstop: a constraint violation must never surface as a 500.
             error_log('[shop] deleteShopProduct failed: ' . $e->getMessage());
             $ok = false;
-            $msg = 'Cannot delete product: it is still referenced. Remove it from orders and carts first.';
+            $msg = 'Cannot delete: this product is still referenced. Remove it from orders and carts first.';
         }
+
+        if ($wantsJson) {
+            json_response(['ok' => $ok, 'message' => $msg]);
+        }
+
         flash($ok ? 'success' : 'error', $msg);
         redirect('/?page=admin_shop');
     }

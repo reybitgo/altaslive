@@ -443,7 +443,7 @@ test('every UI string the manual QA doc names actually exists', function (): voi
         'Order placed. Upload your payment proof to continue.',
         'Order moved to ', 'Refund task opened.', 'Refund marked paid.',
         'Product created.', 'Product updated.', 'The shop is currently closed.',
-        'Cannot delete product: it is still in an order or in someone',
+        'Cannot delete: this product has been bought',
         'Insufficient stock. Requested ', 'Payout route', 'Sold out',
         'Enable Shop', 'Save Settings', 'Expiry run: ',
         'Pending payment', 'Payment under review', 'Payment rejected',

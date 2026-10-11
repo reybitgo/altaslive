@@ -478,7 +478,7 @@ This is the most important rule in the expiry logic: if a customer has already s
 | 1 | Open `?page=cart` with an empty cart | "Cart is empty" and a **Browse the Shop** link. No error. |
 | 2 | Set a cart line's quantity to `0` and update | The line disappears (0 = remove) |
 | 3 | Set a quantity higher than available stock | Red message `Insufficient stock. Requested N, only M available.` |
-| 4 | Click **Delete** on QA Widget (you have orders using it) | Refused: *"Cannot delete product: it is still in an order or in someone's cart."* |
+| 4 | Click **Delete** on QA Widget (you have orders using it) | The button looks greyed out. Clicking it shows a toast: *"Cannot delete: this product has been bought."* — and nothing is deleted |
 | 5 | After every add/remove, check the 🛒 badge | It always equals the real number of units in the cart (0 when empty) |
 | 6 | Empty the cart from the drawer | The drawer redraws with "Your cart is empty", and **no Checkout button** — a dead Checkout link on an empty cart was a real bug, fixed 2026-10-10 |
 
@@ -507,6 +507,7 @@ Tick every box you actually verified. **Leave a box unticked if you did not test
 developer something true. A ticked box you did not check is worse than no box at all.
 
 - [ ] A test product was created, edited, and could not be deleted while orders referenced it.
+- [ ] Deleting a product with **no** orders opened a small confirmation modal; confirming removed the row from the table with a fade, without a page reload.
 - [ ] Two orders completed the full happy path (one e-wallet, one manual payment).
 - [ ] Proof upload, exact-amount verification, and duplicate-reference refusal all behaved correctly.
 - [ ] Packing → ready to ship → shipped → dispatched → delivered → completed, all with proof of delivery.

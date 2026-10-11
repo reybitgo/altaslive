@@ -68,12 +68,42 @@
                       : '<span class="badge bg-secondary-subtle text-secondary">○ Inactive</span>' ?>
                 </td>
                 <td class="text-end" style="padding-right:1.25rem;">
+                  <?php
+                  // Whether anything still references this product, resolved
+                  // once for the whole page in the controller. It only decides
+                  // what the button *says* — the server still refuses the
+                  // delete, because a member can add the item to a cart between
+                  // this render and the click.
+                  $ref  = $productRefs[(int) $p['id']] ?? ['orders' => 0, 'carts' => 0];
+                  $why  = match (true) {
+                      $ref['orders'] > 0 && $ref['carts'] > 0
+                          => 'This product has been bought and is in a cart. It cannot be deleted.',
+                      $ref['orders'] > 0
+                          => 'This product has been bought. It cannot be deleted.',
+                      $ref['carts'] > 0
+                          => 'This product is in a member\'s cart. It cannot be deleted.',
+                      default
+                          => '',
+                  };
+                  $blocked = $why !== '';
+                  ?>
                   <a href="<?= link_to('admin_shop', ['edit' => $p['id']]) ?>" class="btn btn-sm btn-outline-primary">Edit</a>
-                  <form method="post" action="<?= link_to('admin_delete_product') ?>" class="d-inline"
-                        onsubmit="return confirm('Delete this product?');">
+                  <form method="post" action="<?= link_to('admin_delete_product') ?>" class="d-inline js-delete-product-form"
+                        data-name="<?= e($p['name']) ?>"
+                        data-blocked="<?= $blocked ? '1' : '0' ?>"
+                        data-reason="<?= e($why) ?>">
                     <?= csrf_field() ?>
                     <input type="hidden" name="product_id" value="<?= (int) $p['id'] ?>">
-                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    <?php /* aria-disabled, NOT disabled.
+                             A real `disabled` button is unfocusable and swallows
+                             the click, so the member would never learn why. This
+                             one looks dead and explains itself on click. */ ?>
+                    <button type="submit"
+                            class="btn btn-sm btn-outline-danger js-delete-product<?= $blocked ? ' disabled-look' : '' ?>"
+                            <?= $blocked ? 'aria-disabled="true"' : '' ?>
+                            <?php if ($blocked): ?>title="<?= e($why) ?>"<?php endif; ?>>
+                      Delete
+                    </button>
                   </form>
                 </td>
               </tr>
@@ -90,6 +120,89 @@
       ℹ️ Stock is absolute inventory. It is deducted automatically when an order is handed to the courier;
       adjust it here for deliveries, write-offs, and recounts.
     </div>
+
+    <style>
+      /* A referenced product's Delete button reads as unavailable. */
+      .btn.disabled-look {
+        opacity: .45;
+        cursor: not-allowed;
+        pointer-events: none;   /* the tooltip/toast is driven off the form */
+      }
+      tr.js-row-removing { opacity: 0; transform: translateX(-8px); }
+      tbody tr { transition: opacity .25s ease, transform .25s ease; }
+    </style>
+
+    <script>
+    (function () {
+      var CSRF = <?= js(csrf_token()) ?>;
+
+      document.addEventListener('submit', function (e) {
+        var form = e.target.closest('.js-delete-product-form');
+        if (!form) return;
+        e.preventDefault();
+
+        var btn  = form.querySelector('.js-delete-product');
+        var name = form.dataset.name || 'this product';
+
+        // Blocked: explain, post nothing. The server would refuse anyway; this
+        // avoids a pointless round trip and keeps the admin where they are.
+        if (form.dataset.blocked === '1') {
+          if (window.showToast) showToast(form.dataset.reason || 'Cannot delete.', 'error');
+          return;
+        }
+
+        showConfirm({
+          size: 'sm',
+          title: 'Delete ' + name + '?',
+          message: 'This permanently removes the product from the catalog. This cannot be undone.',
+          confirmText: 'Delete',
+          confirmClass: 'btn-danger',
+          onConfirm: function () {
+            if (btn) btn.disabled = true;
+            var body = new URLSearchParams(new FormData(form));
+            body.set('ajax', '1');
+
+            fetch(form.action, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': CSRF
+              },
+              body: body.toString()
+            })
+              .then(function (r) {
+                return r.json().catch(function () {
+                  return { ok: false, message: 'Unexpected server response.' };
+                });
+              })
+              .then(function (res) {
+                if (!res || !res.ok) {
+                  if (btn) btn.disabled = false;
+                  // Reachable: the reference state can change between render
+                  // and click. Say which one is blocking it.
+                  if (window.showToast) showToast(res.message || 'Could not delete.', 'error');
+                  return;
+                }
+                var row = form.closest('tr');
+                if (!row) return;
+                row.classList.add('js-row-removing');
+                // Removed rather than reloaded, so the admin keeps their
+                // place and scroll position in the catalog.
+                window.setTimeout(function () {
+                  row.remove();
+                  if (window.showToast) showToast(res.message || 'Product deleted.', 'success');
+                }, 250);
+              })
+              .catch(function () {
+                if (btn) btn.disabled = false;
+                if (window.showToast) showToast('Could not reach the server. Nothing was deleted.', 'error');
+              });
+          }
+        });
+      });
+    })();
+    </script>
   </div>
 </div>
 

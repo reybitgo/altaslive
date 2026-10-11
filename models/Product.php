@@ -24,6 +24,44 @@ class Product {
         $st->execute([$productId]);
         return (int)$st->fetchColumn();
     }
+    /**
+     * Why a product cannot be deleted, for many products at once.
+     *
+     * Returns product_id => ['orders' => int, 'carts' => int], only for
+     * products that have at least one reference. Two queries for the whole
+     * page — calling delete()'s checks per row instead would be the N+1 that
+     * availableStockMap() was added to remove.
+     *
+     * 'orders' counts shop_order_items, 'carts' counts cart_items. They are
+     * reported separately because the admin remedy differs: an order is a
+     * permanent record, a cart line can be emptied by the member.
+     */
+    public static function referenceMap(array $productIds): array
+    {
+        $ids = array_values(array_unique(array_map('intval', $productIds)));
+        if (!$ids) return [];
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+
+        $out = [];
+
+        $orders = db()->prepare("SELECT product_id, COUNT(*) AS n FROM shop_order_items WHERE product_id IN ({$ph}) GROUP BY product_id");
+        $orders->execute($ids);
+        foreach ($orders->fetchAll() as $r) {
+            $out[(int) $r['product_id']]['orders'] = (int) $r['n'];
+        }
+
+        $carts = db()->prepare("SELECT product_id, COUNT(*) AS n FROM cart_items WHERE product_id IN ({$ph}) GROUP BY product_id");
+        $carts->execute($ids);
+        foreach ($carts->fetchAll() as $r) {
+            $out[(int) $r['product_id']]['carts'] = (int) $r['n'];
+        }
+
+        foreach ($out as $id => $counts) {
+            $out[$id] = ['orders' => $counts['orders'] ?? 0, 'carts' => $counts['carts'] ?? 0];
+        }
+        return $out;
+    }
+
     public static function availableStock(int $productId): int {
         $product = self::find($productId);
         if (!$product) return 0;

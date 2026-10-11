@@ -110,17 +110,28 @@ function showConfirm(opts) {
     confirmClass = "btn-primary",
     onConfirm = null,
     formId = null,
+    // Dialog width. `null` keeps Bootstrap's default, which is what the ~20
+    // existing callers expect. Pass "sm" for a short confirmation that only
+    // needs to carry a title and one line — a default-width modal around
+    // "Are you sure?" is mostly empty space.
+    size = null,
   } = opts;
 
+  // Allow-listed, then appended as a raw class. Same rule as the toast type:
+  // an arbitrary string reaching a class attribute is an injection sink, and
+  // there are only three widths worth having.
+  const sizeClass = { sm: "modal-sm", lg: "modal-lg", xl: "modal-xl" }[size] || "";
+
   const html = `
-    <div class="modal fade" id="${escHtml(id)}" tabindex="-1" aria-modal="true" role="dialog">
-      <div class="modal-dialog modal-dialog-centered">
+    <div class="modal fade" id="${escHtml(id)}" tabindex="-1" aria-modal="true" role="dialog"
+         aria-labelledby="${escHtml(id)}_title" aria-describedby="${escHtml(id)}_body">
+      <div class="modal-dialog modal-dialog-centered ${escHtml(sizeClass)}">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title">${title}</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <h5 class="modal-title" id="${escHtml(id)}_title">${title}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
-          <div class="modal-body" style="font-size:.9rem;line-height:1.65;">${message}</div>
+          <div class="modal-body" id="${escHtml(id)}_body" style="font-size:.9rem;line-height:1.65;">${message}</div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
             <button type="button" class="btn ${escHtml(confirmClass)}" id="${escHtml(id)}_confirm">${escHtml(confirmText)}</button>
