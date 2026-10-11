@@ -134,7 +134,13 @@
 
     <script>
     (function () {
-      var CSRF = <?= js(csrf_token()) ?>;
+      // e(), not js(). A <script> block is a raw-text element: the HTML parser
+      // does NOT decode entities inside it, so js() emitted &quot;token&quot;
+      // verbatim and the whole IIFE died with "SyntaxError: Unexpected token
+      // '&'" — leaving no submit listener at all and therefore no modal.
+      // js() is only correct inside an HTML attribute, where the parser does
+      // decode. Matches the convention in views/partials/cart_offcanvas.php.
+      var CSRF = '<?= e(csrf_token()) ?>';
 
       document.addEventListener('submit', function (e) {
         var form = e.target.closest('.js-delete-product-form');

@@ -602,6 +602,89 @@ test('the credential scan is precise enough to be useful', function (): void {
     );
 });
 
+T::group('JavaScript emitted from PHP');
+
+/**
+ * js() htmlspecialchars()es its output. That is correct inside an HTML
+ * attribute — the parser decodes the entities — and fatal inside <script>,
+ * which is a raw-text element where nothing is decoded.
+ *
+ * The result is `var x = &quot;str&quot;;`, a SyntaxError: Unexpected token '&'.
+ * Because it is a parse error, the ENTIRE script block dies, not just the one
+ * line: any listener it registered is never attached. That is how the admin
+ * product Delete button ended up with no confirmation modal at all, and the
+ * same bug was live on the admin Change Password modal.
+ *
+ * Both were invisible to every existing check. Linting for "is the modal wired
+ * up" passed, because the markup was fine; only running the page showed it.
+ */
+test('js() is never emitted inside a <script> block', function (): void {
+    $root = REPO_ROOT . '/views';
+    $it   = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root));
+    $offenders = [];
+
+    foreach ($it as $f) {
+        if (!$f->isFile() || $f->getExtension() !== 'php') continue;
+        $src = (string) file_get_contents($f->getPathname());
+        if (!preg_match_all('#<script\b[^>]*>(.*?)</script>#is', $src, $m, PREG_OFFSET_CAPTURE)) {
+            continue;
+        }
+        foreach ($m[1] as $region) {
+            if (!preg_match_all('#<\?=\s*(?:js|jsargs)\s*\(#', $region[0], $h, PREG_OFFSET_CAPTURE)) {
+                continue;
+            }
+            $rel = str_replace('\\', '/', substr($f->getPathname(), strlen($root) + 1));
+            foreach ($h[0] as $hit) {
+                $offenders[] = $rel . ':' . (substr_count(substr($src, 0, $region[1] + $hit[1]), "\n") + 1);
+            }
+        }
+    }
+
+    T::ok(
+        $offenders === [],
+        'no view emits js()/jsargs() inside a <script> block',
+        $offenders ? implode(', ', $offenders) : 'none found'
+    );
+
+    // The two call sites that had it, asserted positively so the fix is not
+    // undone by someone "restoring the js() call".
+    foreach (['admin/shop_products.php', 'admin/user_view.php'] as $rel) {
+        $src = (string) file_get_contents(REPO_ROOT . '/views/' . $rel);
+        T::ok(
+            (bool) preg_match('/var CSRF = \'<\?= e\(/', $src)
+            || (bool) preg_match('/const cdUser = \'<\?= e\(/', $src),
+            "{$rel} emits its JS literal with e() inside quotes"
+        );
+    }
+});
+
+test('the shared JS actually executes and builds a working modal', function (): void {
+    // Source inspection cannot catch a parse error. Every check above passed
+    // while the Delete button silently did nothing, because the page's inline
+    // script died on `var CSRF = &quot;...&quot;` and no listener was ever
+    // attached. This runs the real app.js against a stub DOM.
+    $node = trim((string) @shell_exec('node --version 2>NUL'));
+
+    $test = REPO_ROOT . '/tests/js/showconfirm.test.js';
+    T::ok(is_file($test), 'the JS behaviour test exists');
+
+    if ($node === '') {
+        echo "\n  (node not found - skipping the JS execution test)\n";
+        T::ok(true, 'skipped: no node runtime available');
+        return;
+    }
+
+    $out = [];
+    $rc  = 1;
+    exec('node ' . escapeshellarg($test) . ' 2>&1', $out, $rc);
+    $tail = trim(implode("\n", array_slice($out, -4)));
+    T::ok(
+        $rc === 0,
+        'showConfirm runs and produces a usable modal',
+        $rc !== 0 ? $tail : ''
+    );
+});
+
 T::group('Loading invariants');
 
 /**

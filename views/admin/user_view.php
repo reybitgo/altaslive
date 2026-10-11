@@ -798,10 +798,15 @@ function confirmPwChange(btn) {
   }
 
 // The username is interpolated into a message that showConfirm() writes
-    // with insertAdjacentHTML, so it must be escaped AT THE SINK. js() protects
-    // the JavaScript literal; escHtml() protects the DOM. The <strong> around it
-    // is developer-authored markup and stays live. Defect C5b.
-    const cdUser = <?= js($user['username']) ?>;
+    // with insertAdjacentHTML, so it must be escaped AT THE SINK. escHtml()
+    // protects the DOM; the <strong> around it is developer-authored markup
+    // and stays live. Defect C5b.
+    //
+    // e(), not js(), for the literal itself: this sits inside a <script> block,
+    // which is raw text, so js()'s &quot; reached the parser verbatim and threw
+    // "SyntaxError: Unexpected token '&'" — killing this whole script and with
+    // it the Change Password modal. Same bug as admin/shop_products.php.
+    const cdUser = '<?= e($user['username']) ?>';
     showConfirm({
       title: 'Change Password',
       message: 'Change password for <strong>@' + escHtml(cdUser) + '</strong>? This action is irreversible.',
