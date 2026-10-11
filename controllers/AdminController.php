@@ -1115,7 +1115,10 @@ class AdminController
     public function shopOrders(): void
     {
         Auth::guard('admin');
-        $status = (string) ($_GET['status'] ?? 'payment_review');
+        // Default to the first tab in the queue strip — the top of the
+        // order-state sequence (pending). Was hardcoded 'payment_review',
+        // which no longer matches the lifecycle ordering of the tabs.
+        $status = (string) ($_GET['status'] ?? (ShopOrder::STATUSES[0] ?? 'all'));
         $orders = ShopOrder::byStatus($status, (int) ($_GET['pg'] ?? 1), per_page());
         $counts = ShopOrder::statusCounts();
         $counts['all'] = array_sum($counts);

@@ -175,11 +175,36 @@ $overdue = $deadline && strtotime((string) $deadline) < time();
           <div class="card border-danger-subtle">
             <div class="card-body d-flex justify-content-between align-items-center">
               <div style="font-size:.85rem;">Changed your mind? You can still cancel — stock goes back on sale immediately.</div>
-              <form method="post" action="<?= link_to('shop_cancel_order') ?>" onsubmit="return confirm('Cancel this order?');">
+              <?php /* showConfirm(), not the native confirm() every other
+                       destructive action on this page uses: the shop pages
+                       standardized on the app's modal (tests/js enforces its
+                       behavior), and confirm() is also blocked entirely in
+                       some embedded webviews. The buyer's order number is
+                       interpolated so they know exactly which order they are
+                       killing — canceled orders cannot be un-cancelled. */ ?>
+              <form method="post" action="<?= link_to('shop_cancel_order') ?>" class="js-cancel-order-form">
                 <?= csrf_field() ?>
                 <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
                 <button type="submit" class="btn btn-outline-danger btn-sm">Cancel order</button>
               </form>
+              <script>
+              (function () {
+                var form = document.querySelector('.js-cancel-order-form');
+                if (!form) return;
+                form.addEventListener('submit', function (e) {
+                  e.preventDefault();
+                  showConfirm({
+                    size: 'sm',
+                    title: 'Cancel order <?= e((string) $order['order_no']) ?>?',
+                    message: 'The stock goes back on sale immediately<?= $order['payment_method'] === 'ewallet' ? ', and your e-wallet is refunded automatically' : '' ?>. '
+                           + 'This cannot be undone.',
+                    confirmText: 'Cancel order',
+                    confirmClass: 'btn-danger',
+                    onConfirm: function () { form.submit(); }
+                  });
+                });
+              })();
+              </script>
             </div>
           </div>
         <?php endif; ?>

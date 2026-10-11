@@ -5,9 +5,13 @@
  *         counts, next-action hints from the matrix. Expects: $orders,
  *         $counts, $status.
  */
-$tabs = array_merge(['payment_review', 'payment_failed', 'paid', 'packing', 'ready_to_ship',
-                     'shipped', 'out_for_delivery', 'delivery_failed', 'returned_to_sender',
-                     'delivered', 'on_hold', 'pending', 'completed', 'cancelled'], ['all']);
+/* Tab order follows the order-state sequence (ShopOrder::STATUSES): an order
+   moves pending → payment_review → paid → … → delivered → completed/cancelled,
+   so the queue reads left-to-right in the same lifecycle order rather than in
+   whatever order the statuses happened to be listed. The model constant is
+   the single source of truth, so adding a status there re-orders the tabs
+   automatically without touching this view. */
+$tabs = array_merge(ShopOrder::STATUSES, ['all']);
 ?>
 <?php require 'views/partials/head.php'; ?>
 <?php require 'views/partials/sidebar_admin.php'; ?>
@@ -38,8 +42,8 @@ $tabs = array_merge(['payment_review', 'payment_failed', 'paid', 'packing', 'rea
           <a class="nav-link <?= $status === $t ? 'active' : '' ?>"
              href="<?= link_to('admin_shop_orders', ['status' => $t]) ?>"
              <?= $status === $t ? 'aria-current="page"' : '' ?>>
-            <?= $status === 'all' ? 'All' : e(shop_status_label($status)) ?>
-            <span class="badge bg-<?= $counts[$t] ?? 0 > 0 ? 'primary' : 'secondary' ?> ms-1"><?= $counts[$t] ?? 0 ?></span>
+            <?= $t === 'all' ? 'All' : e(shop_status_label($t)) ?>
+            <span class="badge bg-<?= ($counts[$t] ?? 0) > 0 ? 'primary' : 'secondary' ?> ms-1"><?= $counts[$t] ?? 0 ?></span>
           </a>
         </li>
       <?php endforeach; ?>
