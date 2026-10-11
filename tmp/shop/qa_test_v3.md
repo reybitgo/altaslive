@@ -11,7 +11,7 @@
 
 | Evidence                                         | Result                                                                                                                                                                                                                      |
 | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Automated smoke test (`tmp/shop/smoke_test.php`) | **85 passed, 0 failed, exit code 0** — covers order creation, e-wallet & manual payment, packing/ship/deliver legs, holds, resumes, expiry, refund block, stock reservation/deduction, double-deduction guard, attempt caps |
+| Automated suite (`php tests/run.php`) | **529 assertions, 0 failures** across 5 suites — `QaSuiteTest` (11 end-to-end QA cases), `ShopStateMachineTest` (271), `ViewRenderTest`, `TemplateLintTest`, `SchemaDriftTest`. Covers order creation, e-wallet & manual payment, packing/ship/deliver legs, holds, resumes, expiry, refund routes, stock reservation/deduction, double-deduction guard, attempt caps |
 | PHP syntax (lint) battery                        | Clean parse: `index.php`, `core/helpers.php`, all 7 shop models, both controllers                                                                                                                                           |
 | Delivery-leg defects found during matrix testing | Fixed and re-proven: attempts-cap guard on re-dispatch, phantom attempt on refused fail, reship linkage (`reship_of`), stock double-deduction guard                                                                         |
 | Cart stock-out message (S40/S45)                 | Fixed to the exact wording: _"Insufficient stock. Requested N, only M available."_                                                                                                                                          |
@@ -97,20 +97,20 @@ _Purpose: give the shop something to sell. One product is enough for the whole s
 
 1. Open `http://localhost/altaslive/?page=shop`.
 2. Find **QA Widget** (price ₱100.00, 5 in stock).
-3. Click **Add to cart** once (the card submits 1 unit with the request; the card itself has no quantity stepper).
-4. **PASS if:** you land back on the shop page with green flash _"Added to cart."_, the cart drawer auto-opens on the right (URL ends in `?page=shop&cart=1`), and the topbar 🛒 badge shows **1**. On the product card the button now reads **Already in cart** (disabled) with a green notice _"Item already in the cart"_ under it.
-5. To reach 2 units, use the cart drawer's **+** stepper (or open **View full cart** (`?page=cart`) and use its stepper) to bump the quantity to 2.
+3. Set the **Qty** stepper on the card (it is capped at the available stock) and click **Add to cart**.
+4. **PASS if:** you land back on the shop page with green flash _"Added to cart."_, the cart drawer auto-opens on the right (URL ends in `?page=shop&cart=1`), and the topbar 🛒 badge shows the quantity you asked for. On the product card the button now reads **Add more** (still clickable) with a green notice _"N already in the cart"_ under it.
+5. To reach 2 units you can either set the card's **Qty** stepper to 2 before adding, or use the cart drawer's **+** stepper (or open **View full cart** (`?page=cart`) and use its stepper).
 6. **PASS if:** the topbar badge and the drawer's count badge both read **2**, and the drawer subtotal shows `200.00 PHP`.
 7. Click **View full cart** in the drawer → **PASS if:** the cart page lists `QA Widget` with quantity 2 and line total `200.00`.
 
-> **Already-in-cart behavior (by design):** once a product is in the cart, its product card renders a **disabled "Already in cart" button** plus the notice _"Item already in the cart"_ — repeated taps on the card **cannot** add a second copy or bump the quantity. Use the drawer or cart page steppers to change quantity; use the ✕ remove control (or **Remove** in the drawer) to take it out.
+> **Already-in-cart behavior (changed in the 2026-10-10 fix):** the card is no longer a dead end. It renders a **Qty stepper** (max = available stock) and an enabled **Add more** button, so a buyer can top up from the storefront. The green notice reads _"N already in the cart"_. Rapid repeat clicks on the same cart row are ignored while the previous update is still in flight, so the badge and the quantity never disagree.
 
 > **Drawer notes:** the topbar 🛒 button opens the off-canvas drawer; "View full cart" has no underline. Remove/update inside the drawer happen over AJAX (no page reload); if removing the last item empties the cart, the drawer redraws itself with _"Your cart is empty"_ and a **Browse Products** button.
 
 ### B2 — stock-out guard (the S40 test)
 
 1. In the **admin** window, edit `QA Widget` and set **Stock = 2**. Click **💾 Update Product**.
-2. Back in the member window, on the shop page click **Add to cart** again once — the card is now showing **Already in cart** (disabled), so instead bump the drawer/cart quantity from 2 to **3** (your cart now wants 3, only 2 exist).
+2. Back in the member window, on the shop page click **Add more** once (the card's Qty stepper now reads the reduced availability) — or bump the drawer/cart quantity from 2 to **3**, so your cart wants 3 while only 2 exist.
 3. **PASS if:** a red/danger message appears saying exactly:
    **"Insufficient stock. Requested 3, only 2 available."**
    (The numbers will match whatever you actually have — the _shape_ `Requested N, only M available` is what matters.)
@@ -128,7 +128,7 @@ _Purpose: give the shop something to sell. One product is enough for the whole s
 
 1. Member window: cart → click **Proceed to checkout** (the blue button under the Summary card).
 2. Fill: billing name (yours), phone, shipping address (any), city, province, postal.
-3. **Payment method:** **E-Wallet**. Tick the terms checkbox.
+3. **Payment method:** **E-Wallet**. Tick the terms checkbox. (If your balance is below the order total the E-Wallet radio is now **disabled** with a red note saying so, and is not pre-selected — pick another method, or top up first. This is new behaviour as of 2026-10-10 and is intended.)
 4. Click **Place order**.
 5. **PASS if:**
    - green flash _"Order placed and paid. Thank you!"_;
@@ -144,11 +144,11 @@ _Purpose: give the shop something to sell. One product is enough for the whole s
 1. Member window: shop → add `QA Widget × 1` → checkout.
 2. **Payment method:** **GCash**. Terms ticked. **Place order**.
 3. **PASS if:** order page status pill says **Pending payment** and shows a "_Pay by …_" deadline plus the proof-upload form.
-4. **Try the confirm-lock checkbox:** the form requires the little "_I understand submitting this proof ends my option to cancel_" box — unset → **PASS if** the browser refuses to submit.
+4. **Note:** there is no confirm-lock checkbox any more (removed in the 2026-10-10 fix). It was never read server-side - a POST without it was accepted exactly like one with it - so it was decoration implying a protection that did not exist. The same sentence is still shown as plain text under the form. **Do not report its absence as a failure.**
 
 **In the member window, upload the proof:**
 
-5. Attach any image, optionally a reference number, tick the lock, **Submit proof**.
+5. Attach any image, optionally a reference number, **Submit proof**.
 6. **PASS if:** green flash _"Proof submitted…"_ and the status pill becomes **Payment under review**.
 7. **Anti-cancel rule (S-critical):** after proof submission the page must NOT show a _"Cancel order"_ button anymore. **PASS if** it doesn't.
 
@@ -249,12 +249,14 @@ Member window: confirm receipt on the reship-delivered order → **PASS if** com
 
 ## 9. Test H — Refund block & deny (S29/S30)
 
-1. Admin: on a **Delivered** order (repeat C1/fulfilment), open the **Refund** panel, cause `customer_request`, amount = order total, click **Open refund task**.
+1. Admin: on a **Delivered** order (repeat C1/fulfilment), open the **Refund** panel, cause `customer_dispute`, **Payout route `E-wallet`**, amount = order total, click **Open refund task**.
+   > The cause list is `admin_cancel / delivery_failure / customer_dispute / other` — there is no `customer_request` (that value belongs to the *cancel order* form, not the refund form).
+   > **New as of 2026-10-10:** the refund panel has a **Payout route** selector. Only **E-wallet** credits the member's wallet when the refund is paid out; `cash` / `bank` / `manual` (used for GCash) settle out of band and write no wallet credit. The *Destination* box is now just a note for your records and does **not** choose the route.
 2. Member window: refresh the order page → **PASS if** the "Confirm receipt" affordance is gone/locked and the page shows the refund task (open).
-3. Try to confirm receipt anyway (nothing to click? then POST is impossible from the UI — that IS the pass). If you have dev skills only, skip: the automated smoke test proves the block.
+3. Try to confirm receipt anyway (nothing to click? then POST is impossible from the UI — that IS the pass). If you have dev skills only, skip: `tests/QaSuiteTest.php` QA-4 proves the block.
 4. **Back in admin:** click **Deny** on the refund → **PASS if** member window now shows the confirm button again; confirm receipt → **PASS if** the order completes.
 
-> The full refund _approval_ path (approve → mark paid with a receipt reference) is a workflow you don't need for storefront confidence; the automated smoke test covers its guard rules.
+> The full refund _approval_ path (approve → mark paid with a receipt reference) is a workflow you don't need for storefront confidence. If you do walk it: with **Payout route = E-wallet**, the member's wallet is credited exactly once on **Mark paid**; with any other route, the wallet is **not** touched. `QaSuiteTest.php` QA-4 and QA-11 cover both.
 
 ---
 
@@ -296,7 +298,7 @@ Member window: confirm receipt on the reship-delivered order → **PASS if** com
 | 1   | Open `?page=cart` with an empty cart                                                          | "_Cart is empty._" + a "Browse the Shop" link, no error                  |
 | 2   | On the cart page set a line's qty to `0` in the qty box and update                            | The line disappears (qty 0 = remove)                                    |
 | 3   | Set a line's qty to a number bigger than available stock, update                              | Red flash "**Insufficient stock. Requested N, only M available.**"      |
-| 4   | In admin, click **Delete** on your QA product (with QA orders still existing)                 | Refused: _"Cannot delete product: it has existing shop orders."_        |
+| 4   | In admin, click **Delete** on your QA product (with QA orders still existing)                 | Refused: _"Cannot delete product: it is still in an order or in someone's cart."_ |
 | 5   | On the shop page in the member window, look at the top-right cart badge after each add/remove | The number always matches the count of units in the cart (0 when empty) |
 
 > **Drawer vs page badge:** the same count should also be reflected in the off-canvas cart drawer when you open it from the topbar. If the page badge and drawer badge disagree, note both numbers in Appendix B.
@@ -316,6 +318,10 @@ Tick every box. Any box you cannot tick = find a developer and show them this do
 - [ ] An open refund blocked confirm-receipt until denied.
 - [ ] Expired pending orders auto-cancelled; payment_review orders were NEVER expired.
 - [ ] shop_enabled=0 closed the shop; re-enabled it.
+- [ ] The product card offered a **Qty stepper** and an enabled **Add more** button (not a dead "Already in cart"), and repeated clicks on one cart row never desynced the badge.
+- [ ] With a balance below the order total, the **E-Wallet radio was disabled** with an explanatory note rather than silently failing at submit.
+- [ ] A failed checkout **kept the delivery address** the buyer had typed.
+- [ ] The Refund panel had a **Payout route** selector, and paying out an `ewallet` refund credited the wallet exactly once.
 - [ ] Cart and off-canvas drawer badges matched the real cart contents; empty cart showed "Cart is empty"; the "Proceed to checkout" / "View full cart" / "Back to cart" labels matched what you saw.
 
 ## 14. Cleanup after testing
@@ -436,6 +442,9 @@ A sub-section titled "🔗 Indirect Referral Bonuses (10 Levels)" with 10 rows (
 
 ---
 
-_Automated counterpart of this document: `php tmp/shop/smoke_test.php` — 85 assertions, all passing as of 2026-10-09._
+_Automated counterpart of this document: `php tests/run.php` — **529 assertions, 0 failures** across 5 suites as of 2026-10-10.
+_`tmp/shop/smoke_test.php` no longer exists; it was a destructive test against the live database and was replaced by the disposable-schema suite in `tests/`._
+
+_Pre-deploy gate: `php tests/predeploy.php` runs the suite plus the Strategy-C and credential checks, and exits non-zero if you should not deploy._
 
 _This is v3 of the manual cart/shop QA test. If any instruction or expected text above no longer matches the live app, treat that line itself as a QA finding and record it in Appendix B._
