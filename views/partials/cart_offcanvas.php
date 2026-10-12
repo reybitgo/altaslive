@@ -78,6 +78,15 @@ $itemCount  = (int) $cartTotals['total_items'];
     el.classList.toggle('d-none', count <= 0);
   }
 
+  // The sidebar paints the Cart badge twice (desktop sidebar + mobile
+  // offcanvas), so update every instance by class.
+  function updateSidebarBadge(count) {
+    document.querySelectorAll('.sidebar-cart-badge').forEach(function (el) {
+      el.textContent = count;
+      el.classList.toggle('d-none', count <= 0);
+    });
+  }
+
   function broadcastCart(count, removedProductId) {
     window.dispatchEvent(new CustomEvent('cart:changed', {
       detail: { count: count, removedProductId: removedProductId || 0 }
@@ -119,6 +128,7 @@ $itemCount  = (int) $cartTotals['total_items'];
 
     updateFooter(0);
     updateTopbarBadge(0);
+    updateSidebarBadge(0);
     document.getElementById('offcanvasCount').textContent = 0;
   }
 
@@ -186,6 +196,7 @@ $itemCount  = (int) $cartTotals['total_items'];
           input.dataset.qty = String(next);
           updateFooter(res.subtotal);
           updateTopbarBadge(res.count);
+          updateSidebarBadge(res.count);
           document.getElementById('offcanvasCount').textContent = res.count;
           broadcastCart(res.count, 0);
         })
@@ -213,6 +224,7 @@ $itemCount  = (int) $cartTotals['total_items'];
           row.remove();
           updateFooter(res.subtotal);
           updateTopbarBadge(res.count);
+          updateSidebarBadge(res.count);
           document.getElementById('offcanvasCount').textContent = res.count;
           broadcastCart(res.count, parseInt(row.dataset.productId || '0', 10));
           if (!document.querySelector('#cartItemsContainer .cart-item')) {
@@ -253,6 +265,7 @@ $itemCount  = (int) $cartTotals['total_items'];
         input.dataset.qty = String(v);
         updateFooter(res.subtotal);
         updateTopbarBadge(res.count);
+        updateSidebarBadge(res.count);
         document.getElementById('offcanvasCount').textContent = res.count;
         broadcastCart(res.count, 0);
       });

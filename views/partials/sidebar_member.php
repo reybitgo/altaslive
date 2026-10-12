@@ -60,7 +60,7 @@ $cartBadge = Cart::itemCountForMember((int) ($user['id'] ?? 0));
 $nav[] = 'SEPARATOR:Shop';
 $nav[] = ['page' => 'shop',        'icon' => '🛍️', 'label' => 'Shop',      'pages' => ['shop']];
 $nav[] = ['page' => 'shop_orders', 'icon' => '🧾', 'label' => 'My Orders', 'pages' => ['shop_orders', 'shop_order']];
-$nav[] = ['page' => 'cart',        'icon' => '🛒', 'label' => 'Cart',      'pages' => ['cart'], 'badge' => $cartBadge];
+$nav[] = ['page' => 'cart',        'icon' => '🛒', 'label' => 'Cart',      'pages' => ['cart'], 'badge' => $cartBadge, 'badge_class' => 'sidebar-cart-badge'];
 
 // Add Admin View link if the logged-in user is an admin browsing as member
 if (Auth::isAdmin()) {
@@ -113,7 +113,7 @@ function renderSidebarNav($nav, $cp, $user, $view, $initial, $name)
       <a href="<?= $href ?>" <?= $target ?> class="nav-item-link <?= $active ? 'active' : '' ?>">
         <span class="nav-icon"><?= $item['icon'] ?></span>
         <?= e($item['label']) ?>
-        <?php if (!empty($item['badge'])): ?><span class="nav-badge"><?= (int) $item['badge'] ?></span><?php endif; ?>
+        <?php if (isset($item['badge'])): ?><span class="nav-badge<?= !empty($item['badge_class']) ? ' ' . e($item['badge_class']) : '' ?><?= (int) $item['badge'] > 0 ? '' : ' d-none' ?>"><?= (int) $item['badge'] ?></span><?php endif; ?>
       </a>
     <?php endforeach; ?>
     <?php if (Auth::isSuperadmin()): ?>

@@ -252,13 +252,17 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.15rem;
+  /* Stretch-capable, like the sidebar nav-badge: keep the fixed height and a
+     pill radius so multi-digit counts (1000+) grow horizontally instead of
+     overflowing the circle. */
+  min-width: 1.15rem;
   height: 1.15rem;
-  border-radius: 50%;
+  border-radius: 999px;
   font-size: 0.62rem;
   font-weight: 700;
-  padding: 0;
+  padding: 0 .3rem;
   line-height: 1;
+  white-space: nowrap;
 }
 .topbar-balance {
   display: flex;

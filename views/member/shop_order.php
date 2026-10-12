@@ -19,6 +19,10 @@ $overdue = $deadline && strtotime((string) $deadline) < time();
   <div class="page-content">
     <?= render_flash() ?>
 
+    <div class="mb-3">
+      <a href="<?= link_to('shop_orders') ?>" class="btn btn-outline-secondary btn-sm">← Back to Orders</a>
+    </div>
+
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
       <div>
         <h4 class="mb-0">Order <?= e($orderNo) ?></h4>

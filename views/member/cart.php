@@ -133,6 +133,10 @@
       badge.textContent = count;
       badge.classList.toggle('d-none', count <= 0);
     }
+    document.querySelectorAll('.sidebar-cart-badge').forEach(function (el) {
+      el.textContent = count;
+      el.classList.toggle('d-none', count <= 0);
+    });
   }
   function observe() {
     var list = document.getElementById('cartPageItems');

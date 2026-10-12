@@ -46,12 +46,12 @@
           $avail   = $availById[(int) $p['id']] ?? 0;
           $soldOut = $avail <= 0;
         ?>
-          <div class="col-6 col-md-4 col-lg-3">
+          <div class="col-12 col-sm-6 col-md-4 col-lg-3">
             <div class="card h-100 d-flex flex-column">
               <?php if ($img): ?>
-                <img src="<?= $img ?>" alt="<?= e($p['name']) ?>" class="card-img-top" style="height:170px;object-fit:cover;">
+                <img src="<?= $img ?>" alt="<?= e($p['name']) ?>" class="card-img-top shop-card-img">
               <?php else: ?>
-                <div class="card-img-top d-flex align-items-center justify-content-center text-muted" style="height:170px;background:#f4f6fb;font-size:2.5rem;">🛍️</div>
+                <div class="card-img-top shop-card-img d-flex align-items-center justify-content-center text-muted" style="background:#f4f6fb;font-size:2.5rem;">🛍️</div>
               <?php endif; ?>
               <div class="card-body d-flex flex-column">
                 <h6 class="mb-1"><?= e($p['name']) ?></h6>

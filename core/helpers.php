@@ -289,8 +289,9 @@ function render_flash(): string
         $msg = flash($key);
         if ($msg) {
             $html .= sprintf(
-                '<div class="alert %s d-flex align-items-center gap-2 mb-3" role="alert">' .
-                    '<span>%s</span><span>%s</span></div>',
+                '<div class="alert flash-alert %s d-flex align-items-center gap-2 mb-3" role="alert">' .
+                    '<span>%s</span><span>%s</span>' .
+                    '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>',
                 $bsClass,
                 $icon,
                 e($msg)

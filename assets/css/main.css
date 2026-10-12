@@ -658,6 +658,12 @@ body {
   width: 100%;
 }
 
+/* Toast exit: glide out slowly and silently instead of popping away.
+   Added by app.js at hide time so the entrance keeps Bootstrap's fast fade. */
+#toastContainer .toast.slow-hide {
+  transition: opacity 1.6s ease-out !important;
+}
+
 #toastContainer .btn-close {
   position: absolute;
   top: .5rem;
@@ -669,6 +675,24 @@ body {
 #toastContainer .toast-body {
   /* Keeps the last word of a long message clear of the button. */
   padding-right: 2.25rem;
+}
+
+/* Inline flash alerts (render_flash in core/helpers.php) fade out silently
+   and slowly via app.js, mirroring the toast exit. */
+.flash-alert {
+  position: relative;
+  padding-right: 2.25rem;
+  transition: opacity 1.6s ease-out;
+}
+.flash-alert .btn-close {
+  position: absolute;
+  top: .6rem;
+  right: .6rem;
+  margin: 0;
+  padding: .28rem;
+}
+.flash-alert.flash-fading {
+  opacity: 0;
 }
 
 /* Print-only for codes */

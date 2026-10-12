@@ -86,6 +86,10 @@ function showToast(message, type = "success") {
   const el = document.getElementById(id);
   const toast = new bootstrap.Toast(el, { delay: 3500 });
   toast.show();
+  // Slow, silent exit: Bootstrap's default toast fade is 150ms. Swapping the
+  // transition only once hiding starts keeps the entrance quick while the
+  // fade-out glides away (CSS: #toastContainer .toast.slow-hide).
+  el.addEventListener("hide.bs.toast", () => el.classList.add("slow-hide"));
   el.addEventListener("hidden.bs.toast", () => el.remove());
 }
 
@@ -232,3 +236,18 @@ window.addEventListener("load", centerActiveSidebar);
 if (document.fonts && document.fonts.ready) {
   document.fonts.ready.then(centerActiveSidebar);
 }
+
+// ── Silent slow fade-out for inline flash alerts ──────────────
+// render_flash() (core/helpers.php) renders "Added to cart.", validation
+// warnings, etc. as static Bootstrap alerts that linger until the next page
+// load. Fade them out gently after a readable delay, like the toasts above.
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll(".flash-alert").forEach((alert) => {
+    window.setTimeout(() => {
+      alert.classList.add("flash-fading");
+      window.setTimeout(() => {
+        if (alert.parentNode) alert.parentNode.removeChild(alert);
+      }, 1700);
+    }, 3200);
+  });
+});
