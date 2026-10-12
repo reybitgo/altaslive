@@ -30,7 +30,7 @@ $itemCount  = (int) $cartTotals['total_items'];
         <?php foreach ($cartItems as $item): $img = $item['image_url'] ? APP_URL.'/uploads/'.e($item['image_url']) : ''; ?>
           <div class="d-flex gap-3 pb-3 mb-3 border-bottom cart-item" data-item-id="<?= (int) $item['id'] ?>" data-unit-price="<?= (float) $item['unit_price'] ?>">
             <div class="flex-shrink-0" style="width:64px;height:64px;border:1px solid #eef1f8;border-radius:.5rem;overflow:hidden;background:#f8f9fb;display:flex;align-items:center;justify-content:center">
-              <?php if ($img): ?><img src="<?= e($img) ?>" style="width:100%;height:100%;object-fit:cover"><?php else: ?><span style="font-size:1.5rem">🛒</span><?php endif; ?>
+              <?php if ($img): ?><img src="<?= e($img) ?>" style="width:100%;height:100%;object-fit:cover"><?php else: ?><span style="font-size:1.5rem">🛍️</span><?php endif; ?>
             </div>
             <div class="flex-grow-1 min-w-0">
               <div class="fw-semibold text-truncate"><?= e($item['product_name']) ?></div>
@@ -73,7 +73,9 @@ $itemCount  = (int) $cartTotals['total_items'];
 
   function updateTopbarBadge(count) {
     var el = document.querySelector('.topbar-wrapper .topbar-cart-badge');
-    if (el) el.textContent = count;
+    if (!el) return;
+    el.textContent = count;
+    el.classList.toggle('d-none', count <= 0);
   }
 
   function updateFooter(subtotal) {

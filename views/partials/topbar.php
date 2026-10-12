@@ -105,7 +105,7 @@ if (Auth::check()) {
                 data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas"
                 title="Cart" style="font-size:1.05rem;line-height:1;padding:.3rem .55rem;">
             🛒
-            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary topbar-cart-badge"><?= $topbarCartCount ?></span>
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary topbar-cart-badge<?= $topbarCartCount > 0 ? '' : ' d-none' ?>"><?= $topbarCartCount ?></span>
         </button>
         <?php endif; ?>
     </div>

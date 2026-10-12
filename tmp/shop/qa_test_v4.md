@@ -1,647 +1,381 @@
-# QA Test v4 — Shop Storefront (Cart, Admin Products & Order Lifecycle)
+# Shop QA Test (v4) - Beginner-Friendly Guide
 
-**For:** someone who has never done QA testing before, testing AltasLive's shop by hand in a browser.
-**App:** AltasLive — <http://localhost/altaslive>
-**Revised:** 2026-10-10
-**Covers:** storefront, cart, checkout, payment verification, fulfilment, delivery failure, refunds, holds, expiry.
+This checklist walks you through testing the shop feature end-to-end. Follow it exactly. Do not skip instructions.
 
----
+## Prerequisites
 
-## How to use this document
+- [ ] **Two browser windows**: one for the Member (Window M), one for the Admin (Window W).
+  - Use private/incognito for at least one of them, or different browsers (e.g. Chrome for Admin, Firefox for Member). This prevents login sessions from overwriting each other.
+- [ ] **Member account** with enough e-wallet balance. You need at least **₱1,000** total (you will place several orders). Check balance in Window M.
+- [ ] **Admin login.** Default is `admin` / `Admin@1234`. If it doesn't work, confirm with whoever set it up.
+- [ ] **Two small image files** on your computer (to use as fake payment proofs). A screenshot of your desktop is fine.
+- [ ] Keep a **FAIL log** (notepad/text file) and write down order numbers when asked.
 
-Read this part first. It is the most important part.
+## Golden Rule
 
-### What "QA testing" actually means here
+> **All member actions in Window M. All admin actions in Window W.**
 
-You are not looking for the app to be *perfect*. You are answering one question:
+Whenever the test says "In Window M" or "In Window W", switch windows first.
 
-> **Does the shop do what it promises, every time?**
+## Starting Point
 
-That means for each step you will do two things:
+1. **In Window M**, go to `http://localhost/altaslive/?page=shop`.
+2. **PASS if** you see the shop page (product cards, OR "No products are available right now"). Both are acceptable.
+3. **FAIL if** you see raw PHP/code, a blank white page, an error, or you're forced to log in while already logged in.
 
-1. **Do something specific** (click this, type that).
-2. **Compare what you see against what this document says you should see.**
+> If it says "The shop is currently closed", go to **Test J** first to re-open it.
 
-Then you write down one of exactly two words: **PASS** or **FAIL**.
+## How an Order Flows (Reference)
 
-- **PASS** = it looked or behaved as described.
-- **FAIL** = it did something else, or something broke.
-
-A FAIL is **not** a problem with your work. A FAIL is exactly the thing we want to know about. Finding one is you doing the job correctly. Do not stop, do not fix it yourself, and do not tidy up after it — just write it down and keep going.
-
-### The one rule that makes this work
-
-> **Change exactly one thing at a time, and look at the result before doing anything else.**
-
-Do not click three buttons and then decide whether it worked. You will not know which one mattered.
-
-### Words you will see, explained
-
-| Word | What it means here |
-|---|---|
-| **PASS** | It behaved as this document says. |
-| **FAIL** | It behaved differently. Write down exactly what you saw. |
-| **flash** | The coloured message that appears at the top of the page after an action. |
-| **pill / badge** | The small coloured label showing an order's status. |
-| **drawer** | The cart panel that slides in from the right when you click the 🛒 icon. |
-| **member** | A normal customer account. |
-| **admin** | The shop-staff account. |
-
-### Keep a log as you go
-
-Every time you write **FAIL**, also write down:
-
-- Which step number it was.
-- What you **expected** (this document will tell you).
-- What you **actually saw** — copy the message text exactly, don't paraphrase.
-
-A FAIL written as *"the thing was broken"* helps nobody. A FAIL written as
-*"Test D2: expected 'Amount mismatch', but the order became Paid"* is instantly actionable.
-
----
-
-## Before you start
-
-### What you need
-
-- [ ] **Two browser windows**, and this matters:
-  - **Window M** (member) — logged in as a normal member.
-  - **Window W** (admin) — logged in as the shop admin.
-  - Use a **private / incognito window** for each, or open one in a different browser (e.g. Chrome for admin, Firefox for member). This stops the two logins from overwriting each other, which otherwise causes very confusing failures.
-- [ ] **A member account with money in the e-wallet.** At least **₱1,000** — you will place several orders. Check by logging in and looking at your e-wallet balance.
-- [ ] **The admin login.** Default is `admin` / `Admin@1234`. If that does not work, ask whoever set this up — it may have been changed.
-- [ ] **Two small image files** on your computer to use as fake payment proofs. A screenshot of your desktop is fine.
-- [ ] A pen and paper, or a text file, for your FAIL log.
-
-### The golden rule
-
-> **Member stuff in Window M. Admin stuff in Window W.**
-
-When this document says *"in Window M"* or *"in Window W"*, switch windows before you do anything.
-
-### Starting point
-
-1. In **Window M**, go to <http://localhost/altaslive/?page=shop>.
-2. **PASS if** you see the shop page — either product cards, or a message saying *"No products are available right now."* Both are fine; the next test creates a product.
-3. **FAIL if** you see raw code, a blank white page, an error, or you get bounced to the login page when you are logged in.
-
-> If the shop page says the shop is closed, stop and go to **Test J** first to re-open it.
-
----
-
-## What an order goes through
-
-An order is a parcel that moves through stages. You will push two orders through this, one step at a time.
+Orders move through stages. You must only move to the next legal stage.
 
 ```
-pending  →  payment_review  →  paid  →  packing  →  ready_to_ship  →  shipped
-Pending     Payment under       Paid     Packing     Ready to ship    Shipped
-payment      review                                   
-   ↓ (admin rejects the proof)
-payment_failed  →  buyer uploads a new proof  →  back to payment_review
+pending → payment_review → paid → packing → ready_to_ship → shipped
+  (unpaid)   (proof under   (paid)  (packing) (ready)        (shipped)
+                review)
 
-shipped  →  out_for_delivery  →  delivered  →  completed
-          Out for delivery      Delivered      Completed
-                 ↓ (delivery fails)
-          delivery_failed  →  returned_to_sender  →  reshipped  →  packing …
-          Delivery failed      Returned to sender
+pending: buyer places order (non-ewallet) but hasn't uploaded proof yet.
+payment_review: buyer uploaded payment proof; admin must verify it.
+
+If admin rejects proof:
+payment_failed → (buyer uploads new proof) → payment_review
+
+From shipped:
+shipped → out_for_delivery → delivered → completed
+                ↓ (fails)
+           delivery_failed → returned_to_sender → reshipped → packing
 ```
 
-**The rule that governs all of it:** an order can only move to the *next* legal stage. If you try to skip one, the app refuses and tells you so. That refusal is correct behaviour, not a bug — several tests below check that you are refused.
+**Important:** The app only allows legal transitions. If you try to jump stages, it must refuse. A refusal is the correct behavior.
 
 ---
 
-## Test A — Admin: create a test product
-
-*We need one product to buy. This is where we make it.*
+## Test A — Admin: Create a Test Product
 
 **In Window W:**
 
-1. Go to <http://localhost/altaslive/?page=admin_shop>.
+1. Go to `http://localhost/altaslive/?page=admin_shop`.
 2. Click **+ New Product**.
-3. Fill in the form:
+3. Fill the form exactly:
 
-   | Field | Type this |
-   |---|---|
-   | Name * | `QA Widget` |
-   | SKU | `QA-001` |
-   | Price (₱) * | `100` |
-   | Stock | `5` |
-   | Short description | `A widget for testing` |
-   | Full description | `This product exists only for QA testing.` |
-   | Image | (skip for now, or pick any image) |
-   | Status | `active` |
+| Field | Value |
+|---|---|
+| Name * | `QA Widget` |
+| SKU | `QA-001` |
+| Price (₱) * | `100` |
+| Stock | `5` |
+| Short description | `A widget for testing` |
+| Full description | `This product exists only for QA testing.` |
+| Image | (optional; can leave blank or pick any image) |
+| Status | `active` |
 
-4. Click **💾 Create Product**.
-5. **PASS if** you see a green message **"Product created."** and `QA Widget` appears in the product list at ₱100.00.
+4. Click **Create Product**.
+5. **PASS if** you see a green "Product created." message and `QA Widget` appears in the list at ₱100.00.
+6. Click **Edit** on `QA Widget`, verify/update Stock to `5`, click **Update Product**.
+7. **PASS if** you see "Product updated." (or similar success message).
 
-> **Note the two different button labels.** When *creating*, the button says **Create Product**. When *editing* an existing product, it says **Update Product**. They are the same form.
-
-6. Now click **Edit** on `QA Widget`, change **Stock** to `5` again (leave as is), and click **Update Product**.
-7. **PASS if** you see **"Product updated."**
-
-> **You will use this product for everything below.** Do not delete it until the Cleanup section at the end.
+> Creating shows "Create Product"; editing shows "Update Product".
 
 ---
 
-## Test B — Member: add to cart
+## Test B — Member: Browse and Add to Cart
 
 **In Window M:**
 
-1. Go to <http://localhost/altaslive/?page=shop>.
-2. Find **QA Widget** (₱100.00).
-3. You will see an **Add to cart** button on the card (no Qty box — the card always adds one unit per click).
-4. Click **Add to cart**.
-5. **PASS if:**
-   - a green message **"Added to cart."** appears,
-   - the 🛒 cart icon at the top shows a badge with **1**,
-   - the cart drawer slides in from the right showing QA Widget,
-   - the card's button now reads **Already in cart** (disabled); no quantity notice is shown under it.
+1. Go to `http://localhost/altaslive/?page=shop`.
+2. Find `QA Widget`. Click **Add to cart**.
+3. **PASS if:** the cart badge (top-right) increases by 1, and the button on that product card becomes "Already in cart" (disabled).
+4. Open the cart (`?page=cart` or cart drawer).
+5. **PASS if:** QA Widget is listed, quantity is 1, line total is ₱100.00, cart total is ₱100.00.
 
-> **What changed on 2026-10-11:** the card's Qty stepper was removed — the card always adds exactly one unit per click,
-> and once the product is in your cart the button reads disabled **Already in cart**. To buy more than one, open the
-> cart (drawer or `?page=cart`) and use the quantity stepper there.
-
-6. Open the drawer, set the QA Widget line's quantity to `2` (use the **+** button or type it), and click **Update**.
-7. **PASS if** the drawer badge and the 🛒 badge both read **2**, and the drawer shows a subtotal of `200.00 PHP`.
-8. Click **View full cart** in the drawer.
-9. **PASS if** you land on the cart page (`?page=cart`) and it lists **QA Widget**, quantity **2**, line total **200.00**.
-
-> **If clicking a +/− button seems to do nothing for a moment:** that is intentional. If you click again before the
-> first update finishes, the extra click is ignored, so the quantity and the badge can never disagree. Wait a second
-> and it will update. If it *never* updates, that is a FAIL.
-
-### B2 — the stock guard (an important one)
-
-The shop must never let you order more items than exist. Let's prove it refuses.
-
-1. **In Window W**, click **Edit** on `QA Widget`, set **Stock** to `2`, click **Update Product**.
-2. **In Window M**, go back to the shop page (press F5 to refresh).
-3. Open the cart and set the quantity to `3` (the card's button is disabled once the item is in the cart).
-4. **PASS if** a red message appears saying exactly:
-
-   ```
-   Insufficient stock. Requested 3, only 2 available.
-   ```
-
-   The numbers will match whatever you actually have. The *shape* of the message is what matters.
-5. **PASS if** your quantity did **not** increase to 3 — the cart still holds 2.
-6. **In Window W**, set Stock back to `5` and **Update Product**.
-7. **In Window M**, set the cart quantity back to `2`.
-
-### B3 — the sold-out display
-
-1. **In Window W**, set Stock to `0`, **Update Product**.
-2. **In Window M**, refresh the shop page.
-3. **PASS if** the card shows a grey **Sold out** badge and **no Add button at all** — you cannot add a sold-out item.
-4. **In Window W**, set Stock back to `5`, **Update Product**.
+> Quantity adjustment happens in the cart, not on the product card.
 
 ---
 
-## Test C — Checkout and placing an order
+## Test C — Checkout and Placing an Order
 
-You will place **two** orders: one paying with the e-wallet, one paying by hand (GCash). They behave differently and we test both.
+You will place **two** orders: (C1) E-Wallet (auto-paid), (C2) GCash (manual proof upload). They behave differently.
 
-### C1 — E-Wallet order (fastest, fully automatic)
-
-**In Window M:**
-
-1. Open your cart (`?page=cart`). Confirm it holds QA Widget × 2 = ₱200.00.
-2. Click the blue **Proceed to checkout** button.
-3. Fill in the delivery form:
-   - Recipient name * — your name
-   - Recipient phone
-   - Delivery address * — any street address
-   - City, Province, Postal
-   - Billing name, Billing phone
-4. Choose a payment method.
-5. **Before ticking terms:** the **Place order** button should be greyed out, reading
-   *"Tick the terms checkbox to place your order"*. Try clicking it — nothing submits.
-6. Tick the **terms** checkbox.
-7. **PASS if** the button turns solid blue, reads **Place order**, and clicking it places the order.
-
-> **If your e-wallet balance is too low:** the **E-Wallet** radio button will be *greyed out* and a red note will say
-> your balance does not cover the order. That is correct behaviour (new as of 2026-10-10) — pick another method, or ask
-> for a top-up. Do not report it as a FAIL.
-
-7. **PASS if:**
-   - a green message **"Order placed and paid. Thank you!"**,
-   - you land on the order page and the status pill reads **Paid**,
-   - the **History** card on the right lists events,
-   - your 🛒 cart badge is back to **0**.
-
-8. In Window M, go to **My Orders** (<http://localhost/altaslive/?page=shop_orders>).
-9. **PASS if** the order is listed with status **Paid**.
-
-> **Write down the order number.** It looks like `AL26101000xxx`. It is on the order page, near the top.
-> Order number: `______________________`
-
-> **Your delivery address should still be filled in** if checkout bounces you back with an error. That is new
-> behaviour as of 2026-10-10 — previously a failed checkout threw away everything you had typed. Test it in C3.
-
-### C2 — GCash order (needs you to act as both buyer and shop staff)
-
-This order starts unpaid, so you can test the manual-payment path.
+### C1 — E-Wallet Order (Automatic Payment)
 
 **In Window M:**
 
-1. Go to the shop page, add QA Widget × 1, open the cart, **Proceed to checkout**.
-2. Fill in the address as before.
-3. Choose **GCash** as the payment method.
+1. Add 2x `QA Widget` to cart (or set quantity to 2 in cart). Cart total should be **₱200.00**.
+2. From cart, click **Proceed to checkout**.
+3. Fill delivery/billing details (all required fields marked *):
+   - Recipient name, phone, delivery address, city/province/postal code
+   - Billing name/phone (if shown)
+4. Under Payment Method, select **E-Wallet** (if available).  
+   > **Note:** If your balance is below the order total, the E-Wallet option will be **greyed out** with a red explanatory note. That is correct behavior — pick another payment method or top up. Do not fail this.
+5. **Terms checkbox:** Before ticking terms, the "Place order" button should be greyed out and read *"Tick the terms checkbox to place your order"*. Clicking it should do nothing.
+6. Tick the **Terms & Conditions** checkbox.
+7. **PASS if** the button becomes solid blue and reads **Place order**.
+8. Click **Place order**.
+9. **PASS if:**
+   - You see a green message: **"Order placed and paid. Thank you!"**
+   - You land on the order details page with status pill showing **Paid**
+   - History/events are listed on the right
+   - Cart badge returns to **0**
+
+10. Go to **My Orders** (`?page=shop_orders`). **PASS if** this order shows status **Paid**.
+11. **Write down Order #1 (E-Wallet):** `______________________`
+
+> Failed checkout should preserve the delivery form you filled in (Test C3 below).
+
+### C2 — GCash Order (Manual Payment + Proof Upload)
+
+This order starts unpaid so you can test the manual payment flow.
+
+**In Window M:**
+
+1. Go to Shop → Add **1x QA Widget** → Open cart → **Proceed to checkout**.
+2. Fill delivery details.
+3. Choose **GCash** as payment method.
 4. Tick terms, click **Place order**.
 5. **PASS if:**
-   - a green message **"Order placed. Upload your payment proof to continue."**,
-   - the status pill reads **Pending payment**,
-   - you see a "pay by…" deadline and a proof-upload form.
+   - Green message: **"Order placed. Upload your payment proof to continue."**
+   - Status pill reads **Pending payment**
+   - You see a "pay by..." deadline and the **payment proof upload form**
 
-> **There is no confirm-lock checkbox.** An earlier version of this test told you to tick one. It was removed on
-> 2026-10-10 because the server never read it — submitting without it worked exactly the same, so it gave the
-> impression of a protection that did not exist. A plain sentence now sits under the form instead. **Its absence is
-> not a FAIL.**
+> **Note:** There is no "confirm-lock" checkbox. The upload form shows a short explanation instead. This is intentional and not a FAIL.
 
-6. Attach any image, optionally type a reference number like `GC-QA-001`, and click **Submit proof**.
-7. **PASS if:**
-   - a green message appears,
-   - the status pill becomes **Payment under review**,
-   - **there is no "Cancel order" button any more.** This is important — once a proof is in, the buyer must not be
-     able to cancel. **PASS if the button is gone.**
-
-> Write down this order number too: `______________________`
-
-### C3 — a failed checkout keeps what you typed
-
-1. In Window M, start a checkout and fill in the whole delivery form.
-2. Try to place the order **without ticking the terms checkbox**.
-3. **PASS if** you are returned to the checkout page with an error, **and your delivery address is still filled in.**
-4. **FAIL if** the form came back empty — that is the old bug.
-
----
-
-## Test D — Admin: verifying the money
-
-**In Window W:**
-
-1. Go to <http://localhost/altaslive/?page=admin_shop_orders>.
-2. Click the **Payment under review** tab. Your C2 order is listed.
-3. Click the order to open it.
-4. Find the green-bordered **Verify payment** panel.
-5. **First, try the wrong amount on purpose:**
-   - Change **Amount received** to the order total **minus 10** (e.g. `90` when the total is `100`).
-   - Type a reference like `QA-REF-1`.
-   - Click **Mark paid**.
-6. **PASS if** it is **refused** with an "Amount mismatch" error showing both numbers, and the order stays **Payment under review**.
-   - *A refusal here is the correct result. If the order became Paid, that is a serious FAIL.*
-
-7. **Now enter the exact total** (`100`), type reference `QA-REF-2`, click **Mark paid**.
+6. **Upload payment proof:** Attach one of your test images.  
+   **Reference number (IMPORTANT):** In the "Reference no." field, type something like `GC-QA-001` (optional). You may also leave this field **completely blank** — the system accepts proof without a reference number.
+7. Click **Submit proof**.
 8. **PASS if:**
-   - a green message **"Order moved to Paid."**,
-   - the status pill reads **Paid**,
-   - the proof shows a green **verified** badge,
-   - the History card gained a `payment_verified` entry.
+   - You see a green success message
+   - Status pill becomes **Payment under review**
+   - **The "Cancel order" button is gone.** Once proof is submitted, the buyer cannot cancel. This must be the case.
 
-### D2 — the duplicate-reference guard
+9. **Write down Order #2 (GCash):** `______________________`
 
-Two orders must never be able to share one payment reference.
+> The reference number entered here is **advisory only**. If you left it blank, that is fine. The admin will record the canonical reference when verifying payment (see Test D).
 
-1. **In Window M**, place another GCash order and submit a proof with reference `QA-REF-DUP`.
-2. **In Window W**, open that order, enter Amount = exact total, and set **Payment reference** to `QA-REF-2` (the reference already used in step 7).
-3. **PASS if** it is **refused** with a duplicate-reference error.
+### C3 — Failed Checkout Preserves Form Data
 
----
-
-## Test E — Fulfilment: from paid to delivered
-
-**In Window W**, open the C1 order (the E-Wallet one). Press F5 between steps if a button doesn't appear.
-
-> Each panel has a heading and a button, and they are worded differently. The **heading** tells you which stage it is;
-> the **button** tells you what it does. Use the button names below.
-
-1. Panel **Start packing** → click **Packing** → **PASS if** the pill reads **Packing**.
-2. Panel **Finish packing** → click **Ready to ship** → **PASS if** the pill reads **Ready to ship**.
-3. Panel **Courier handoff**. Fill in courier (e.g. `QA Express`) and tracking (e.g. `TRK-001`), then click
-   **Mark shipped (stock deducts)**.
-   - **PASS if** the pill reads **Shipped**.
-   - The button says "(stock deducts)" because this is the moment the goods leave the shop's stock.
-4. Panel **Out for delivery** → click **Dispatch** → **PASS if** the pill reads **Out for delivery**.
-5. Panel **Mark delivered**. Fill in **Received by** (a name) or attach a photo — one of the two is required.
-   Then click **Delivered**.
-   - **PASS if** the pill reads **Delivered**.
-   - *If the app refuses and says a receiver or photo is required, that is correct behaviour.*
-6. **In Window M**, open the order.
-   - **PASS if** you can see the courier name and tracking number, and there is a **Confirm receipt** button.
-7. Click **Confirm receipt** → **PASS if** the pill reads **Completed**.
-
-### E2 — actions that must be refused
-
-On the now-**Completed** order, in Window W, look at the action panels.
-
-- **PASS if** there is no **Mark paid**, no **Mark shipped**, and no **Cancel order** panel available.
-- **FAIL if** any finished-stage action is still offered.
-
-> This is one of the most important tests in this document. It is how you know a customer cannot, for example, ship an
-> order that was never paid.
+1. **In Window M**, start checkout with a new cart item. Fill in **all** delivery fields completely.
+2. Try to place the order **without ticking the Terms checkbox**.
+3. **PASS if:** You're returned to checkout with an error message, **and all delivery fields you typed remain filled in**.
+4. **FAIL if:** The form came back completely empty.
 
 ---
 
-## Test F — Delivery failure, return, reship (the "sad path")
+## Test D — Admin: Verify Payment (Reference Number Handling)
 
-Real parcels get lost and returned. The shop must handle it **without losing or double-counting stock**.
-
-**In Window M:** place a new **E-Wallet** order for QA Widget × 2 (₱200), and note the number: `______________________`
+Order #2 is now in **Payment under review**. This is where the reference number becomes canonical and enforced.
 
 **In Window W:**
 
-1. Mark it **Paid**, then **Packing** → **Ready to ship** → **Mark shipped** (courier `QA Express`, tracking `TRK-002`).
-2. Panel **Out for delivery** → click **Dispatch**.
-3. Panel **Delivery failed**. Choose a fault (`customer`, `carrier` or `shop`), type a reason, then click **Record failure**.
-   - **PASS if** the pill reads **Delivery failed**.
-4. Panel **Return to sender** → click **Return to sender**.
-   - **PASS if** the pill reads **Returned to sender**.
-5. Panel **Reship** → click **Reship order**.
-   - **PASS if** the pill goes back to **Packing**, and the order's shipment panel shows **two** shipments.
-6. **Critical check — stock:** on the product edit page, note the current **Stock** number. It must be the *same* as it
-   was before this test started. If stock has gone *up* or *down* by a whole unit of QA Widget, that is a **serious
-   FAIL** — record the before and after numbers exactly.
-7. Drive the order back out: **Ready to ship** → **Mark shipped** → **Dispatch** → **Delivered** → (in Window M)
-   **Confirm receipt**.
-   - **PASS if** it reaches **Completed**, and the Stock number is *still* unchanged from step 6.
+1. Go to `http://localhost/altaslive/?page=admin_shop_orders`.
+2. Click the **Payment under review** tab. You should see Order #2 (GCash).
+3. Open Order #2.
 
-> **This is the single most important test in this document.** The goods are the same physical goods coming back, so
-> the stock count must not move a second time. If it does, someone could buy stock that is already in a van.
+### D1 — Amount validation and correct verification
+
+1. Look for the green-bordered **Verify payment** panel (top/right or in Actions).
+2. **Test wrong amount (must be rejected):**
+   - Set **Amount received** to `90.00` (10 less than order total ₱100.00)
+   - In **Payment reference**, type `QA-REF-1` (this is just a test value)
+   - Click **Mark paid**
+3. **PASS if:** Rejected with an "Amount mismatch" error showing both amounts. The order **stays in Payment under review**. Do not proceed if it became Paid.
+4. **Test correct verification (with reference):**
+   - Set **Amount received** to the **exact total** (`100.00`)
+   - In **Payment reference**, type `QA-REF-2` (must be a valid reference string)
+   - Click **Mark paid**
+5. **PASS if:**
+   - Green message: **"Order moved to Paid."**
+   - Status pill reads **Paid**
+   - The latest proof shows a **green "verified" badge**
+   - History card shows a `payment_verified` event
+
+> **About the Payment reference field (admin):** This is the **canonical transfer reference** (GCash/Maya/Bank/USDT tx hash, etc.). Even if the member left it blank when submitting proof, the admin **must** enter a valid, usable reference here to mark the order as Paid. The system normalizes it (uppercase, keeps A-Z 0-9 _ -) and **requires a non-empty usable value**. It will reject empty/invalid characters.
+
+### D2 — Duplicate reference guard
+
+1. **In Window M**, place a **new GCash order** (add 1x QA Widget to cart, checkout with GCash). Submit proof with reference `QA-REF-DUP` (optional; you can also leave blank — we’ll test admin entering duplicate).
+2. **In Window W**, open that new order (should be in Payment under review).
+3. Enter **Amount = exact total (₱100.00)**.
+4. In **Payment reference**, enter `QA-REF-2` (this was already used in D1 step 4).
+5. Click **Mark paid**.
+6. **PASS if:** Rejected with a **duplicate reference** error. The order stays in **Payment under review**. The reference cannot be reused on a different order.
+
+### D3 — What if member submitted proof with NO reference number?
+
+This is a common case. The workflow is: **inspect the proof image, extract the actual reference, enter it at verification.**
+
+1. **In Window M**, place another GCash order (1x QA Widget). When submitting proof, **leave Reference no. blank** and attach an image. Submit.
+2. **In Window W**, open that order → Payment under review. View the proof image.
+3. The admin Verify payment panel still requires a Payment reference. Type the actual transaction reference you see on that proof image (or from your payment channel records). If the image truly shows no reference, use a realistic unique one for testing (e.g. `QA-REF-NOREF-001`).
+4. Enter exact amount, click **Mark paid**.
+5. **PASS if:** Order moves to **Paid**. The canonical reference you entered is stored on the order and shown at the top (ref line).
+
+**Key takeaway:** Member reference is optional/advisory. Admin reference is **required, canonical, and uniqueness-checked** at verification time.
 
 ---
 
-## Test G — Hold and resume
+## Test E — Fulfilment: From Paid to Delivered
 
-Holding an order means "pause this, we need to check something".
+**In Window W**, open the C1 order (E-Wallet, already Paid). Refresh between steps if buttons don't appear.
 
-**In Window W**, on the completed C1 order — hold won't apply to a finished order, so use a fresh order. Place a new
-E-Wallet order in Window M, mark it **Paid** in Window W, then:
+1. **Start packing** panel → Click **Packing**. **PASS if** status pill becomes **Packing**.
+2. **Finish packing** panel → Click **Ready to ship**. **PASS if** status becomes **Ready to ship**.
+3. **Courier handoff** panel → Fill Courier (e.g. `QA Express`), Tracking (e.g. `TRK-001`). Click **Mark shipped (stock deducts)**. **PASS if** status becomes **Shipped**. (Stock deduction happens at this moment.)
+4. **Out for delivery** panel → Click **Dispatch**. **PASS if** status becomes **Out for delivery**.
+5. **Mark delivered** panel → Enter **Received by** (name) **OR** attach POD photo. One of them is required. Click **Delivered**. **PASS if** status becomes **Delivered**. If refused saying receiver/photo required, that’s correct.
+6. **In Window M**, open that order. **PASS if** courier/tracking are visible and there is a **Confirm receipt** button.
+7. Click **Confirm receipt**. **PASS if** status becomes **Completed**.
 
-1. Click **Place hold**. Give a reason and submit.
-   - **PASS if** the pill reads **On hold**.
-2. A **Resume to Paid** button should now appear (it names the status you will go back to) → click it.
-   - **PASS if** the pill goes back to **Paid**.
+### E2 — No Actions on Completed Orders
 
-> **Note:** while an order is on hold, the buyer can still cancel it. That is intentional — a hold is a pause, not a
-> lock. Do not report it as a FAIL.
+On the Completed order (Window W), look at Actions panels.  
+**PASS if:** No "Mark paid", no "Mark shipped", no "Cancel order" panels are available.  
+**FAIL if:** Any finished-stage action is still offered.
+
+---
+
+## Test F — Delivery Failure, Return, Reship (No Stock Double-Count)
+
+This tests the "sad path". Stock must **not** change when returning/reshipping the same goods.
+
+**In Window M:** Place a new **E-Wallet** order for QA Widget (2x or 1x; note quantity). Write order number: `______________________`
+
+**In Window W:**
+
+1. Move it through: **Paid** → **Packing** → **Ready to ship** → **Mark shipped** (Courier `QA Express`, Tracking `TRK-002`).
+2. **Dispatch** (Out for delivery).
+3. **Delivery failed** panel → Choose fault (customer/carrier/shop), enter reason → Click **Record failure**. **PASS if** status becomes **Delivery failed**.
+4. **Return to sender** → Click **Return to sender**. **PASS if** status becomes **Returned to sender**.
+5. **Reship** → Click **Reship order**. **PASS if** status returns to **Packing** and the order shows **2 shipments**.
+6. **Check stock (critical):** Go to Admin → Shop Products → Edit QA Widget. Note current **Stock** value. Compare to the stock value **before** step 1 of this test. **PASS if stock is unchanged.** If it increased/decreased by a full unit, this is a **SERIOUS FAIL**. Record before/after numbers.
+7. Complete the reshipment: **Ready to ship** → **Mark shipped** → **Dispatch** → **Delivered** (with receiver/photo) → **In Window M: Confirm receipt**. **PASS if** status becomes **Completed** and stock remains unchanged from step 6.
+
+> **Critical:** Returning/reshipping must not move stock. Goods returned to sender are the same goods.
+
+---
+
+## Test G — Hold and Resume
+
+Use a fresh order (not completed).
+
+**In Window M:** Place E-Wallet order. **In Window W:** Mark it **Paid**.
+
+1. Click **Place hold** → Provide reason → Submit. **PASS if** status becomes **On hold**.
+2. A **Resume to Paid** (or equivalent) button appears → Click it. **PASS if** status returns to **Paid**.
+
+> While on hold, buyer may still cancel in some cases — that’s intentional (hold is pause, not lock). Not a FAIL.
 
 ---
 
 ## Test H — Refunds
 
-### H1 — an open refund blocks the buyer
+### H1 — Open refund blocks buyer confirmation
 
-1. **In Window W**, on a **Delivered** order, find the **Refund** panel.
-2. Fill in:
-   - Amount — the full order total
-   - Cause — choose `customer_dispute` (the list is `admin_cancel` / `delivery_failure` / `customer_dispute` / `other`)
-   - **Payout route** — choose `E-wallet`
-   - Destination — type anything, e.g. `original payment method`
-3. Click **Open refund task** → **PASS if** you see **"Refund task opened."**
-4. **In Window M**, refresh the order page.
-   - **PASS if** the **Confirm receipt** button is gone and the order now shows the open refund task.
+1. **In Window W**, open a **Delivered** order.
+2. Refund panel → Amount = full order total. Cause = `customer_dispute`. **Payout route** = `E-wallet`. Destination = e.g. `original payment method` (note). Click **Open refund task**. **PASS if** "Refund task opened."
+3. **In Window M**, refresh order page. **PASS if** **Confirm receipt** button is gone and the open refund task is visible.
 
-> **The Payout route field is new (2026-10-10).** It decides where the money goes when the refund is paid out.
-> Only **E-wallet** credits the buyer's wallet automatically. `cash`, `bank` and `manual` (use this for GCash) are
-> settled by hand and do **not** touch the wallet. The *Destination* box is now just a note for your records — it no
-> longer chooses the route. (An earlier bug meant a GCash refund silently paid into the buyer's wallet.)
+> Payout route determines automatic crediting: **E-wallet** auto-credits buyer wallet. cash/bank/manual do **not** auto-credit wallet (handled manually). Destination is informational.
 
-### H2 — denying the refund unblocks the buyer
+### H2 — Deny refund unblocks buyer
 
-5. **In Window W**, click **Deny** on the refund.
-6. **In Window M**, refresh → **PASS if** the **Confirm receipt** button is back.
-7. Click **Confirm receipt** → **PASS if** the pill reads **Completed**.
+1. **In Window W**, click **Deny** on the refund.
+2. **In Window M**, refresh. **PASS if** **Confirm receipt** button returns.
+3. Click **Confirm receipt**. **PASS if** status becomes **Completed**.
 
-### H3 — paying out a refund (optional but worth doing once)
+### H3 — Approve and pay out refund (with wallet credit)
 
-1. On a **Delivered** order, open a refund with **Payout route = E-wallet**, click **Open refund task**.
+1. On a **Delivered** order, open refund with **Payout route = E-wallet** → **Open refund task**.
 2. Click **Approve**.
-3. Note the buyer's e-wallet balance (Window M).
-4. Click **Mark paid (receipt required)** and type any receipt reference.
-5. **PASS if** you see **"Refund marked paid."** and the buyer's balance has gone **up** by exactly the refund amount.
-6. **Try clicking Mark paid again.**
-   - **PASS if** it is refused and the balance does **not** rise a second time. A double credit here means the shop
-     would pay a customer twice for one order — report it immediately.
+3. **In Window M**, note buyer’s **e-wallet balance**.
+4. **In Window W**, click **Mark paid (receipt required)** → Enter receipt reference (any text) → Submit. **PASS if** "Refund marked paid." and buyer balance increased by **exactly** refund amount.
+5. Try clicking **Mark paid** again. **PASS if** it’s refused and balance does **not** increase a second time (no double credit).
 
 ---
 
-## Test I — Expiry (unpaid orders give up)
+## Test I — Expiry (Auto-Cancel Unpaid Orders)
 
-An unpaid order should eventually cancel itself so the items go back on sale.
+Pending (unpaid) orders should auto-cancel so stock returns. Orders already in **Payment under review** must **never** expire.
 
-**In Window M:** place a GCash order for QA Widget × 1 and **do not** pay it. Leave it at **Pending payment**.
+### I1 — Pending orders expire
 
-**In Window W:**
+1. **In Window M**, place a **GCash** order (1x QA Widget). **Do not submit proof**. Leave it in **Pending payment**.
+2. **In Window W**, note QA Widget stock. Go to `?page=admin_shop_orders`.
+3. Click **Run expiry** (top-right).
+4. **PASS if** flash says something like *"Expiry run: 1 order(s) cancelled, 0 auto-completed."* and that order is now **Cancelled**.
 
-1. Open <http://localhost/altaslive/?page=admin_shop_orders>.
-2. Note the Stock number on the QA Widget product page.
-3. Click the **Run expiry** button (top-right, next to the heading).
-4. **PASS if** the flash reads something like *"Expiry run: 1 order(s) cancelled, 0 auto-completed."* and your unpaid
-   order now shows **Cancelled**.
-
-> **If nothing expires:** the order's deadline is still in the future. To test this you need to backdate it, which
-> means running one SQL statement. Ask a developer to run:
+> If nothing expires (deadline still future): you may backdate for testing. Run:
 > ```sql
-> UPDATE shop_orders SET payment_deadline = NOW() - INTERVAL 1 HOUR WHERE status = 'pending';
+> UPDATE shop_orders SET payment_deadline = NOW() - INTERVAL 1 HOUR 
+> WHERE status = 'pending';
 > ```
-> Then click **Run expiry** again. If you cannot get this run, write *"SKIPPED — needed DB access"* rather than PASS or
-> FAIL. An honest skip is fine; a guessed PASS is not.
+> Then click **Run expiry** again. If DB access not available, record **SKIPPED — needed DB access** (do not guess PASS).
 
-### I2 — orders under review must never expire
+### I2 — Payment under review must NOT expire
 
-This is the most important rule in the expiry logic: if a customer has already sent proof, the clock stops.
-
-1. Find an order sitting at **Payment under review** (from C2 or D2).
+1. Find an order currently in **Payment under review** (C2 or D3).
 2. Click **Run expiry** again.
-3. **PASS if** that order is **untouched** and still says **Payment under review**.
-4. Click **Run expiry** a third time → **PASS if** it reports **0 cancelled** and shows no errors.
+3. **PASS if** that order is **unchanged** (still Payment under review).
+4. Click **Run expiry** a third time. **PASS if** reports **0 cancelled** with no errors.
 
 ---
 
-## Test J — The shop on/off switch
+## Test J — Shop On/Off Switch
 
-1. **In Window W**, go to <http://localhost/altaslive/?page=admin_settings>.
-2. Find the **🛍️ Enable Shop** toggle.
-3. Turn it **off**, scroll down, click **💾 Save Settings**.
-4. **In Window M**, click **Shop** in the sidebar.
-   - **PASS if** you are redirected away with a red message **"The shop is currently closed."**
-5. **In Window W**, turn the toggle back **on**, **💾 Save Settings**.
-6. **In Window M**, refresh the shop page → **PASS if** it loads normally.
-
-> Remember to leave the switch **ON** when you finish.
+1. **In Window W**, go to `?page=admin_settings`.
+2. Find **Enable Shop** toggle → Turn **OFF** → Scroll down → Click **Save Settings**.
+3. **In Window M**, click **Shop** in sidebar. **PASS if** redirected with red message: **"The shop is currently closed."**
+4. **In Window W**, turn toggle **ON** → **Save Settings**.
+5. **In Window M**, refresh shop page. **PASS if** it loads normally.
+6. Leave shop **ON** when finished.
 
 ---
 
-## Test K — Edge cases worth a few minutes
+## Test K — Edge Cases
 
-| # | Do this | You expect |
+| # | Action | Expected Result |
 |---|---|---|
-| 1 | Open `?page=cart` with an empty cart | "Cart is empty" and a **Browse the Shop** link. No error. |
-| 2 | Set a cart line's quantity to `0` and update | The line disappears (0 = remove) |
-| 3 | Set a quantity higher than available stock | Red message `Insufficient stock. Requested N, only M available.` |
-| 4 | Click **Delete** on QA Widget (you have orders using it) | The button looks greyed out. Clicking it shows a toast: *"Cannot delete: this product has been bought."* — and nothing is deleted |
-| 5 | After every add/remove, check the 🛒 badge | It always equals the real number of units in the cart (0 when empty) |
-| 6 | Empty the cart from the drawer | The drawer redraws with "Your cart is empty", and **no Checkout button** — a dead Checkout link on an empty cart was a real bug, fixed 2026-10-10 |
+| K1 | Open `?page=cart` while empty | Shows "Cart is empty" + "Browse the Shop" link. No errors. |
+| K2 | Set cart line quantity to `0` and update | Line disappears (treat 0 as remove). |
+| K3 | Set quantity higher than available stock | Red error: `Insufficient stock. Requested N, only M available.` |
+| K4 | Try to delete QA Widget while orders reference it (Admin → Shop Products) | Delete button appears disabled or clicking shows toast: "Cannot delete: this product has been bought." Product not deleted. |
+| K5 | Add/remove items repeatedly | Cart badge always equals total units in cart (0 when empty). |
+| K6 | Empty cart from drawer | Drawer shows "Your cart is empty" and **no Checkout button** appears. |
+| K7 | With balance < order total, try E-Wallet | E-Wallet radio is disabled with explanatory note. |
 
 ---
 
-## Test L — Accessibility spot-check (optional but recommended)
+## Test L — Accessibility Spot Check (Recommended)
 
-Five minutes. It catches things only a human can.
-
-1. Open the shop page and press **Tab** repeatedly from the top of the page.
-   - **PASS if** focus moves through the links and buttons in a sensible order and you can always see where focus is.
-2. Tab to a product card's **Add to cart** button — it should be a single, clearly labelled control (the card has no
-   Qty box; quantity is adjusted in the cart).
-   - Without a screen reader, use the browser's accessibility inspector (Chrome: F12 → Elements → right-click an
-     element → Inspect Accessibility).
-3. **PASS if** every field on the checkout page has a real label attached to it. A quick way to check: click the grey
-   text *"Delivery address"*, then press **Tab** — focus should land in the address box. (Nine checkout fields had no
-   label at all before 2026-10-10; the whole delivery block was announced as "edit text, blank".)
-4. Open the cart drawer with the keyboard only (Tab to the 🛒 button, press Enter) → **PASS if** it opens.
+1. **Keyboard nav:** On shop page, press **Tab** repeatedly from top. **PASS if** focus moves logically and focus indicator is always visible.
+2. Product cards: Tab to **Add to cart** button. It should be a single clear control (no quantity stepper on card). **PASS if** focusable and labeled.
+3. **Checkout labels:** Click label text (e.g. "Delivery address") → press Tab. **PASS if** focus moves into the associated input field. All checkout fields must have proper labels.
+4. **Cart drawer:** Tab to cart/badge button → press Enter. **PASS if** drawer opens/closes via keyboard.
 
 ---
 
-## Final pass — what "done" looks like
+## Final Checklist
 
-Tick every box you actually verified. **Leave a box unticked if you did not test it** — an unticked box tells the
-developer something true. A ticked box you did not check is worse than no box at all.
+Tick only what you actually verified. Unticked is fine if not tested; ticking untested is worse.
 
-- [ ] A test product was created, edited, and could not be deleted while orders referenced it.
-- [ ] Deleting a product with **no** orders opened a small confirmation modal; confirming removed the row from the table with a fade, without a page reload.
-- [ ] Two orders completed the full happy path (one e-wallet, one manual payment).
-- [ ] Proof upload, exact-amount verification, and duplicate-reference refusal all behaved correctly.
-- [ ] Packing → ready to ship → shipped → dispatched → delivered → completed, all with proof of delivery.
-- [ ] A delivery failure reached returned-to-sender, was reshipped, and **stock never changed**.
-- [ ] A hold + resume round-tripped.
-- [ ] An open refund blocked confirm-receipt until denied.
-- [ ] A refund paid out with route `ewallet` credited the wallet **exactly once**; paying again was refused.
-- [ ] Expired pending orders auto-cancelled; **payment_review orders were NEVER expired**.
-- [ ] `shop_enabled=0` closed the shop; re-enabled it.
-- [ ] Cart and drawer badges always matched the real cart contents; an empty cart showed "Cart is empty" and no Checkout button.
-- [ ] The product card offered a single **Add to cart** button with no Qty stepper, and read disabled **Already in cart** once the item was in the cart.
-- [ ] Repeated clicks on one cart row never left the quantity and the badge disagreeing.
-- [ ] With a balance below the order total, the **E-Wallet radio was disabled** with an explanatory note.
-- [ ] A failed checkout **kept the delivery address** that had been typed.
-- [ ] No finished-stage action (Mark paid, Ship, Cancel) was offered on a completed order.
+- [ ] Test A: Product created/edited; cannot delete while referenced
+- [ ] Test B: Browse/add to cart works; badge/disabled state correct
+- [ ] Test C1: E-Wallet order completes automatically to Paid
+- [ ] Test C2: GCash order → Pending payment → Proof submitted → Payment under review (Cancel button removed). Reference optional on submit.
+- [ ] Test C3: Failed checkout preserves filled delivery form
+- [ ] Test D1: Wrong amount rejected; exact amount + valid reference marks Paid; proof verified; history logged
+- [ ] Test D2: Duplicate reference rejected across orders
+- [ ] Test D3: Proof submitted with NO reference → admin can still verify by entering canonical reference from proof
+- [ ] Test E: Full fulfilment to Completed with delivery confirmation
+- [ ] Test E2: No finished-stage actions on Completed orders
+- [ ] Test F: Delivery failure → returned-to-sender → reshipped → completed with **stock unchanged**
+- [ ] Test G: Hold + resume works
+- [ ] Test H1: Open refund blocks confirm-receipt
+- [ ] Test H2: Denied refund unblocks confirm-receipt
+- [ ] Test H3: E-wallet refund credits exactly once; double-pay refused
+- [ ] Test I1: Expired pending orders auto-cancelled
+- [ ] Test I2: Payment under review orders **never** expire
+- [ ] Test J: Shop enable/disable works (leave ON)
+- [ ] Test K: Edge cases pass
+- [ ] Test L: Basic accessibility checks pass
 
----
-
-## Appendix A — URL cheat sheet
-
-**Window M (member)**
-
-| Page | URL |
-|---|---|
-| Shop | `?page=shop` |
-| Cart | `?page=cart` |
-| Checkout | `?page=checkout` |
-| My Orders | `?page=shop_orders` |
-| One order | `?page=shop_order&id=<order id>` |
-
-**Window W (admin)**
-
-| Page | URL |
-|---|---|
-| Shop Products | `?page=admin_shop` |
-| Shop Orders | `?page=admin_shop_orders` |
-| One order | `?page=admin_shop_order&id=<order id>` |
-| Settings | `?page=admin_settings` |
-
-Base: `http://localhost/altaslive`
-
----
-
-## Appendix B — Status pills you will see
-
-| Internal status | What the pill says |
-|---|---|
-| `pending` | Pending payment |
-| `payment_review` | Payment under review |
-| `payment_failed` | Payment rejected |
-| `paid` | Paid |
-| `packing` | Packing |
-| `ready_to_ship` | Ready to ship |
-| `shipped` | Shipped |
-| `out_for_delivery` | Out for delivery |
-| `delivery_failed` | Delivery failed |
-| `returned_to_sender` | Returned to sender |
-| `delivered` | Delivered |
-| `completed` | Completed |
-| `cancelled` | Cancelled |
-| `on_hold` | On hold |
-
-A pill reading **Unknown** is always a FAIL — report it.
-
----
-
-## Appendix C — If something looks wrong
-
-Write it down like this. Fill in every line:
-
-```
-Test:      (e.g. D2)
-Step:      (the number)
-I did:     (what you clicked / typed)
-I expected:(the exact message or behaviour this document promised)
-I saw:     (the exact message or behaviour that happened — copy it verbatim)
-Screenshot:(filename, or "none")
-Window:    (M or W)
-```
-
-**Then keep going.** Do not stop the run because of one FAIL. A run that finds four problems is worth far more than a
-run that stopped at the first one.
-
-### Things that are NOT bugs
-
-Do not report these — they are the app working correctly:
-
-- Trying to skip a stage (e.g. shipping an unpaid order) and being refused.
-- Trying to complete an order with an open refund and being refused.
-- Marking a delivery failed too many times and being refused (there is a deliberate attempt cap).
-- A cancelled order keeping its order number instead of getting a new one.
-- The cart refusing a quantity above available stock.
-- The confirm-lock checkbox no longer existing (removed 2026-10-10).
-- The E-Wallet option being disabled when the balance is too low.
-
-### Things that ARE bugs — report these loudly
-
-- Money left the wallet but the order did not become Paid.
-- A refund credited the wallet twice.
-- Stock went **down** by the same goods twice after a reship.
-- Stock went **up** on its own after an order was cancelled or returned.
-- A completed order still offered Mark paid / Ship / Cancel.
-- One customer could see or change another customer's order or cart.
-- Raw code, a blank page, or a 500 error page.
-- A pill reading **Unknown**.
-
----
-
-## Appendix D — Cleanup
-
-The automated suite (`php tests/run.php`) runs against a throwaway database and cleans up after itself, so it needs no
-cleanup.
-
-Your manual run writes to the **real** database. If this is a shared or demo environment, tidy up:
-
-1. Delete your test orders and carts (they can be removed from the database directly — there is no bulk-delete button
-   in the shop UI).
-2. Leave QA Widget in place, or delete it once no order references it.
-3. Make sure the **Enable Shop** toggle is back **ON**.
-
-If this is your own local machine, you can leave the test data in place — it is harmless and is actually useful if you
-want to re-run this document.
-
----
-
-## Appendix E — What this document cannot test
-
-Being straight with you about the limits:
-
-- **Automated counterpart:** `php tests/run.php` — **535 assertions, 0 failures** across 5 suites as of 2026-10-10.
-  It covers the money, the stock, the state machine and the database contracts far more thoroughly than any person
-  clicking through a browser can.
-- **What only you can cover:** whether the pages actually *look* right, whether the drawer and other AJAX pieces
-  behave smoothly, and whether the accessibility spot-checks pass with your eyes and screen reader.
-- Neither replaces the other. If your run finds something the suite did not, that is a genuine gap worth reporting.
+**End of QA.** Record any FAILs with exact steps and screenshots if possible.

@@ -720,3 +720,26 @@ function shop_public_order_no(int $id, string $createdAt): string
     return 'AL' . date('ymd', strtotime($createdAt)) . str_pad((string) $id, 5, '0', STR_PAD_LEFT);
 }
 
+/**
+ * One-line copy for the admin order desk's confirm modal, keyed by target
+ * status. Lives here rather than in views/admin/shop_order.php for the same
+ * M14 reason as shop_next_action(): a file-scope function in a view is a
+ * fatal redeclare on a second include.
+ *
+ * The copy is plain text: it travels through a data-CONFIRM attribute and
+ * is assigned to a data attribute in JS. HTML entities would show as
+ * literal text there, so no markup is sent.
+ *
+ * @return string|null null = no specific copy; the requester gets a default.
+ */
+function shop_order_confirm_copy(string $to): ?string
+{
+    return match ($to) {
+        'payment_failed'     => 'Reject this proof? The buyer gets a correction window to re-upload.',
+        'payment_review'     => 'Move this PAID order back to payment review? This reopens the proof loop.',
+        'cancelled'          => 'CANCEL this order? Its stock is released and a refund task may open.',
+        'returned_to_sender' => 'Mark this parcel as RETURNED TO SENDER?',
+        default              => null,
+    };
+}
+

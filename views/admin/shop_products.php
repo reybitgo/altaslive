@@ -1,8 +1,7 @@
 <?php
 /**
  * @file   views/admin/shop_products.php
- * @brief  Product catalog management (plan §5.14). Expects: $products
- *         (paginate()), $editProduct (?array), $pageTitle set in controller.
+ * @brief  Product catalog management. Expects: $products (paginate()), $editProduct (?array), $pageTitle set in controller.
  */
 ?>
 <?php require 'views/partials/head.php'; ?>
@@ -17,7 +16,7 @@
         <h4 class="mb-0">Shop Products</h4>
         <p class="text-muted mb-0" style="font-size:.8rem;">Manage the storefront catalog.</p>
       </div>
-      <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#productModal">+ New Product</button>
+      <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#productModal"><i class="fa-solid fa-plus me-1"></i> New Product</button>
     </div>
 
     <div class="card">
@@ -31,26 +30,27 @@
               <th class="text-center">Reserved</th>
               <th class="text-center">Available</th>
               <th class="text-center">Status</th>
-              <th class="text-end" style="padding-right:1.25rem;width:160px;">Actions</th>
+              <th class="text-end" style="padding-right:1.25rem;white-space:nowrap;width:1%;">Actions</th>
             </tr>
           </thead>
           <tbody>
             <?php if (empty($products['data'])): ?>
               <tr><td colspan="7" class="text-center py-5 text-muted">
-                <div style="font-size:2rem;opacity:.3;">🛍️</div>
+                <div style="font-size:2rem;opacity:.3;"><i class="fa-solid fa-box-open"></i></div>
                 <div class="mt-2">No products yet. Click <strong>+ New Product</strong> to create the first one.</div>
               </td></tr>
             <?php else: foreach ($products['data'] as $p):
               $reserved = Product::reservedStock((int) $p['id']);
               $available = max(0, (int) $p['stock'] - $reserved);
+              $imgUrl = !empty($p['image_url']) ? APP_URL . '/uploads/' . e($p['image_url']) : '';
             ?>
               <tr>
                 <td style="padding-left:1.25rem;">
-                  <div class="d-flex align-items-center gap-2">
+<div class="d-flex align-items-center gap-2">
                     <?php if (!empty($p['image_url'])): ?>
-                      <img src="<?= APP_URL ?>/uploads/<?= e($p['image_url']) ?>" alt="" style="width:38px;height:38px;object-fit:cover;border-radius:.4rem;">
+                      <img src="<?= APP_URL ?>/uploads/<?= e($p['image_url']) ?>" alt="" style="width:38px;height:38px;object-fit:cover;object-position:center;border-radius:.4rem;display:block;flex-shrink:0;">
                     <?php else: ?>
-                      <div style="width:38px;height:38px;border-radius:.4rem;background:#f4f6fb;display:flex;align-items:center;justify-content:center;">🛍️</div>
+                      <div style="width:38px;height:38px;flex-shrink:0;border-radius:.4rem;background:#f4f6fb;display:flex;align-items:center;justify-content:center;line-height:1;"><span style="font-size:1.1rem;line-height:1;display:flex;align-items:center;justify-content:center;">🛍️</span></div>
                     <?php endif; ?>
                     <div>
                       <div class="fw-semibold"><?= e($p['name']) ?></div>
@@ -63,21 +63,14 @@
                 <td class="text-center font-mono text-warning" title="Held by active orders"><?= $reserved ?></td>
                 <td class="text-center font-mono <?= $available <= 0 ? 'text-danger fw-bold' : 'text-success' ?>"><?= $available ?></td>
                 <td class="text-center">
-                  <?php /* data-role so the toggle can update the badge in place
-                           instead of reloading the page. */ ?>
                   <span data-role="status-badge" class="<?= $p['status'] === 'active'
                       ? 'badge bg-success-subtle text-success'
                       : 'badge bg-secondary-subtle text-secondary' ?>">
-                    <?= $p['status'] === 'active' ? '● Active' : '○ Inactive' ?>
+                    <?= $p['status'] === 'active' ? '<i class="fa-solid fa-circle-check me-1"></i>Active' : '<i class="fa-solid fa-circle-xmark me-1"></i>Inactive' ?>
                   </span>
                 </td>
-                <td class="text-end" style="padding-right:1.25rem;">
+                <td class="text-end" style="padding-right:1.25rem;white-space:nowrap;">
                   <?php
-                  // Whether anything still references this product, resolved
-                  // once for the whole page in the controller. It only decides
-                  // what the button *says* — the server still refuses the
-                  // delete, because a member can add the item to a cart between
-                  // this render and the click.
                   $ref  = $productRefs[(int) $p['id']] ?? ['orders' => 0, 'carts' => 0];
                   $why  = match (true) {
                       $ref['orders'] > 0 && $ref['carts'] > 0
@@ -85,36 +78,53 @@
                       $ref['orders'] > 0
                           => 'This product has been bought. It cannot be deleted.',
                       $ref['carts'] > 0
-                          => 'This product is in a member\'s cart. It cannot be deleted.',
+                          => "This product is in a member's cart. It cannot be deleted.",
                       default
                           => '',
                   };
                   $blocked = $why !== '';
                   ?>
-                  <?php /* One flex row for the actions. Bare inline buttons
-                           in this cell sit flush against each other once the
-                           Actions column runs out of width on a phone, so the
-                           gap-2 flex container guarantees separation at every
-                           viewport width instead of only on wide screens. */ ?>
-                  <div class="d-flex flex-wrap justify-content-end gap-2">
-                    <a href="<?= link_to('admin_shop', ['edit' => $p['id']]) ?>" class="btn btn-sm btn-outline-primary">Edit</a>
-                    <form method="post" action="<?= link_to('admin_delete_product') ?>" class="js-product-action-form"
-                        data-action="delete" data-name="<?= e($p['name']) ?>"
-                        data-blocked="<?= $blocked ? '1' : '0' ?>"
-                        data-reason="<?= e($why) ?>">
-                    <?= csrf_field() ?>
-                    <input type="hidden" name="product_id" value="<?= (int) $p['id'] ?>">
-                    <?php /* aria-disabled, NOT disabled.
-                             A real `disabled` button is unfocusable and swallows
-                             the click, so the member would never learn why. This
-                             one looks dead and explains itself on click. */ ?>
-                    <button type="submit"
-                            class="btn btn-sm btn-outline-danger js-product-action<?= $blocked ? ' disabled-look' : '' ?>"
-                            <?= $blocked ? 'aria-disabled="true"' : '' ?>
-                            <?php if ($blocked): ?>title="<?= e($why) ?>"<?php endif; ?>>
-                      Delete
+                  <div class="d-inline-flex align-items-center flex-nowrap gap-2">
+                    <button type="button" class="btn btn-link p-0 border-0 text-secondary product-view-btn"
+                            data-bs-toggle="modal" data-bs-target="#productViewModal"
+                            data-id="<?= (int)$p['id'] ?>"
+                            data-name="<?= e($p['name']) ?>"
+                            data-sku="<?= e($p['sku'] ?? '') ?>"
+                            data-price="<?= fmt_money((float)$p['price']) ?>"
+                            data-stock="<?= (int)$p['stock'] ?>"
+                            data-reserved="<?= $reserved ?>"
+                            data-available="<?= $available ?>"
+                            data-status="<?= $p['status'] === 'active' ? 'Active' : 'Inactive' ?>"
+                            data-status-class="<?= $p['status'] === 'active' ? 'text-success fw-semibold' : 'text-secondary fw-semibold' ?>"
+                            data-image="<?= $imgUrl ?>"
+                            data-short="<?= e($p['short_description'] ?? '') ?>"
+                            data-full="<?= e($p['description'] ?? '') ?>"
+                            data-created="<?= !empty($p['created_at']) ? e($p['created_at']) : '-' ?>"
+                            data-updated="<?= !empty($p['updated_at']) ? e($p['updated_at']) : '-' ?>"
+                            title="View product details" aria-label="View <?= e($p['name']) ?>">
+                      <i class="fa-solid fa-eye"></i>
                     </button>
-                  </form>
+
+                    <a href="<?= link_to('admin_shop', ['edit' => $p['id']]) ?>"
+                       class="text-primary d-inline-block"
+                       title="Edit product" aria-label="Edit <?= e($p['name']) ?>">
+                      <i class="fa-solid fa-pen-to-square"></i>
+                    </a>
+
+                    <form method="post" action="<?= link_to('admin_delete_product') ?>" class="js-product-action-form d-inline"
+                          data-action="delete" data-name="<?= e($p['name']) ?>"
+                          data-blocked="<?= $blocked ? '1' : '0' ?>"
+                          data-reason="<?= e($why) ?>">
+                      <?= csrf_field() ?>
+                      <input type="hidden" name="product_id" value="<?= (int)$p['id'] ?>">
+                      <button type="submit"
+                              class="btn btn-link p-0 border-0 js-product-action<?= $blocked ? ' disabled-look' : '' ?>"
+                              <?= $blocked ? 'aria-disabled="true"' : '' ?>
+                              title="<?= $blocked ? e($why) : 'Delete product' ?>"
+                              aria-label="Delete <?= e($p['name']) ?>">
+                        <i class="fa-solid fa-trash<?= $blocked ? ' text-muted' : ' text-danger' ?>"></i>
+                      </button>
+                    </form>
                   </div>
                 </td>
               </tr>
@@ -128,33 +138,30 @@
     </div>
 
     <div class="text-muted mt-2" style="font-size:.75rem;">
-      ℹ️ Stock is absolute inventory. It is deducted automatically when an order is handed to the courier;
-      adjust it here for deliveries, write-offs, and recounts.
+      <i class="fa-solid fa-circle-info me-1"></i> Stock is absolute inventory. It is deducted automatically when an order is handed to the courier; adjust it here for deliveries, write-offs, and recounts.
     </div>
 
     <style>
-      /* A referenced product's Delete button reads as unavailable. */
       .btn.disabled-look {
         opacity: .45;
         cursor: not-allowed;
-        pointer-events: none;   /* the tooltip/toast is driven off the form */
+        pointer-events: none;
       }
       tr.js-row-removing { opacity: 0; transform: translateX(-8px); }
       tbody tr { transition: opacity .25s ease, transform .25s ease; }
+      .product-view-btn { text-decoration: none; }
+      .product-view-btn:focus,
+      .product-view-btn:focus-visible,
+      .js-product-action:focus,
+      .js-product-action:focus-visible {
+        box-shadow: none !important;
+        outline: none !important;
+      }
     </style>
 
     <script>
     (function () {
-      // e(), not js(). A <script> block is a raw-text element: the HTML parser
-      // does NOT decode entities inside it, so js() emitted &quot;token&quot;
-      // verbatim and the whole IIFE died with "SyntaxError: Unexpected token
-      // '&'" — leaving no submit listener at all and therefore no modal.
-      // js() is only correct inside an HTML attribute, where the parser does
-      // decode. Matches the convention in views/partials/cart_offcanvas.php.
       var CSRF = '<?= e(csrf_token()) ?>';
-
-      // Wording per action. Delete is irreversible; the difference is stated
-      // in the modal rather than left for the admin to remember.
       function copyFor(action, name) {
         return {
           title: 'Delete ' + name + '?',
@@ -163,25 +170,18 @@
           confirmClass: 'btn-danger',
         };
       }
-
       document.addEventListener('submit', function (e) {
         var form = e.target.closest('.js-product-action-form');
         if (!form) return;
         e.preventDefault();
-
-        var btn    = form.querySelector('.js-product-action');
-        var name   = form.dataset.name || 'this product';
+        var btn = form.querySelector('.js-product-action');
+        var name = form.dataset.name || 'this product';
         var action = form.dataset.action || 'delete';
-
-        // Blocked: explain, post nothing. The server would refuse anyway; this
-        // avoids a pointless round trip and keeps the admin where they are.
         if (action === 'delete' && form.dataset.blocked === '1') {
           if (window.showToast) showToast(form.dataset.reason || 'Cannot delete.', 'error');
           return;
         }
-
         var copy = copyFor(action, name);
-
         showConfirm({
           size: 'sm',
           title: copy.title,
@@ -192,7 +192,6 @@
             if (btn) btn.disabled = true;
             var body = new URLSearchParams(new FormData(form));
             body.set('ajax', '1');
-
             fetch(form.action, {
               method: 'POST',
               headers: {
@@ -202,42 +201,131 @@
               },
               body: body.toString()
             })
-              .then(function (r) {
-                return r.json().catch(function () {
-                  return { ok: false, message: 'Unexpected server response.' };
-                });
-              })
-              .then(function (res) {
-                if (!res || !res.ok) {
-                  if (btn) btn.disabled = false;
-                  // Reachable: the reference state can change between render
-                  // and click. Say which one is blocking it.
-                  if (window.showToast) showToast(res.message || 'Could not complete.', 'error');
-                  return;
-                }
-                var row = form.closest('tr');
-                if (!row) return;
-                row.classList.add('js-row-removing');
-                // Removed rather than reloaded, so the admin keeps their
-                // place and scroll position in the catalog.
-                window.setTimeout(function () {
-                  row.remove();
-                  if (window.showToast) showToast(res.message || 'Product deleted.', 'success');
-                }, 250);
-              })
-              .catch(function () {
-                if (btn) btn.disabled = false;
-                if (window.showToast) showToast('Could not reach the server. Nothing was deleted.', 'error');
-              });
+            .then(function (r) { return r.json().catch(function () { return { ok: false, message: 'Unexpected server response.' }; }); })
+            .then(function (res) {
+              if (!res || !res.ok) { if (btn) btn.disabled = false; if (window.showToast) showToast(res.message || 'Could not complete.', 'error'); return; }
+              var row = form.closest('tr');
+              if (row) { row.classList.add('js-row-removing'); window.setTimeout(function () { row.remove(); if (window.showToast) showToast(res.message || 'Product deleted.', 'success'); }, 250); }
+            })
+            .catch(function () { if (btn) btn.disabled = false; if (window.showToast) showToast('Could not reach the server. Nothing was deleted.', 'error'); });
           }
         });
       });
     })();
+    document.addEventListener('DOMContentLoaded', function () {
+      var viewModal = document.getElementById('productViewModal');
+      if (!viewModal) return;
+      var lastBtn = null;
+      var base = '<?= link_to('admin_shop') ?>' + '&';
+      viewModal.addEventListener('shown.bs.modal', function (event) {
+        var btn = event.relatedTarget;
+        if (!btn) return;
+        lastBtn = btn;
+        document.getElementById('pv-title').textContent = btn.dataset.name || 'Product Details';
+        document.getElementById('pv-name').textContent = btn.dataset.name || '';
+        document.getElementById('pv-id-display').textContent = btn.dataset.id || '';
+        document.getElementById('pv-sku').textContent = btn.dataset.sku || '-';
+        document.getElementById('pv-price').textContent = btn.dataset.price || '₱0.00';
+        document.getElementById('pv-status').textContent = btn.dataset.status || '';
+        document.getElementById('pv-status').className = btn.dataset.statusClass || 'fw-semibold';
+        document.getElementById('pv-stock').textContent = btn.dataset.stock || '0';
+        document.getElementById('pv-reserved').textContent = btn.dataset.reserved || '0';
+        document.getElementById('pv-available').textContent = btn.dataset.available || '0';
+        document.getElementById('pv-short').textContent = btn.dataset.short || '';
+        document.getElementById('pv-full').textContent = btn.dataset.full || '';
+        document.getElementById('pv-created-display').textContent = btn.dataset.created || '-';
+        document.getElementById('pv-updated-display').textContent = btn.dataset.updated || '-';
+        var img = document.getElementById('pv-image');
+        var noImg = document.getElementById('pv-no-image');
+        if (btn.dataset.image) {
+          img.src = btn.dataset.image;
+          img.alt = btn.dataset.name || 'Product image';
+          img.classList.remove('d-none');
+          noImg.classList.add('d-none');
+        } else {
+          img.classList.add('d-none');
+          noImg.classList.remove('d-none');
+        }
+        var editLink = document.getElementById('pv-edit-link');
+        editLink.href = base + 'edit=' + (btn.dataset.id || '');
+      });
+
+      var editModalEl = document.getElementById('productModal');
+      var editModalForm = editModalEl.querySelector('form');
+      var NEW_TITLE = '<i class="fa-solid fa-plus me-2"></i>New Product';
+      var EDIT_TITLE = '<i class="fa-solid fa-pen-to-square me-2"></i>Edit Product';
+      var CREATE_BTN = '<i class="fa-solid fa-plus me-1"></i>Create Product';
+      var UPDATE_BTN = '<i class="fa-solid fa-check me-1"></i>Update Product';
+      var titleEl = document.getElementById('editModalTitle');
+      var submitEl = document.getElementById('editModalSubmit');
+      var imgWrap = document.getElementById('editImagePreviewWrap');
+      var imgEl = document.getElementById('editImagePreview');
+      var imgCbox = document.getElementById('removeImage');
+
+      function setField(sel, v) {
+        var el = editModalForm.querySelector(sel);
+        if (el) el.value = (v === null || v === undefined) ? '' : String(v);
+      }
+
+      function resetEditForm() {
+        ['product_id', 'name', 'sku', 'price', 'stock', 'short_description', 'description'].forEach(function (n) {
+          setField('[name="' + n + '"]', '');
+        });
+        var status = editModalForm.querySelector('[name="status"]');
+        if (status) status.value = 'active';
+        var file = editModalForm.querySelector('[name="image"]');
+        if (file) file.value = '';
+        if (imgEl) imgEl.src = '';
+        if (imgWrap) imgWrap.style.display = 'none';
+        if (imgCbox) imgCbox.checked = false;
+        if (titleEl) titleEl.innerHTML = NEW_TITLE;
+        if (submitEl) submitEl.innerHTML = CREATE_BTN;
+      }
+
+      var editBtn = document.getElementById('pv-edit-link');
+      if (editBtn) editBtn.addEventListener('click', function (e) {
+        if (!lastBtn) return;
+        e.preventDefault();
+        var d = lastBtn.dataset;
+        setField('[name="product_id"]', d.id || '');
+        setField('[name="name"]', d.name || '');
+        setField('[name="sku"]', d.sku || '');
+        var priceStr = String(d.price || '').replace(/[^\d.]/g, '');
+        setField('[name="price"]', priceStr === '' ? '' : String(parseFloat(priceStr)));
+        setField('[name="stock"]', d.stock || '');
+        setField('[name="short_description"]', d.short || '');
+        setField('[name="description"]', d.full || '');
+        var statusSel = editModalForm.querySelector('[name="status"]');
+        if (statusSel) statusSel.value = d.status === 'Active' ? 'active' : 'inactive';
+        if (titleEl) titleEl.innerHTML = EDIT_TITLE;
+        if (submitEl) submitEl.innerHTML = UPDATE_BTN;
+        if (imgEl) imgEl.src = d.image || '';
+        if (imgWrap) imgWrap.style.display = d.image ? '' : 'none';
+        if (imgCbox) imgCbox.checked = false;
+        var vm = bootstrap.Modal.getInstance(viewModal);
+        if (vm) vm.hide();
+        var em = bootstrap.Modal.getOrCreateInstance(editModalEl);
+        em.show();
+      });
+
+      function stripEditParam() {
+        var u = new URL(window.location.href);
+        if (u.searchParams.has('edit')) {
+          u.searchParams.delete('edit');
+          history.replaceState(null, '', u.toString());
+        }
+      }
+
+      editModalEl.addEventListener('hidden.bs.modal', function () {
+        resetEditForm();
+        stripEditParam();
+      });
+    });
     </script>
   </div>
 </div>
 
-<!-- ═══ PRODUCT MODAL (create / edit) ═══ -->
+<!-- PRODUCT MODAL (create/edit) -->
 <div class="modal fade" id="productModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
@@ -245,7 +333,7 @@
         <?= csrf_field() ?>
         <input type="hidden" name="product_id" value="<?= e($editProduct['id'] ?? '') ?>">
         <div class="modal-header">
-          <h5 class="modal-title"><?= ($editProduct ?? null) ? '✏️ Edit Product' : '➕ New Product' ?></h5>
+          <h5 class="modal-title" id="editModalTitle"><?= ($editProduct ?? null) ? '<i class="fa-solid fa-pen-to-square me-2"></i>Edit Product' : '<i class="fa-solid fa-plus me-2"></i>New Product' ?></h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
@@ -277,35 +365,134 @@
             </div>
             <div class="col-12">
               <label class="form-label">Image</label>
-              <?php if (!empty($editProduct['image_url'])): ?>
-                <div class="mb-2">
-                  <img src="<?= APP_URL ?>/uploads/<?= e($editProduct['image_url']) ?>" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:.5rem;">
-                  <div class="form-check mt-1">
-                    <input class="form-check-input" type="checkbox" name="remove_image" id="removeImage" value="1">
-                    <label class="form-check-label" for="removeImage" style="font-size:.82rem;">Remove current image</label>
-                  </div>
+              <div class="mb-2" id="editImagePreviewWrap"<?= !empty($editProduct['image_url']) ? '' : ' style="display:none;"' ?>>
+                <img id="editImagePreview" src="<?= !empty($editProduct['image_url']) ? APP_URL . '/uploads/' . e($editProduct['image_url']) : '' ?>" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:.5rem;">
+                <div class="form-check mt-1">
+                  <input class="form-check-input" type="checkbox" name="remove_image" id="removeImage" value="1">
+                  <label class="form-check-label" for="removeImage" style="font-size:.82rem;">Remove current image</label>
                 </div>
-              <?php endif; ?>
+              </div>
               <input type="file" name="image" class="form-control" accept="image/jpeg,image/png,image/gif,image/webp">
               <div class="form-text">JPG, PNG, GIF or WebP · max 5 MB<?= ($editProduct ?? null) ? ' · leave empty to keep the current image' : '' ?>.</div>
             </div>
             <div class="col-md-4">
               <label class="form-label">Status</label>
               <select name="status" class="form-select">
-                <option value="active" <?= (($editProduct['status'] ?? 'active') === 'active') ? 'selected' : '' ?>>🟢 Active</option>
-                <option value="inactive" <?= (($editProduct['status'] ?? '') === 'inactive') ? 'selected' : '' ?>>⚪ Inactive</option>
+                <option value="active" <?= (($editProduct['status'] ?? 'active') === 'active') ? 'selected' : '' ?>>Active</option>
+                <option value="inactive" <?= (($editProduct['status'] ?? '') === 'inactive') ? 'selected' : '' ?>>Inactive</option>
               </select>
             </div>
           </div>
         </div>
         <div class="modal-footer">
           <a href="<?= link_to('admin_shop') ?>" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</a>
-          <button type="submit" class="btn btn-primary"><?= ($editProduct ?? null) ? '💾 Update Product' : '➕ Create Product' ?></button>
+          <button type="submit" id="editModalSubmit" class="btn btn-primary"><?= ($editProduct ?? null) ? '<i class="fa-solid fa-check me-1"></i>Update Product' : '<i class="fa-solid fa-plus me-1"></i>Create Product' ?></button>
         </div>
       </form>
     </div>
   </div>
 </div>
+
+<!-- PRODUCT VIEW MODAL -->
+<div class="modal fade" id="productViewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title d-flex align-items-center gap-2">
+          <i class="fa-solid fa-box text-primary"></i>
+          <span id="pv-title">Product Details</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body py-4">
+        <div class="row g-4">
+          <div class="col-md-5">
+            <div class="card border-0 bg-light h-100">
+              <div class="card-body d-flex align-items-center justify-content-center p-4">
+                <img id="pv-image" src="" alt="Product image"
+                     class="img-fluid rounded shadow-sm d-none"
+                     style="max-height:320px; object-fit:cover; width:100%;">
+                <div id="pv-no-image" class="text-center text-muted">
+                  <div style="font-size:4rem;line-height:1;">🛍️</div>
+                  <div class="mt-2 small">No image available</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-7">
+            <div class="h-100">
+              <div class="card-body p-0">
+                <div class="row g-3">
+                  <div class="col-12">
+                    <h4 id="pv-name" class="fw-bold mb-1"></h4>
+                    <div class="text-muted small">SKU: <span id="pv-sku" class="font-mono">-</span></div>
+                  </div>
+                  <div class="col-sm-6">
+                    <div class="border rounded p-2">
+                      <div class="text-muted small">Price</div>
+                      <div id="pv-price" class="fs-5 fw-semibold text-primary font-mono"></div>
+                    </div>
+                  </div>
+                  <div class="col-sm-6">
+                    <div class="border rounded p-2">
+                      <div class="text-muted small">Status</div>
+                      <div id="pv-status"></div>
+                    </div>
+                  </div>
+                  <div class="col-sm-4">
+                    <div class="border rounded p-2">
+                      <div class="text-muted small">Stock</div>
+                      <div id="pv-stock" class="fw-semibold font-mono"></div>
+                    </div>
+                  </div>
+                  <div class="col-sm-4">
+                    <div class="border rounded p-2">
+                      <div class="text-muted small">Reserved</div>
+                      <div id="pv-reserved" class="fw-semibold font-mono text-warning"></div>
+                    </div>
+                  </div>
+                  <div class="col-sm-4">
+                    <div class="border rounded p-2">
+                      <div class="text-muted small">Available</div>
+                      <div id="pv-available" class="fw-semibold font-mono"></div>
+                    </div>
+                  </div>
+                  <div class="col-12">
+                    <div class="border rounded p-2">
+                      <div class="text-muted small mb-1">Short Description</div>
+                      <div id="pv-short" class="text-body"></div>
+                    </div>
+                  </div>
+                  <div class="col-12">
+                    <div class="border rounded p-2">
+                      <div class="text-muted small mb-1">Full Description</div>
+                      <div id="pv-full" class="text-body" style="white-space:pre-wrap;"></div>
+                    </div>
+                  </div>
+                  <div class="col-12">
+                    <hr class="my-2">
+                    <div class="d-flex flex-wrap gap-3 small text-muted">
+                      <div><strong>Product ID:</strong> <span id="pv-id-display" class="font-mono"></span></div>
+                      <div><strong>Created:</strong> <span id="pv-created-display"></span></div>
+                      <div><strong>Updated:</strong> <span id="pv-updated-display"></span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        <a id="pv-edit-link" href="#" class="btn btn-primary">
+          <i class="fa-solid fa-pen-to-square me-1"></i> Edit Product
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
 <?php if ($editProduct ?? null): ?>
 <script>
   document.addEventListener('DOMContentLoaded', function () {

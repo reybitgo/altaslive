@@ -19,6 +19,11 @@ foreach (ShopOrder::TRANSITIONS as $to => $rule) {
     }
 }
 $needConfirm = ['cancelled', 'returned_to_sender', 'payment_failed', 'on_hold']; // irreversible legs
+
+/* One-line developer copy for the confirm modal, keyed by target status
+   (shop_order_confirm_copy() in core/helpers.php — views may not declare
+   functions, M14). showConfirm's `message` is trusted HTML (see
+   assets/js/app.js), so these literals are safe raw; only the order number   is dynamic and it is e()'d where interpolated. */
 ?>
 <?php require 'views/partials/head.php'; ?>
 <?php require 'views/partials/sidebar_admin.php'; ?>
@@ -75,8 +80,8 @@ $needConfirm = ['cancelled', 'returned_to_sender', 'payment_failed', 'on_hold'];
                     <button type="submit" class="btn btn-success btn-sm w-100">Mark paid</button>
                   </form>
                   <!-- Reject proof -->
-                  <form method="post" action="<?= link_to('admin_order_transition') ?>" class="border rounded p-2"
-                        onsubmit="return confirm('Reject this proof? The buyer gets a correction window.');">
+                  <form method="post" action="<?= link_to('admin_order_transition') ?>" class="border rounded p-2 js-confirm-form"
+                        data-confirm="<?= e(shop_order_confirm_copy('payment_failed') ?? 'Reject this proof?') ?>">
                     <?= csrf_field() ?>
                     <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
                     <input type="hidden" name="to" value="payment_failed">
@@ -95,8 +100,8 @@ $needConfirm = ['cancelled', 'returned_to_sender', 'payment_failed', 'on_hold'];
                     <button type="submit" class="btn btn-primary btn-sm w-100">Packing</button>
                   </form>
                   <!-- Revert (rare): paid → payment_review, only before packing -->
-                  <form method="post" action="<?= link_to('admin_order_transition') ?>" class="border rounded p-2"
-                        onsubmit="return confirm('Move this paid order back to payment review?');">
+                  <form method="post" action="<?= link_to('admin_order_transition') ?>" class="border rounded p-2 js-confirm-form"
+                        data-confirm="<?= e(shop_order_confirm_copy('payment_review') ?? 'Move this paid order back to payment review?') ?>">
                     <?= csrf_field() ?>
                     <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
                     <input type="hidden" name="to" value="payment_review">
@@ -174,8 +179,8 @@ $needConfirm = ['cancelled', 'returned_to_sender', 'payment_failed', 'on_hold'];
                        legal in the matrix, but NO form rendered it — so the status
                        was unreachable and so was the Reship button below. */ ?>
                 <?php if (in_array($status, ['shipped', 'out_for_delivery', 'delivery_failed'], true)): ?>
-                  <form method="post" action="<?= link_to('admin_order_transition') ?>" class="border rounded p-2"
-                        onsubmit="return confirm('Mark this parcel as RETURNED TO SENDER?');">
+                  <form method="post" action="<?= link_to('admin_order_transition') ?>" class="border rounded p-2 js-confirm-form"
+                        data-confirm="<?= e(shop_order_confirm_copy('returned_to_sender') ?? 'Mark this parcel as returned to sender?') ?>">
                     <?= csrf_field() ?>
                     <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
                     <input type="hidden" name="to" value="returned_to_sender">
@@ -186,8 +191,8 @@ $needConfirm = ['cancelled', 'returned_to_sender', 'payment_failed', 'on_hold'];
                 <?php endif; ?>
 
                 <?php if ($status === 'returned_to_sender'): ?>
-                  <form method="post" action="<?= link_to('admin_order_reship') ?>" class="border rounded p-2"
-                        onsubmit="return confirm('Open a reshipment? The shop absorbs the cost — no fee is charged.');">
+                  <form method="post" action="<?= link_to('admin_order_reship') ?>" class="border rounded p-2 js-confirm-form"
+                        data-confirm="Open a reshipment? The shop absorbs the cost — no fee is charged.">
                     <?= csrf_field() ?>
                     <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
                     <div class="fw-semibold mb-1" style="font-size:.82rem;">🔁 Reship</div>
@@ -206,8 +211,8 @@ $needConfirm = ['cancelled', 'returned_to_sender', 'payment_failed', 'on_hold'];
        the matrix stays the single source of truth. */ ?>
 
                 <?php if (in_array($status, ['pending', 'payment_failed', 'paid', 'packing', 'ready_to_ship', 'on_hold', 'returned_to_sender'], true)): ?>
-                  <form method="post" action="<?= link_to('admin_order_transition') ?>" class="border border-danger-subtle rounded p-2"
-                        onsubmit="return confirm('CANCEL this order? This releases its stock and may open a refund task.');">
+                  <form method="post" action="<?= link_to('admin_order_transition') ?>" class="border border-danger-subtle rounded p-2 js-confirm-form"
+                        data-confirm="<?= e(shop_order_confirm_copy('cancelled') ?? 'CANCEL this order?') ?>">
                     <?= csrf_field() ?>
                     <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
                     <input type="hidden" name="to" value="cancelled">
@@ -430,4 +435,55 @@ $needConfirm = ['cancelled', 'returned_to_sender', 'payment_failed', 'on_hold'];
     </div>
   </div>
 </div>
+<script>
+// Confirm-before-post for every action-bar form. The irreversibly-important
+// legs carry a specific data-confirm message (rendered above from
+// shop_order_confirm_copy()); the plain forward steps get a default one.
+// One delegated listener, like views/admin/shop_products.php.
+(function () {
+  var ORDER_NO = '<?= e($orderNo) ?>';
+
+  document.addEventListener('submit', function (e) {
+    var form = e.target.closest('.js-confirm-form');
+    if (!form) return;
+    e.preventDefault();
+
+    var msg    = form.dataset.confirm || '';
+    var target = (form.querySelector('input[name="to"]') || {}).value || '';
+    var btn    = form.querySelector('button[type="submit"]');
+    var label  = btn ? (btn.textContent || '').trim() : 'Confirm action';
+
+    showConfirm({
+      size: 'sm',
+      title: label + ' — ' + ORDER_NO,
+      message: msg
+        ? msg  // rendered above with e(); trusted HTML by contract
+        : 'Move this order ' + label.replace(/\s*\(.*\)$/, '') + '?',
+      confirmText: label,
+      confirmClass: /cancel|reject|failure|returned/i.test(label + ' ' + target) ? 'btn-danger' : 'btn-primary',
+      onConfirm: function () { form.submit(); }
+    });
+  });  // The remaining forms (forward steps like Packing / Dispatch, plus hold,
+  // refund-creation, note) also post real state changes with no other
+  // confirmation; opt them in with a default message.
+  document.querySelectorAll(
+    '.card form[method="post"]:not(.js-confirm-form)'
+  ).forEach(function (form) {
+    form.classList.add('js-confirm-form');
+    form.dataset.confirm = '';
+  });
+
+  // Flash → toast. The transition handlers redirect back with a flash
+  // message ('Order moved to X.' / refusals); render it as the app toast
+  // (showToast already escapes the message and maps error→danger).
+  if (window.showToast) {
+    document.querySelectorAll('.page-content > .alert[role="alert"]').forEach(function (el) {
+      var kind = ['danger', 'warning', 'info', 'success'].find(function (c) { return el.classList.contains('alert-' + c); }) || 'info';
+      var text = (el.textContent || '').replace(/^[✓✕ℹ⚠]\s*/, '').trim();
+      if (text) showToast(text, kind);
+      el.remove();
+    });
+  }
+})();
+</script>
 <?php require 'views/partials/footer.php'; ?>

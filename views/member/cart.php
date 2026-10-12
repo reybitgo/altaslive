@@ -129,7 +129,10 @@
     document.getElementById('cartPageTotalPrice').textContent = fmt(subtotal) + ' PHP';
     document.getElementById('cartPageItemsCount').textContent = count;
     var badge = document.querySelector('.topbar-wrapper .topbar-cart-badge');
-    if (badge) badge.textContent = count;
+    if (badge) {
+      badge.textContent = count;
+      badge.classList.toggle('d-none', count <= 0);
+    }
   }
   function observe() {
     var list = document.getElementById('cartPageItems');
