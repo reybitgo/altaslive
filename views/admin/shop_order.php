@@ -427,9 +427,27 @@ $needConfirm = ['cancelled', 'returned_to_sender', 'payment_failed', 'on_hold'];
         </div>
 
         <!-- Timeline -->
-        <div class="card mb-3">
-          <div class="card-header"><span class="card-title">🕘 History</span></div>
-          <div class="card-body"><?php require __DIR__ . '/../partials/shop_order_timeline.php'; ?></div>
+        <div class="card mb-3" id="adminHistoryCard">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span class="card-title">🕘 History</span>
+            <?php if (!empty($events)): ?>
+              <select id="historyPageSize" class="form-select form-select-sm" aria-label="Events per page" style="width:auto;">
+                <option value="5" selected>5</option>
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+              </select>
+            <?php endif; ?>
+          </div>
+          <div class="card-body">
+            <?php require __DIR__ . '/../partials/shop_order_timeline.php'; ?>
+            <nav id="historyPager" class="d-none mt-2" aria-label="History pages">
+              <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <span id="historyPagerInfo" class="text-muted small"></span>
+                <ul class="pagination pagination-sm mb-0 ms-auto"></ul>
+              </div>
+            </nav>
+          </div>
         </div>
       </div>
     </div>
@@ -483,6 +501,72 @@ $needConfirm = ['cancelled', 'returned_to_sender', 'payment_failed', 'on_hold'];
       if (text) showToast(text, kind);
       el.remove();
     });
+  }
+
+  // ── History timeline pager ─────────────────────────────────
+  // Client-side pagination of the shared timeline partial: the desk renders
+  // the full event list and paging happens in the browser (page size 5, 10,
+  // 20 or 50, default 5). No page reload, no server round-trip.
+  var historyCard = document.getElementById('adminHistoryCard');
+  if (historyCard) {
+    var sizeSel  = document.getElementById('historyPageSize');
+    var pagerNav = document.getElementById('historyPager');
+    var pagerUl  = pagerNav.querySelector('ul');
+    var pagerInfo = document.getElementById('historyPagerInfo');
+    var page = 1;
+    var size = sizeSel ? (parseInt(sizeSel.value, 10) || 5) : 5;
+
+    function drawHistoryRows() {
+      var timeline = historyCard.querySelector('.shop-timeline');
+      var rows = timeline ? Array.prototype.slice.call(timeline.querySelectorAll('.shop-timeline-row')) : [];
+      if (!rows.length) { pagerNav.classList.add('d-none'); return; }
+      var pages = Math.max(1, Math.ceil(rows.length / size));
+      if (page > pages) page = pages;
+      rows.forEach(function (row, i) {
+        row.classList.toggle('d-none', !(i >= (page - 1) * size && i < page * size));
+      });
+      var from = (page - 1) * size + 1;
+      var to = Math.min(page * size, rows.length);
+      if (pagerInfo) pagerInfo.textContent = 'Showing ' + from + '–' + to + ' of ' + rows.length;
+      var html = '<li class="page-item' + (page <= 1 ? ' disabled' : '') + '">' +
+                 '<a class="page-link" href="#" data-hp="first" aria-label="First page">&laquo;</a></li>';
+      html += '<li class="page-item' + (page <= 1 ? ' disabled' : '') + '">' +
+                 '<a class="page-link" href="#" data-hp="prev" aria-label="Previous">&lsaquo;</a></li>';
+      for (var p = 1; p <= pages; p++) {
+        html += '<li class="page-item' + (p === page ? ' active' : '') + '">' +
+                '<a class="page-link" href="#" data-hp="' + p + '">' + p + '</a></li>';
+      }
+      html += '<li class="page-item' + (page >= pages ? ' disabled' : '') + '">' +
+              '<a class="page-link" href="#" data-hp="next" aria-label="Next">&rsaquo;</a></li>';
+      html += '<li class="page-item' + (page >= pages ? ' disabled' : '') + '">' +
+              '<a class="page-link" href="#" data-hp="last" aria-label="Last page">&raquo;</a></li>';
+      pagerUl.innerHTML = html;
+      pagerNav.classList.toggle('d-none', pages <= 1);
+    }
+
+    pagerUl.addEventListener('click', function (e) {
+      var a = e.target.closest('a[data-hp]');
+      if (!a) return;
+      e.preventDefault();
+      var cmd = a.dataset.hp;
+      var timeline = historyCard.querySelector('.shop-timeline');
+      var rows = timeline ? timeline.querySelectorAll('.shop-timeline-row') : [];
+      var pages = Math.max(1, Math.ceil(rows.length / size));
+      if (cmd === 'first') page = 1;
+      else if (cmd === 'prev') page = Math.max(1, page - 1);
+      else if (cmd === 'next') page = Math.min(pages, page + 1);
+      else if (cmd === 'last') page = pages;
+      else page = parseInt(cmd, 10) || 1;
+      drawHistoryRows();
+    });
+
+    if (sizeSel) sizeSel.addEventListener('change', function () {
+      size = parseInt(this.value, 10) || 5;
+      page = 1;
+      drawHistoryRows();
+    });
+
+    drawHistoryRows();
   }
 })();
 </script>

@@ -17,7 +17,7 @@ $actorLabel = [
     <div class="text-muted small">No events yet.</div>
   <?php else: ?>
     <?php foreach ($events as $ev): ?>
-      <div class="d-flex gap-2 pb-3 mb-1 border-bottom">
+      <div class="shop-timeline-row d-flex gap-2 pb-3 mb-1 border-bottom">
         <div class="flex-shrink-0">
           <span class="badge bg-<?= e(shop_status_tone((string) $ev['to_status'])) ?>" style="min-width:34px;">&bull;</span>
         </div>

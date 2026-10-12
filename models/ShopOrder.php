@@ -884,7 +884,7 @@ class ShopOrder
             // caller-facing constraint was a client-side maxlength (Phase 7).
             $paymentReference = clean_reference($paymentReference, 40);
             if ($paymentReference === '') {
-                throw new InvalidArgumentException('Payment reference contains no usable characters.');
+                throw new InvalidArgumentException('Payment reference required.');
             }
             if ($paymentReference !== null && $paymentReference !== '') {
                 // Uniqueness spans the whole transfer lifecycle: a reference on

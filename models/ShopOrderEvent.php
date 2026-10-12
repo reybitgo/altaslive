@@ -30,7 +30,7 @@ class ShopOrderEvent
 
     public static function forOrder(int $orderId): array
     {
-        $st = db()->prepare("SELECT * FROM shop_order_events WHERE order_id = ? ORDER BY created_at ASC, id ASC");
+        $st = db()->prepare("SELECT * FROM shop_order_events WHERE order_id = ? ORDER BY created_at DESC, id DESC");
         $st->execute([$orderId]);
         return $st->fetchAll();
     }

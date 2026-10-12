@@ -79,6 +79,10 @@ class ShopShipment
      */
     public static function upsertTracking(int $orderId, string $courier, string $tracking, ?string $expectedAt = null): int
     {
+        // Boundary hardening: an empty-string datetime from any caller would
+        // otherwise hit MySQL as '' and throw 22007 — treat it as absent so
+        // both the INSERT and touch()/UPDATE paths write NULL.
+        $expectedAt = is_string($expectedAt) && trim($expectedAt) === '' ? null : $expectedAt;
         $pdo = db();
         $active = self::activeFor($orderId);
         if ($active) {

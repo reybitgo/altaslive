@@ -1208,7 +1208,7 @@ class AdminController
                     $ok = ShopOrder::ship($orderId, Auth::id(),
                         trim((string) ($_POST['courier'] ?? '')),
                         trim((string) ($_POST['tracking_number'] ?? '')),
-                        $_POST['expected_delivery_at'] ?? null);
+                        ($_POST['expected_delivery_at'] ?? '') !== '' ? $_POST['expected_delivery_at'] : null);
                     break;
 
                 case 'out_for_delivery':

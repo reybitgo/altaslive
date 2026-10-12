@@ -280,7 +280,7 @@ function render_flash(): string
     // Map flash key → Bootstrap 5 alert class + icon
     $types = [
         'success' => ['alert-success', '✓'],
-        'error'   => ['alert-danger',  '✕'],
+        'error'   => ['alert-danger',  ''],
         'info'    => ['alert-info',    'ℹ'],
         'warning' => ['alert-warning', '⚠'],
     ];
@@ -288,12 +288,13 @@ function render_flash(): string
     foreach ($types as $key => [$bsClass, $icon]) {
         $msg = flash($key);
         if ($msg) {
+            $iconHtml = $icon !== '' ? sprintf('<span>%s</span>', $icon) : '';
             $html .= sprintf(
                 '<div class="alert flash-alert %s d-flex align-items-center gap-2 mb-3" role="alert">' .
-                    '<span>%s</span><span>%s</span>' .
+                    '%s<span>%s</span>' .
                     '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>',
                 $bsClass,
-                $icon,
+                $iconHtml,
                 e($msg)
             );
         }
