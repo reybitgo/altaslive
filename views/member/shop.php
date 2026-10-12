@@ -18,7 +18,7 @@
         <p class="text-muted mb-0" style="font-size:.8rem;">Browse our products and order for delivery.</p>
       </div>
       <a href="<?= link_to('cart') ?>" class="btn btn-outline-primary">🛒 View Cart
-        <?php if ($cartCount > 0): ?><span class="badge bg-primary ms-1"><?= $cartCount ?></span><?php endif; ?>
+        <span id="shopViewCartBadge" class="badge bg-primary ms-1<?= $cartCount > 0 ? '' : ' d-none' ?>"><?= $cartCount ?></span>
       </a>
     </div>
 
@@ -125,6 +125,30 @@
           // never add a second copy or bump the quantity.
           // (Cart add is still handled server-side normally for products not
           // in the cart; this guard is only a UI convenience on the shop page.)
+
+          // The off-canvas drawer lives above this page and can change the
+          // cart without a reload. Keep the shop card state and the View Cart
+          // badge honest: reset the card for an item just removed, and
+          // re-sync the badge count after any drawer mutation.
+          window.addEventListener('cart:changed', function (e) {
+            var d = e.detail || {};
+            var badge = document.getElementById('shopViewCartBadge');
+            if (badge) {
+              badge.textContent = d.count || 0;
+              badge.classList.toggle('d-none', (d.count || 0) <= 0);
+            }
+            if (d.removedProductId) {
+              var form = document.querySelector('#shopContent form[data-product-id="' + d.removedProductId + '"]');
+              if (form) {
+                var btn = form.querySelector('.shop-add-btn');
+                if (btn) {
+                  btn.disabled = false;
+                  btn.removeAttribute('aria-disabled');
+                  btn.textContent = 'Add to cart';
+                }
+              }
+            }
+          });
         });
       </script>
       <?php endif; ?>

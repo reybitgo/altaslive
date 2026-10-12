@@ -28,7 +28,7 @@ $itemCount  = (int) $cartTotals['total_items'];
     <?php else: ?>
       <div class="flex-grow-1 overflow-auto p-3" id="cartItemsContainer">
         <?php foreach ($cartItems as $item): $img = $item['image_url'] ? APP_URL.'/uploads/'.e($item['image_url']) : ''; ?>
-          <div class="d-flex gap-3 pb-3 mb-3 border-bottom cart-item" data-item-id="<?= (int) $item['id'] ?>" data-unit-price="<?= (float) $item['unit_price'] ?>">
+          <div class="d-flex gap-3 pb-3 mb-3 border-bottom cart-item" data-item-id="<?= (int) $item['id'] ?>" data-product-id="<?= (int) $item['product_id'] ?>" data-unit-price="<?= (float) $item['unit_price'] ?>">
             <div class="flex-shrink-0" style="width:64px;height:64px;border:1px solid #eef1f8;border-radius:.5rem;overflow:hidden;background:#f8f9fb;display:flex;align-items:center;justify-content:center">
               <?php if ($img): ?><img src="<?= e($img) ?>" style="width:100%;height:100%;object-fit:cover"><?php else: ?><span style="font-size:1.5rem">🛍️</span><?php endif; ?>
             </div>
@@ -76,6 +76,12 @@ $itemCount  = (int) $cartTotals['total_items'];
     if (!el) return;
     el.textContent = count;
     el.classList.toggle('d-none', count <= 0);
+  }
+
+  function broadcastCart(count, removedProductId) {
+    window.dispatchEvent(new CustomEvent('cart:changed', {
+      detail: { count: count, removedProductId: removedProductId || 0 }
+    }));
   }
 
   function updateFooter(subtotal) {
@@ -181,6 +187,7 @@ $itemCount  = (int) $cartTotals['total_items'];
           updateFooter(res.subtotal);
           updateTopbarBadge(res.count);
           document.getElementById('offcanvasCount').textContent = res.count;
+          broadcastCart(res.count, 0);
         })
         .catch(function () {
           input.value = input.dataset.qty || input.defaultValue;
@@ -207,6 +214,7 @@ $itemCount  = (int) $cartTotals['total_items'];
           updateFooter(res.subtotal);
           updateTopbarBadge(res.count);
           document.getElementById('offcanvasCount').textContent = res.count;
+          broadcastCart(res.count, parseInt(row.dataset.productId || '0', 10));
           if (!document.querySelector('#cartItemsContainer .cart-item')) {
             refreshDrawer();
           }
@@ -246,6 +254,7 @@ $itemCount  = (int) $cartTotals['total_items'];
         updateFooter(res.subtotal);
         updateTopbarBadge(res.count);
         document.getElementById('offcanvasCount').textContent = res.count;
+        broadcastCart(res.count, 0);
       });
   });
 
