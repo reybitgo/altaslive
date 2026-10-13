@@ -123,11 +123,28 @@ $overdue = $deadline && strtotime((string) $deadline) < time();
               <?php endif; ?>
               <p class="text-muted" style="font-size:.8rem;">Confirm receipt by <strong><?= e(fmt_date((string) ($order['completion_due_at'] ?? ''))) ?></strong> — confirming ends the reporting window.</p>
               <?php if (ShopOrder::canMemberAct($order, 'confirm')): ?>
-                <form method="post" action="<?= link_to('shop_confirm_receipt') ?>" onsubmit="return confirm('Confirm that you received this order? This ends the reporting window.');">
+                <form method="post" action="<?= link_to('shop_confirm_receipt') ?>" class="js-confirm-receipt-form">
                   <?= csrf_field() ?>
                   <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
                   <button type="submit" class="btn btn-success">✅ Confirm receipt</button>
                 </form>
+                <script>
+                (function () {
+                  var form = document.querySelector('.js-confirm-receipt-form');
+                  if (!form) return;
+                  form.addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    showConfirm({
+                      size: 'sm',
+                      title: 'Confirm receipt — Order <?= e((string) $order['order_no']) ?>?',
+                      message: 'Confirm that you received this order? This ends the reporting window.',
+                      confirmText: 'Confirm receipt',
+                      confirmClass: 'btn-success',
+                      onConfirm: function () { form.submit(); }
+                    });
+                  });
+                })();
+                </script>
               <?php endif; ?>
 
             <?php elseif ($status === 'on_hold'): ?>
