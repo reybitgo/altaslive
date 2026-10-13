@@ -49,7 +49,18 @@ $tabs = array_merge(ShopOrder::STATUSES, ['all']);
       <?php endforeach; ?>
     </ul>
 
-    <div class="card">
+    <div class="card" id="adminOrdersCard">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="card-title">Orders</span>
+        <?php if (!empty($orders)): ?>
+          <select id="adminOrdersPageSize" class="form-select form-select-sm" aria-label="Orders per page" style="width:auto;">
+            <option value="5" selected>5</option>
+            <option value="10">10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+          </select>
+        <?php endif; ?>
+      </div>
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
           <thead>
@@ -65,15 +76,15 @@ $tabs = array_merge(ShopOrder::STATUSES, ['all']);
             </tr>
           </thead>
           <tbody>
-            <?php if (empty($orders['data'])): ?>
+            <?php if (empty($orders)): ?>
               <tr><td colspan="8" class="text-center py-5 text-muted">
                 <div style="font-size:2rem;opacity:.3;">📦</div>
                 <div class="mt-2">No orders<?= $status !== 'all' ? ' in ' . e(shop_status_label($status)) : '' ?>.</div>
               </td></tr>
-            <?php else: foreach ($orders['data'] as $o):
+            <?php else: foreach ($orders as $o):
               $buyer = User::find((int) $o['member_id']);
             ?>
-              <tr>
+              <tr class="js-order-row">
                 <td style="padding-left:1.25rem;" class="fw-semibold"><?= e($o['order_no']) ?></td>
                 <td style="font-size:.82rem;">
                   <?= e('@' . ($buyer['username'] ?? $o['member_id'])) ?>
@@ -98,10 +109,79 @@ $tabs = array_merge(ShopOrder::STATUSES, ['all']);
           </tbody>
         </table>
       </div>
-      <?php if ($orders['total_pages'] > 1): ?>
-        <div class="card-footer"><?= pagination_links($orders, link_to('admin_shop_orders', ['status' => $status, 'per_page' => per_page()])) ?></div>
-      <?php endif; ?>
+      <nav id="adminOrdersPager" class="d-none card-footer" aria-label="Order pages">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <span id="adminOrdersPagerInfo" class="text-muted small"></span>
+          <ul class="pagination pagination-sm mb-0 ms-auto"></ul>
+        </div>
+      </nav>
     </div>
   </div>
 </div>
+<script>
+// ── Shop Orders pager ────────────────────────────────────────
+// Client-side pagination: the page renders every order for the selected status
+// tab and paging happens in the browser (page size 5, 10, 20 or 50, default 5).
+// No page reload, no server round-trip. Mirrors the member My Orders pager.
+(function () {
+  var ordersCard = document.getElementById('adminOrdersCard');
+  if (!ordersCard) return;
+  var sizeSel   = document.getElementById('adminOrdersPageSize');
+  var pagerNav  = document.getElementById('adminOrdersPager');
+  var pagerUl   = pagerNav.querySelector('ul');
+  var pagerInfo = document.getElementById('adminOrdersPagerInfo');
+  var page = 1;
+  var size = sizeSel ? (parseInt(sizeSel.value, 10) || 5) : 5;
+
+  function drawOrderRows() {
+    var rows = Array.prototype.slice.call(ordersCard.querySelectorAll('.js-order-row'));
+    if (!rows.length) { pagerNav.classList.add('d-none'); return; }
+    var pages = Math.max(1, Math.ceil(rows.length / size));
+    if (page > pages) page = pages;
+    rows.forEach(function (row, i) {
+      row.classList.toggle('d-none', !(i >= (page - 1) * size && i < page * size));
+    });
+    var from = (page - 1) * size + 1;
+    var to = Math.min(page * size, rows.length);
+    if (pagerInfo) pagerInfo.textContent = 'Showing ' + from + '–' + to + ' of ' + rows.length;
+    var html = '<li class="page-item' + (page <= 1 ? ' disabled' : '') + '">' +
+               '<a class="page-link" href="#" data-hp="first" aria-label="First page">&laquo;</a></li>';
+    html += '<li class="page-item' + (page <= 1 ? ' disabled' : '') + '">' +
+               '<a class="page-link" href="#" data-hp="prev" aria-label="Previous">&lsaquo;</a></li>';
+    for (var p = 1; p <= pages; p++) {
+      html += '<li class="page-item' + (p === page ? ' active' : '') + '">' +
+              '<a class="page-link" href="#" data-hp="' + p + '">' + p + '</a></li>';
+    }
+    html += '<li class="page-item' + (page >= pages ? ' disabled' : '') + '">' +
+            '<a class="page-link" href="#" data-hp="next" aria-label="Next">&rsaquo;</a></li>';
+    html += '<li class="page-item' + (page >= pages ? ' disabled' : '') + '">' +
+            '<a class="page-link" href="#" data-hp="last" aria-label="Last page">&raquo;</a></li>';
+    pagerUl.innerHTML = html;
+    pagerNav.classList.toggle('d-none', pages <= 1);
+  }
+
+  pagerUl.addEventListener('click', function (e) {
+    var a = e.target.closest('a[data-hp]');
+    if (!a) return;
+    e.preventDefault();
+    var cmd = a.dataset.hp;
+    var rows = ordersCard.querySelectorAll('.js-order-row');
+    var pages = Math.max(1, Math.ceil(rows.length / size));
+    if (cmd === 'first') page = 1;
+    else if (cmd === 'prev') page = Math.max(1, page - 1);
+    else if (cmd === 'next') page = Math.min(pages, page + 1);
+    else if (cmd === 'last') page = pages;
+    else page = parseInt(cmd, 10) || 1;
+    drawOrderRows();
+  });
+
+  if (sizeSel) sizeSel.addEventListener('change', function () {
+    size = parseInt(this.value, 10) || 5;
+    page = 1;
+    drawOrderRows();
+  });
+
+  drawOrderRows();
+})();
+</script>
 <?php require 'views/partials/footer.php'; ?>

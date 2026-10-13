@@ -1119,7 +1119,7 @@ class AdminController
         // order-state sequence (pending). Was hardcoded 'payment_review',
         // which no longer matches the lifecycle ordering of the tabs.
         $status = (string) ($_GET['status'] ?? (ShopOrder::STATUSES[0] ?? 'all'));
-        $orders = ShopOrder::byStatus($status, (int) ($_GET['pg'] ?? 1), per_page());
+        $orders = ShopOrder::allByStatus($status);
         $counts = ShopOrder::statusCounts();
         $counts['all'] = array_sum($counts);
         // A previous revision also ran a second COUNT(*) here for an

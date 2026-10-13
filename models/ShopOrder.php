@@ -585,6 +585,26 @@ class ShopOrder
         return paginate($sql, $status === 'all' ? [] : [$status], $page, $perPage);
     }
 
+    /**
+     * Every order for one status ('all' = everything), newest first — a plain
+     * list, not a paginated envelope. The admin queue pages these client-side
+     * (like the member My Orders list), so it needs the full set in one render.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    public static function allByStatus(string $status): array
+    {
+        if ($status !== 'all' && !in_array($status, self::STATUSES, true)) {
+            $status = 'all';
+        }
+        $sql = $status === 'all'
+            ? "SELECT * FROM shop_orders ORDER BY created_at DESC, id DESC"
+            : "SELECT * FROM shop_orders WHERE status = ? ORDER BY created_at DESC, id DESC";
+        $st = db()->prepare($sql);
+        $st->execute($status === 'all' ? [] : [$status]);
+        return $st->fetchAll();
+    }
+
     /** One GROUP BY row per status — drives admin tabs and sidebar badges. */
     public static function statusCounts(): array
     {
