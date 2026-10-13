@@ -32,6 +32,10 @@ $needConfirm = ['cancelled', 'returned_to_sender', 'payment_failed', 'on_hold'];
   <div class="page-content">
     <?= render_flash() ?>
 
+    <div class="mb-3">
+      <a href="<?= link_to('admin_shop_orders') ?>" class="btn btn-outline-secondary btn-sm">← Back to Orders</a>
+    </div>
+
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
       <div>
         <div class="d-flex align-items-center gap-2">
