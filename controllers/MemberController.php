@@ -1156,7 +1156,7 @@ class MemberController
     public function shopOrders(): void
     {
         Auth::guard('member');
-        $orders = ShopOrder::forMember(Auth::id(), (int) ($_GET['pg'] ?? 1), per_page());
+        $orders = ShopOrder::allForMember(Auth::id());
         $pageTitle = 'My Orders';
         require 'views/member/shop_orders.php';
     }

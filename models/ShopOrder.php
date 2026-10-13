@@ -557,6 +557,22 @@ class ShopOrder
         );
     }
 
+    /**
+     * Every one of a member's orders, newest first — a plain list, not a
+     * paginated envelope. The My Orders page pages these client-side (like the
+     * admin history timeline), so it needs the full set in one render.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    public static function allForMember(int $memberId): array
+    {
+        $st = db()->prepare(
+            "SELECT * FROM shop_orders WHERE member_id = ? ORDER BY created_at DESC, id DESC"
+        );
+        $st->execute([$memberId]);
+        return $st->fetchAll();
+    }
+
     /** Admin list filtered by one status ('all' = everything). */
     public static function byStatus(string $status, int $page = 1, int $perPage = 10): array
     {

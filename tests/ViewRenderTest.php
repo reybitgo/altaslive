@@ -289,7 +289,7 @@ test('the order lists render without PHP diagnostics', function (): void {
     Fixtures::loginAs($memberId, 'member');
     RenderLog::arm();
     try {
-        $orders = ['data' => $rows->fetchAll(), 'total_pages' => 1, 'page' => 1, 'per_page' => 10];
+        $orders = $rows->fetchAll();
         render_view('views/member/shop_orders.php', ['orders' => $orders]);
     } finally {
         RenderLog::disarm();
@@ -312,7 +312,7 @@ test('the status badge shows real labels in the rendered member list', function 
     ob_start();
     RenderLog::arm();
     try {
-        $orders = ['data' => $rows->fetchAll(), 'total_pages' => 1, 'page' => 1, 'per_page' => 10];
+        $orders = $rows->fetchAll();
         extract(['orders' => $orders], EXTR_SKIP);
         require REPO_ROOT . '/views/member/shop_orders.php';
     } catch (Throwable $e) {
