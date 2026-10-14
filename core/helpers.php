@@ -567,7 +567,8 @@ function shop_checkout_old_input(): array
     $allowed = [
         'billing_name', 'billing_phone',
         'shipping_name', 'shipping_phone', 'shipping_address',
-        'shipping_city', 'shipping_province', 'shipping_postal',
+        'shipping_barangay', 'shipping_city', 'shipping_province', 'shipping_region', 'shipping_postal',
+        'shipping_region_code', 'shipping_province_code', 'shipping_city_code', 'shipping_barangay_code',
         'notes_member', 'payment_method',
     ];
 
@@ -593,7 +594,8 @@ function shop_checkout_remember_input(array $post): void
     $allowed = [
         'billing_name', 'billing_phone',
         'shipping_name', 'shipping_phone', 'shipping_address',
-        'shipping_city', 'shipping_province', 'shipping_postal',
+        'shipping_barangay', 'shipping_city', 'shipping_province', 'shipping_region', 'shipping_postal',
+        'shipping_region_code', 'shipping_province_code', 'shipping_city_code', 'shipping_barangay_code',
         'notes_member', 'payment_method',
     ];
     $clean = [];

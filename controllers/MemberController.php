@@ -117,10 +117,16 @@ class MemberController
             'recipient_name' => trim((string) ($_POST['recipient_name'] ?? '')),
             'phone'          => trim((string) ($_POST['phone'] ?? '')),
             'address_line'   => trim((string) ($_POST['address_line'] ?? '')),
+            'barangay'       => trim((string) ($_POST['barangay'] ?? '')),
             'city'           => trim((string) ($_POST['city'] ?? '')),
             'province'       => trim((string) ($_POST['province'] ?? '')),
+            'region'         => trim((string) ($_POST['region'] ?? '')),
             'postal'         => trim((string) ($_POST['postal'] ?? '')),
             'country'        => trim((string) ($_POST['country'] ?? 'PH')),
+            'region_code'    => trim((string) ($_POST['region_code'] ?? '')),
+            'province_code'  => trim((string) ($_POST['province_code'] ?? '')),
+            'city_code'      => trim((string) ($_POST['city_code'] ?? '')),
+            'barangay_code'  => trim((string) ($_POST['barangay_code'] ?? '')),
             'is_default'     => ($_POST['is_default'] ?? '') === '1',
         ];
     }
@@ -1418,9 +1424,15 @@ class MemberController
             'shipping_name'     => trim((string) ($_POST['shipping_name'] ?? $billingName)),
             'shipping_phone'    => trim((string) ($_POST['shipping_phone'] ?? '')),
             'shipping_address'  => trim((string) ($_POST['shipping_address'] ?? '')),
+            'shipping_barangay' => trim((string) ($_POST['shipping_barangay'] ?? '')),
             'shipping_city'     => trim((string) ($_POST['shipping_city'] ?? '')),
             'shipping_province' => trim((string) ($_POST['shipping_province'] ?? '')),
+            'shipping_region'   => trim((string) ($_POST['shipping_region'] ?? '')),
             'shipping_postal'   => trim((string) ($_POST['shipping_postal'] ?? '')),
+            'region_code'       => trim((string) ($_POST['shipping_region_code'] ?? '')),
+            'province_code'     => trim((string) ($_POST['shipping_province_code'] ?? '')),
+            'city_code'         => trim((string) ($_POST['shipping_city_code'] ?? '')),
+            'barangay_code'     => trim((string) ($_POST['shipping_barangay_code'] ?? '')),
             'notes_member'      => trim((string) ($_POST['notes_member'] ?? '')),
         ];
         // All three are required; the message names whichever are actually
@@ -1541,10 +1553,16 @@ class MemberController
                 'recipient_name' => $addr['shipping_name'],
                 'phone'          => $addr['shipping_phone'],
                 'address_line'   => $addr['shipping_address'],
+                'barangay'       => $addr['shipping_barangay'] ?? '',
                 'city'           => $addr['shipping_city'],
                 'province'       => $addr['shipping_province'],
+                'region'         => $addr['shipping_region'] ?? '',
                 'postal'         => $addr['shipping_postal'],
                 'country'        => 'PH',
+                'region_code'    => $addr['region_code'] ?? '',
+                'province_code'  => $addr['province_code'] ?? '',
+                'city_code'      => $addr['city_code'] ?? '',
+                'barangay_code'  => $addr['barangay_code'] ?? '',
             ]);
         } catch (Throwable $e) {
             // Ignore: the address book is a convenience, not part of the order.

@@ -188,7 +188,7 @@
                     <?php if ((int) $a['is_default'] === 1): ?><span class="badge bg-success ms-1">Default</span><?php endif; ?>
                   </div>
                   <div><?= e($a['recipient_name']) ?><?= !empty($a['phone']) ? ' · ' . e($a['phone']) : '' ?></div>
-                  <div class="text-muted"><?= e(trim($a['address_line'] . ', ' . $a['city'] . ' ' . $a['province'] . ' ' . $a['postal'])) ?></div>
+                  <div class="text-muted"><?= e(implode(', ', array_filter([$a['address_line'], $a['barangay'] ?? '', $a['city'] ?? '', $a['province'] ?? '', $a['region'] ?? '']))) ?><?= !empty($a['postal']) ? ' ' . e($a['postal']) : '' ?></div>
                 </div>
                 <div class="d-flex gap-1 flex-shrink-0">
                   <button type="button" class="btn btn-sm btn-outline-secondary js-address-edit"
@@ -197,9 +197,15 @@
                           data-recipient="<?= e($a['recipient_name']) ?>"
                           data-phone="<?= e($a['phone']) ?>"
                           data-address="<?= e($a['address_line']) ?>"
+                          data-barangay="<?= e($a['barangay'] ?? '') ?>"
                           data-city="<?= e($a['city']) ?>"
                           data-province="<?= e($a['province']) ?>"
+                          data-region="<?= e($a['region'] ?? '') ?>"
                           data-postal="<?= e($a['postal']) ?>"
+                          data-region-code="<?= e($a['region_code'] ?? '') ?>"
+                          data-province-code="<?= e($a['province_code'] ?? '') ?>"
+                          data-city-code="<?= e($a['city_code'] ?? '') ?>"
+                          data-barangay-code="<?= e($a['barangay_code'] ?? '') ?>"
                           data-default="<?= (int) $a['is_default'] ?>">Edit</button>
                   <?php if ((int) $a['is_default'] !== 1): ?>
                     <form method="post" action="<?= link_to('shop_address_default') ?>">
@@ -248,22 +254,26 @@
                 </div>
               </div>
               <div class="mb-2">
-                <label class="form-label" for="addr_address">Address *</label>
-                <input type="text" id="addr_address" name="address_line" class="form-control" maxlength="255" placeholder="House / street / barangay" required>
+                <label class="form-label" for="addr_loc">Region, Province, City, Barangay</label>
+                <button type="button" id="addr_loc" class="form-control text-start js-psgc-trigger" aria-haspopup="dialog">
+                  <span class="text-muted js-psgc-placeholder">Select region, province, city, barangay…</span>
+                </button>
+                <input type="hidden" name="region" id="addr_region" value="">
+                <input type="hidden" name="province" id="addr_province" value="">
+                <input type="hidden" name="city" id="addr_city" value="">
+                <input type="hidden" name="barangay" id="addr_barangay" value="">
+                <input type="hidden" name="region_code" id="addr_region_code" value="">
+                <input type="hidden" name="province_code" id="addr_province_code" value="">
+                <input type="hidden" name="city_code" id="addr_city_code" value="">
+                <input type="hidden" name="barangay_code" id="addr_barangay_code" value="">
               </div>
-              <div class="row g-2">
-                <div class="col-5 mb-2">
-                  <label class="form-label" for="addr_city">City</label>
-                  <input type="text" id="addr_city" name="city" class="form-control" maxlength="80">
-                </div>
-                <div class="col-5 mb-2">
-                  <label class="form-label" for="addr_province">Province</label>
-                  <input type="text" id="addr_province" name="province" class="form-control" maxlength="80">
-                </div>
-                <div class="col-2 mb-2">
-                  <label class="form-label" for="addr_postal">Postal</label>
-                  <input type="text" id="addr_postal" name="postal" class="form-control" maxlength="20">
-                </div>
+              <div class="mb-2">
+                <label class="form-label" for="addr_address">Street Name, Building, House No. *</label>
+                <input type="text" id="addr_address" name="address_line" class="form-control" maxlength="255" placeholder="Street name, building, house no." required>
+              </div>
+              <div class="mb-2" style="max-width:160px;">
+                <label class="form-label" for="addr_postal">Postal</label>
+                <input type="text" id="addr_postal" name="postal" class="form-control" maxlength="20" inputmode="numeric">
               </div>
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" name="is_default" id="addr_default" value="1">
@@ -280,6 +290,7 @@
     </div>
   </div>
 </div>
+<?php require 'views/partials/address_picker.php'; ?>
 <script>
   function previewPhoto(input) {
     if (!input.files || !input.files[0]) return;
@@ -305,18 +316,40 @@
     if (!modalEl || typeof bootstrap === 'undefined') return;
     var modal = new bootstrap.Modal(modalEl);
     var fields = {
-      id:        'addr_id',
-      label:     'addr_label',
-      recipient: 'addr_recipient',
-      phone:     'addr_phone',
-      address:   'addr_address',
-      city:      'addr_city',
-      province:  'addr_province',
-      postal:    'addr_postal'
+      id:            'addr_id',
+      label:         'addr_label',
+      recipient:     'addr_recipient',
+      phone:         'addr_phone',
+      address:       'addr_address',
+      barangay:      'addr_barangay',
+      city:          'addr_city',
+      province:      'addr_province',
+      region:        'addr_region',
+      postal:        'addr_postal',
+      regionCode:    'addr_region_code',
+      provinceCode:  'addr_province_code',
+      cityCode:      'addr_city_code',
+      barangayCode:  'addr_barangay_code'
     };
     function set(name, value) {
       var el = document.getElementById(fields[name]);
       if (el) el.value = value == null ? '' : value;
+    }
+    function esc(s) {
+      return String(s).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; });
+    }
+    // The trigger shows the chosen chain; the individual levels live in hidden
+    // inputs so the same form still posts region/province/city/barangay.
+    function renderLoc() {
+      var trigger = document.getElementById('addr_loc');
+      if (!trigger) return;
+      var parts = ['barangay', 'city', 'province', 'region'].map(function (k) {
+        var el = document.getElementById(fields[k]);
+        return el ? el.value.trim() : '';
+      }).filter(Boolean);
+      trigger.innerHTML = parts.length
+        ? '<span>' + parts.map(esc).join(', ') + '</span>'
+        : '<span class="text-muted js-psgc-placeholder">Select region, province, city, barangay…</span>';
     }
     function open(mode, data) {
       document.getElementById('addressModalTitle').textContent =
@@ -326,12 +359,36 @@
       set('recipient', data ? data.recipient : '');
       set('phone', data ? data.phone : '');
       set('address', data ? data.address : '');
+      set('barangay', data ? data.barangay : '');
       set('city', data ? data.city : '');
       set('province', data ? data.province : '');
+      set('region', data ? data.region : '');
       set('postal', data ? data.postal : '');
+      set('regionCode', data ? data.regionCode : '');
+      set('provinceCode', data ? data.provinceCode : '');
+      set('cityCode', data ? data.cityCode : '');
+      set('barangayCode', data ? data.barangayCode : '');
+      renderLoc();
       document.getElementById('addr_default').checked = !!(data && data.isDefault);
       modal.show();
     }
+
+    // Region → Province → City → Barangay picker (psgc.cloud). On commit the
+    // chosen chain fills the hidden fields; the parent modal stays open.
+    PsgcPicker.attach({
+      trigger: document.getElementById('addr_loc'),
+      onPick: function (picked) {
+        set('region', picked.region ? picked.region.name : '');
+        set('province', picked.province ? picked.province.name : '');
+        set('city', picked.city ? picked.city.name : '');
+        set('barangay', picked.barangay ? picked.barangay.name : '');
+        set('regionCode', picked.region ? picked.region.code : '');
+        set('provinceCode', picked.province ? picked.province.code : '');
+        set('cityCode', picked.city ? picked.city.code : '');
+        set('barangayCode', picked.barangay ? picked.barangay.code : '');
+        renderLoc();
+      }
+    });
 
     var addBtn = document.querySelector('.js-address-add');
     if (addBtn) addBtn.addEventListener('click', function () { open('add', null); });
@@ -339,15 +396,21 @@
     document.querySelectorAll('.js-address-edit').forEach(function (btn) {
       btn.addEventListener('click', function () {
         open('edit', {
-          id:        btn.dataset.id,
-          label:     btn.dataset.label,
-          recipient: btn.dataset.recipient,
-          phone:     btn.dataset.phone,
-          address:   btn.dataset.address,
-          city:      btn.dataset.city,
-          province:  btn.dataset.province,
-          postal:    btn.dataset.postal,
-          isDefault: btn.dataset.default === '1'
+          id:           btn.dataset.id,
+          label:        btn.dataset.label,
+          recipient:    btn.dataset.recipient,
+          phone:        btn.dataset.phone,
+          address:      btn.dataset.address,
+          barangay:     btn.dataset.barangay,
+          city:         btn.dataset.city,
+          province:     btn.dataset.province,
+          region:       btn.dataset.region,
+          postal:       btn.dataset.postal,
+          regionCode:   btn.dataset.regionCode,
+          provinceCode: btn.dataset.provinceCode,
+          cityCode:     btn.dataset.cityCode,
+          barangayCode: btn.dataset.barangayCode,
+          isDefault:    btn.dataset.default === '1'
         });
       });
     });

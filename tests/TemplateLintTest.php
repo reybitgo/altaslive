@@ -338,7 +338,7 @@ test('every checkout field has a label bound to it by id', function (): void {
 
     // The delivery fields specifically, so a future template rewrite cannot
     // quietly drop them again.
-    foreach (['shipping_name', 'shipping_address', 'shipping_city', 'billing_name', 'notes_member'] as $f) {
+    foreach (['shipping_name', 'shipping_address', 'shipping_loc', 'billing_name', 'notes_member'] as $f) {
         T::ok(
             (bool) preg_match('/<label[^>]*for="' . $f . '"/', $src),
             "the {$f} field has a bound label"

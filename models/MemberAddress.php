@@ -16,10 +16,16 @@ class MemberAddress
         'recipient_name' => 120,
         'phone'          => 40,
         'address_line'   => 255,
+        'barangay'       => 120,
         'city'           => 80,
         'province'       => 80,
+        'region'         => 80,
         'postal'         => 20,
         'country'        => 2,
+        'region_code'    => 20,
+        'province_code'  => 20,
+        'city_code'      => 20,
+        'barangay_code'  => 20,
     ];
 
     /** Default address first, then most recent. */
@@ -72,8 +78,8 @@ class MemberAddress
 
         $st = $pdo->prepare(
             "INSERT INTO member_addresses
-                (member_id, label, recipient_name, phone, address_line, city, province, postal, country, is_default)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                (member_id, label, recipient_name, phone, address_line, barangay, city, province, region, postal, country, region_code, province_code, city_code, barangay_code, is_default)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
         $st->execute([
             $memberId,
@@ -81,10 +87,16 @@ class MemberAddress
             $fields['recipient_name'],
             $fields['phone'],
             $fields['address_line'],
+            $fields['barangay'],
             $fields['city'],
             $fields['province'],
+            $fields['region'],
             $fields['postal'],
             $fields['country'],
+            $fields['region_code'],
+            $fields['province_code'],
+            $fields['city_code'],
+            $fields['barangay_code'],
             $isDefault ? 1 : 0,
         ]);
         return (int) $pdo->lastInsertId();
@@ -104,7 +116,10 @@ class MemberAddress
         $st = db()->prepare(
             "UPDATE member_addresses SET
                 label = ?, recipient_name = ?, phone = ?, address_line = ?,
-                city = ?, province = ?, postal = ?, country = ?, is_default = ?
+                barangay = ?, city = ?, province = ?, region = ?,
+                postal = ?, country = ?,
+                region_code = ?, province_code = ?, city_code = ?, barangay_code = ?,
+                is_default = ?
              WHERE id = ? AND member_id = ?"
         );
         return $st->execute([
@@ -112,10 +127,16 @@ class MemberAddress
             $fields['recipient_name'],
             $fields['phone'],
             $fields['address_line'],
+            $fields['barangay'],
             $fields['city'],
             $fields['province'],
+            $fields['region'],
             $fields['postal'],
             $fields['country'],
+            $fields['region_code'],
+            $fields['province_code'],
+            $fields['city_code'],
+            $fields['barangay_code'],
             $isDefault ? 1 : 0,
             $id,
             $memberId,

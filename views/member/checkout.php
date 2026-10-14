@@ -33,9 +33,15 @@
         'shipping_name'     => $defaultAddr['recipient_name'] ?? '',
         'shipping_phone'    => $defaultAddr['phone'] ?? '',
         'shipping_address'  => $defaultAddr['address_line'] ?? '',
+        'shipping_barangay' => $defaultAddr['barangay'] ?? '',
         'shipping_city'     => $defaultAddr['city'] ?? '',
         'shipping_province' => $defaultAddr['province'] ?? '',
+        'shipping_region'   => $defaultAddr['region'] ?? '',
         'shipping_postal'   => $defaultAddr['postal'] ?? '',
+        'shipping_region_code'   => $defaultAddr['region_code'] ?? '',
+        'shipping_province_code' => $defaultAddr['province_code'] ?? '',
+        'shipping_city_code'     => $defaultAddr['city_code'] ?? '',
+        'shipping_barangay_code' => $defaultAddr['barangay_code'] ?? '',
     ] : [];
 
     $pick = static function (string $key, string $fallback = '') use ($old, $fromAddr): string {
@@ -65,9 +71,15 @@
                               data-name="<?= e($a['recipient_name']) ?>"
                               data-phone="<?= e($a['phone']) ?>"
                               data-address="<?= e($a['address_line']) ?>"
+                              data-barangay="<?= e($a['barangay'] ?? '') ?>"
                               data-city="<?= e($a['city']) ?>"
                               data-province="<?= e($a['province']) ?>"
-                              data-postal="<?= e($a['postal']) ?>">
+                              data-region="<?= e($a['region'] ?? '') ?>"
+                              data-postal="<?= e($a['postal']) ?>"
+                              data-region-code="<?= e($a['region_code'] ?? '') ?>"
+                              data-province-code="<?= e($a['province_code'] ?? '') ?>"
+                              data-city-code="<?= e($a['city_code'] ?? '') ?>"
+                              data-barangay-code="<?= e($a['barangay_code'] ?? '') ?>">
                         <?= e((!empty($a['label']) ? $a['label'] . ' — ' : '') . $a['recipient_name'] . ' · ' . $a['address_line']) ?><?= (int) $a['is_default'] === 1 ? ' (default)' : '' ?>
                       </option>
                     <?php endforeach; ?>
@@ -87,18 +99,24 @@
                          value="<?= e($pick('shipping_phone', $user['mobile'] ?? '')) ?>">
                 </div>
                 <div class="col-12">
-                  <label class="form-label" for="shipping_address">Delivery address *</label>
-                  <input type="text" id="shipping_address" name="shipping_address" class="form-control" maxlength="255" placeholder="House / street / barangay" required value="<?= e($pick('shipping_address')) ?>">
+                  <label class="form-label" for="shipping_loc">Region, Province, City, Barangay</label>
+                  <button type="button" id="shipping_loc" class="form-control text-start js-psgc-trigger" aria-haspopup="dialog">
+                    <span class="text-muted js-psgc-placeholder">Select region, province, city, barangay…</span>
+                  </button>
+                  <input type="hidden" name="shipping_region" id="shipping_region" value="<?= e($pick('shipping_region')) ?>">
+                  <input type="hidden" name="shipping_province" id="shipping_province" value="<?= e($pick('shipping_province')) ?>">
+                  <input type="hidden" name="shipping_city" id="shipping_city" value="<?= e($pick('shipping_city')) ?>">
+                  <input type="hidden" name="shipping_barangay" id="shipping_barangay" value="<?= e($pick('shipping_barangay')) ?>">
+                  <input type="hidden" name="shipping_region_code" id="shipping_region_code" value="<?= e($pick('shipping_region_code')) ?>">
+                  <input type="hidden" name="shipping_province_code" id="shipping_province_code" value="<?= e($pick('shipping_province_code')) ?>">
+                  <input type="hidden" name="shipping_city_code" id="shipping_city_code" value="<?= e($pick('shipping_city_code')) ?>">
+                  <input type="hidden" name="shipping_barangay_code" id="shipping_barangay_code" value="<?= e($pick('shipping_barangay_code')) ?>">
                 </div>
-                <div class="col-md-5">
-                  <label class="form-label" for="shipping_city">City</label>
-                  <input type="text" id="shipping_city" name="shipping_city" class="form-control" maxlength="80" value="<?= e($pick('shipping_city')) ?>">
+                <div class="col-12">
+                  <label class="form-label" for="shipping_address">Street Name, Building, House No. *</label>
+                  <input type="text" id="shipping_address" name="shipping_address" class="form-control" maxlength="255" placeholder="Street name, building, house no." required value="<?= e($pick('shipping_address')) ?>">
                 </div>
-                <div class="col-md-5">
-                  <label class="form-label" for="shipping_province">Province</label>
-                  <input type="text" id="shipping_province" name="shipping_province" class="form-control" maxlength="80" value="<?= e($pick('shipping_province')) ?>">
-                </div>
-                <div class="col-md-2">
+                <div class="col-md-4">
                   <label class="form-label" for="shipping_postal">Postal</label>
                   <input type="text" id="shipping_postal" name="shipping_postal" class="form-control" maxlength="20" value="<?= e($pick('shipping_postal')) ?>">
                 </div>
@@ -214,6 +232,7 @@
     </form>
   </div>
 </div>
+<?php require 'views/partials/address_picker.php'; ?>
 <script>
 // Single-submit guard (M8).
 //
@@ -297,12 +316,18 @@
   var sel = document.getElementById('savedAddress');
   if (!sel) return;
   var map = {
-    name:     'shipping_name',
-    phone:    'shipping_phone',
-    address:  'shipping_address',
-    city:     'shipping_city',
-    province: 'shipping_province',
-    postal:   'shipping_postal'
+    name:         'shipping_name',
+    phone:        'shipping_phone',
+    address:      'shipping_address',
+    barangay:     'shipping_barangay',
+    city:         'shipping_city',
+    province:     'shipping_province',
+    region:       'shipping_region',
+    postal:       'shipping_postal',
+    'region-code':   'shipping_region_code',
+    'province-code': 'shipping_province_code',
+    'city-code':     'shipping_city_code',
+    'barangay-code': 'shipping_barangay_code'
   };
   sel.addEventListener('change', function () {
     var opt = sel.options[sel.selectedIndex];
@@ -311,7 +336,48 @@
       var el = document.getElementById(map[k]);
       if (el) el.value = opt.dataset[k] || '';
     });
+    if (window.ShipLoc) window.ShipLoc.render();
   });
+})();
+
+// Region → Province → City → Barangay picker for the checkout delivery chain.
+(function () {
+  var trigger = document.getElementById('shipping_loc');
+  if (!trigger || typeof PsgcPicker === 'undefined') return;
+  var fields = ['shipping_barangay', 'shipping_city', 'shipping_province', 'shipping_region'];
+  var codes = {
+    region:   { name: 'shipping_region',   code: 'shipping_region_code' },
+    province: { name: 'shipping_province', code: 'shipping_province_code' },
+    city:     { name: 'shipping_city',     code: 'shipping_city_code' },
+    barangay: { name: 'shipping_barangay', code: 'shipping_barangay_code' }
+  };
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; });
+  }
+  function render() {
+    var parts = fields.map(function (id) {
+      var el = document.getElementById(id);
+      return el ? el.value.trim() : '';
+    }).filter(Boolean);
+    trigger.innerHTML = parts.length
+      ? '<span>' + parts.map(esc).join(', ') + '</span>'
+      : '<span class="text-muted js-psgc-placeholder">Select region, province, city, barangay…</span>';
+  }
+  window.ShipLoc = { render: render };
+  PsgcPicker.attach({
+    trigger: trigger,
+    onPick: function (picked) {
+      Object.keys(codes).forEach(function (k) {
+        var p = picked[k];
+        var nameEl = document.getElementById(codes[k].name);
+        var codeEl = document.getElementById(codes[k].code);
+        if (nameEl) nameEl.value = p ? p.name : '';
+        if (codeEl) codeEl.value = p ? p.code : '';
+      });
+      render();
+    }
+  });
+  render();
 })();
 </script>
 <?php require 'views/partials/footer.php'; ?>
