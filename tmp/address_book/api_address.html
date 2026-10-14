@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Region, Province, City, Barangay</title>
+<style>
+:root{--accent:#ee4d2d;--line:#e8e8e8;--mute:#9a9a9a;--bg:#f5f5f5}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:#1f1f1f;font:18px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button{padding:0;border:0;background:none;color:inherit;font:inherit;cursor:pointer}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.wrap,.sheet{max-width:480px;margin:0 auto}
+.top{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:12px;height:64px;padding:0 16px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.back{display:grid;place-items:center;flex:none;width:32px;height:32px;color:var(--accent)}
+.back svg{width:26px;height:26px}
+
+/* form screen */
+.card{margin:12px;padding:18px 18px 6px;border-radius:16px;background:#fff}
+.card h2{margin:0 0 4px;font-size:19px;font-weight:500}
+.field{position:relative;display:block;width:100%;padding:26px 0 8px;border-bottom:1px solid var(--line);text-align:left}
+.field:last-child{border-bottom:0}
+.field:focus-within{border-bottom-color:var(--accent)}
+.field input{display:block;width:100%;height:30px;padding:0;border:0;outline:0;background:transparent;font:inherit}
+.field label{position:absolute;left:0;top:28px;color:var(--mute);pointer-events:none;transition:all .15s}
+.field input:focus+label,.field input:not(:placeholder-shown)+label{top:6px;font-size:14px}
+.field input:-webkit-autofill+label{top:6px;font-size:14px}
+.pre{display:none;position:absolute;left:0;bottom:8px;line-height:30px}
+.field input:focus~.pre,.field input:not(:placeholder-shown)~.pre{display:block}
+.field input.tel{padding-left:56px}
+.loc{padding-right:34px}
+.loc .lbl{display:block;color:var(--mute);line-height:30px}
+.loc.filled .lbl{position:absolute;top:6px;left:0;font-size:14px;line-height:1.3}
+.loc .val div{line-height:1.5}
+.chev{position:absolute;right:0;top:50%;width:22px;height:22px;margin-top:-5px;color:var(--mute)}
+
+/* location picker */
+#picker{position:fixed;inset:0;z-index:5;overflow:auto;background:var(--bg)}
+.sheet{min-height:100%;background:var(--bg)}
+.search{display:flex;flex:1;align-items:center;gap:8px;height:44px;padding:0 12px;border-radius:10px;background:var(--bg);color:var(--mute)}
+.search svg{flex:none;width:20px;height:20px}
+.search input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:#1f1f1f;font:inherit}
+.cap{display:flex;justify-content:space-between;padding:14px 16px 6px;background:#fff;color:var(--mute)}
+.cap button{color:var(--accent)}
+#trail{margin:0;padding:0 0 14px;list-style:none;background:#fff}
+#trail li{position:relative;padding:12px 16px 12px 56px}
+#trail li button{display:block;width:100%;text-align:left}
+#trail li::before{content:"";position:absolute;left:32px;top:21px;width:10px;height:10px;border-radius:50%;background:#ddd}
+#trail li:not(.now)::after{content:"";position:absolute;left:36px;top:31px;bottom:-21px;width:1px;background:#ddd}
+#trail li:has(+.now)::after{bottom:-6px}
+#trail li.now{margin:6px 14px 0;padding:14px 12px 14px 41px;border:1px solid #ddd;border-radius:12px;color:var(--accent)}
+#trail li.now::before{left:17px;top:50%;margin-top:-5px;background:var(--accent);box-shadow:0 0 0 3px #fff,0 0 0 5px var(--accent)}
+#sec{margin:0;padding:12px 16px;color:var(--mute);font-size:16px;font-weight:400}
+#list{margin:0;padding:0;min-height:60vh;list-style:none;background:#fff}
+#list button[data-i]{display:flex;align-items:center;width:100%;text-align:left}
+#list i{flex:0 0 56px;color:#b5b5b5;font-style:normal;text-align:center}
+#list span{flex:1;padding:16px 16px 16px 0;border-bottom:1px solid var(--line)}
+.msg{padding:24px 16px;color:var(--mute)}
+.msg button{color:var(--accent);text-decoration:underline}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <form id="f">
+    <div class="card">
+      <h2>Address</h2>
+      <div class="field"><input id="name" name="full_name" placeholder=" " autocomplete="name" required><label for="name">Full Name</label></div>
+      <div class="field"><input id="phone" class="tel" name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" pattern="9[0-9]{9}" maxlength="10" placeholder=" " title="10 digits, starting with 9" required><label for="phone">Phone Number</label><b class="pre">(+63)</b></div>
+      <button type="button" id="loc" class="field loc" aria-haspopup="dialog">
+        <span class="lbl">Region, Province, City, Barangay</span><span class="val"></span>
+        <svg class="chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+      </button>
+      <div class="field"><input id="zip" name="postal_code" inputmode="numeric" autocomplete="postal-code" pattern="[0-9]{4}" maxlength="4" placeholder=" " title="4-digit postal code" required><label for="zip">Postal Code</label></div>
+      <div class="field"><input id="street" name="street" autocomplete="address-line1" placeholder=" " required><label for="street">Street Name, Building, House No.</label></div>
+    </div>
+  </form>
+</div>
+
+<div id="picker" role="dialog" aria-modal="true" aria-label="Choose region, province, city and barangay" hidden>
+  <div class="sheet">
+    <header class="top">
+      <button type="button" class="back" id="close" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
+      <label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="q" type="search" autocomplete="off"></label>
+    </header>
+    <div id="crumbs" hidden>
+      <div class="cap"><span>Region Selected</span><button type="button" id="reset">Reset</button></div>
+      <ol id="trail"></ol>
+    </div>
+    <h2 id="sec"></h2>
+    <ul id="list"></ul>
+  </div>
+</div>
+
+<script>
+const API = 'https://psgc.cloud/api/v2';
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';');
+const byName = (a, b) => a.name.localeCompare(b.name);
+const LEVEL = { region: 'Region', province: 'Province', city: 'City', barangay: 'Barangay' };
+
+// Your five regions -> official PSGC regions, matched on the first two digits of the region code.
+const GROUPS = [
+  ['Metro Manila', ['13']],
+  ['North Luzon', ['01', '02', '03', '14']],
+  ['South Luzon', ['04', '17', '05']],
+  ['Visayas', ['06', '07', '08', '18']],       // 18 = Negros Island Region (not in the API yet)
+  ['Mindanao', ['09', '10', '11', '12', '16', '19']],
+];
+function buildGroups(regions) {
+  const left = new Set(regions);
+  const out = GROUPS.map(([name, prefixes]) => {
+    const rs = regions.filter(r => prefixes.includes(String(r.code).slice(0, 2)));
+    rs.forEach(r => left.delete(r));
+    return { name, regions: rs, flat: name === 'Metro Manila' };  // flat = no province level
+  }).filter(g => g.regions.length);
+  left.forEach(r => out.push({ name: r.name, regions: [r] }));    // regions missing from the table
+  return out.sort(byName);
+}
+
+// Fetch each list once; follows pagination links if the API ever adds them.
+const cache = new Map();
+function getList(path) {
+  if (!cache.has(path)) cache.set(path, (async () => {
+    let url = API + path, rows = [];
+    while (url) {
+      const res = await fetch(url, { headers: { Accept: 'application/json' } });
+      if (!res.ok) throw new Error(res.status);
+      const j = await res.json(), next = j.links && j.links.next;
+      rows = rows.concat(j.data || []);
+      url = next ? new URL(next, url).href : null;
+    }
+    return rows.sort(byName);
+  })().catch(e => { cache.delete(path); throw e; }));
+  return cache.get(path);
+}
+
+// Each level is only reachable once the one before it is chosen:
+// the picker shows one level at a time and builds the next request from the previous pick.
+const order = d => d.region && d.region.flat ? ['region', 'city', 'barangay'] : ['region', 'province', 'city', 'barangay'];
+let groups = null, picked = {}, draft = {}, step = '', rows = [], shown = [], seq = 0;
+
+async function load(s) {
+  if (s === 'region') return groups || (groups = buildGroups(await getList('/regions')));
+  const d = draft;
+  const paths = s === 'province' ? d.region.regions.map(r => `/regions/${r.code}/provinces`)
+    : s === 'city' ? [d.region.flat
+        ? `/regions/${d.region.regions[0].code}/cities-municipalities`  // Metro Manila: no provinces
+        : `/provinces/${d.province.code}/cities-municipalities`]
+    : [`/cities-municipalities/${d.city.code}/barangays`];
+  return (await Promise.all(paths.map(getList))).flat().sort(byName);
+}
+
+function paint(msg) {
+  const t = $('q').value.trim().toLowerCase();
+  shown = rows.filter(r => r.name.toLowerCase().includes(t));
+  let last = '';
+  $('list').innerHTML = msg ? `<li class="msg">${msg}</li>`
+    : !shown.length ? '<li class="msg">No matches</li>'
+    : shown.map((r, i) => {
+        const L = r.name[0].toUpperCase(), first = L !== last; last = L;
+        return `<li><button type="button" data-i="${i}"><i aria-hidden="true">${first ? L : ''}</i><span>${esc(r.name)}</span></button></li>`;
+      }).join('');
+}
+
+async function render() {
+  const ord = order(draft), done = ord.filter(k => draft[k]);
+  step = ord.find(k => !draft[k]);
+  if (!step) return commit();
+  const my = ++seq;
+  $('q').value = ''; $('q').placeholder = 'Search ' + LEVEL[step].toLowerCase();
+  $('crumbs').hidden = !done.length;
+  $('trail').innerHTML = done.map(k => `<li><button type="button" data-k="${k}">${esc(draft[k].name)}</button></li>`).join('')
+    + `<li class="now" aria-current="step">Select ${LEVEL[step]}</li>`;
+  $('sec').textContent = LEVEL[step];
+  $('picker').scrollTop = 0;
+  rows = []; paint('Loading…');
+  try {
+    rows = await load(step);
+    if (my !== seq) return;
+    if (step === 'barangay' && !rows.length) return commit();   // nothing to choose at this level
+    paint();
+  } catch (e) {
+    if (my === seq) $('list').innerHTML = '<li class="msg">Couldn\'t load this list. <button type="button" id="retry">Try again</button></li>';
+  }
+}
+
+$('list').onclick = e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.id === 'retry') return render();
+  if (b.dataset.i != null) { draft[step] = shown[b.dataset.i]; render(); }
+};
+$('trail').onclick = e => {   // tap a chosen level to go back to it
+  const b = e.target.closest('button');
+  if (!b) return;
+  const ord = order(draft);
+  ord.slice(ord.indexOf(b.dataset.k)).forEach(k => delete draft[k]);
+  render();
+};
+$('reset').onclick = () => { draft = {}; render(); };
+$('q').oninput = () => { if (rows.length) paint(); };
+
+function openPicker() {
+  draft = {};
+  $('picker').hidden = false;
+  document.body.style.overflow = 'hidden';
+  $('close').focus();
+  render();
+}
+function closePicker() {
+  $('picker').hidden = true;
+  document.body.style.overflow = '';
+  $('loc').focus();
+}
+function commit() {
+  picked = { ...draft };
+  $('loc').classList.add('filled');
+  $('loc').querySelector('.val').innerHTML = order(picked).filter(k => picked[k]).map(k => `<div>${esc(picked[k].name)}</div>`).join('');
+  closePicker();
+}
+$('loc').onclick = openPicker;
+$('close').onclick = closePicker;
+document.onkeydown = e => { if (e.key === 'Escape' && !$('picker').hidden) closePicker(); };
+load('region').catch(() => {});   // warm the cache so the first open is instant
+
+</script>
+</body>
+</html>

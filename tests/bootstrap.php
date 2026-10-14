@@ -436,6 +436,7 @@ function resetState(): void
         'shop_order_events', 'shop_shipments', 'shop_order_items',
         'shop_payment_proofs', 'shop_refunds', 'shop_orders',
         'cart_items', 'carts', 'products',
+        'member_addresses',
         'ewallet_ledger', 'commissions', 'payout_requests',
     ] as $table) {
         $pdo->exec("TRUNCATE TABLE `{$table}`");

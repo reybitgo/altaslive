@@ -167,6 +167,117 @@
         </div>
       </div>
     </form>
+
+    <!-- ── Delivery address book (own forms; NOT nested in the profile form) ── -->
+    <div class="card mt-3" id="addresses">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="card-title">📍 Delivery Addresses</span>
+        <button type="button" class="btn btn-sm btn-primary js-address-add">+ Add address</button>
+      </div>
+      <div class="card-body">
+        <p class="text-muted mb-3" style="font-size:.8rem;">Save the addresses you deliver to. At checkout you can pick one to prefill the Delivery details — you can still edit them there.</p>
+        <?php if (empty($addresses)): ?>
+          <p class="text-muted mb-0" style="font-size:.85rem;">No saved addresses yet.</p>
+        <?php else: ?>
+          <div class="d-flex flex-column gap-2">
+            <?php foreach ($addresses as $a): ?>
+              <div class="border rounded p-2 d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                <div style="font-size:.85rem;">
+                  <div class="fw-semibold">
+                    <?= !empty($a['label']) ? e($a['label']) : 'Address' ?>
+                    <?php if ((int) $a['is_default'] === 1): ?><span class="badge bg-success ms-1">Default</span><?php endif; ?>
+                  </div>
+                  <div><?= e($a['recipient_name']) ?><?= !empty($a['phone']) ? ' · ' . e($a['phone']) : '' ?></div>
+                  <div class="text-muted"><?= e(trim($a['address_line'] . ', ' . $a['city'] . ' ' . $a['province'] . ' ' . $a['postal'])) ?></div>
+                </div>
+                <div class="d-flex gap-1 flex-shrink-0">
+                  <button type="button" class="btn btn-sm btn-outline-secondary js-address-edit"
+                          data-id="<?= (int) $a['id'] ?>"
+                          data-label="<?= e($a['label']) ?>"
+                          data-recipient="<?= e($a['recipient_name']) ?>"
+                          data-phone="<?= e($a['phone']) ?>"
+                          data-address="<?= e($a['address_line']) ?>"
+                          data-city="<?= e($a['city']) ?>"
+                          data-province="<?= e($a['province']) ?>"
+                          data-postal="<?= e($a['postal']) ?>"
+                          data-default="<?= (int) $a['is_default'] ?>">Edit</button>
+                  <?php if ((int) $a['is_default'] !== 1): ?>
+                    <form method="post" action="<?= link_to('shop_address_default') ?>">
+                      <?= csrf_field() ?>
+                      <input type="hidden" name="address_id" value="<?= (int) $a['id'] ?>">
+                      <button type="submit" class="btn btn-sm btn-outline-success">Set default</button>
+                    </form>
+                  <?php endif; ?>
+                  <form method="post" action="<?= link_to('shop_address_delete') ?>" class="js-address-delete-form">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="address_id" value="<?= (int) $a['id'] ?>">
+                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                  </form>
+                </div>
+              </div>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
+      </div>
+    </div>
+
+    <!-- Add / edit address modal -->
+    <div class="modal fade" id="addressModal" tabindex="-1" aria-labelledby="addressModalTitle" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <form method="post" action="<?= link_to('shop_address_save') ?>">
+            <?= csrf_field() ?>
+            <input type="hidden" name="address_id" id="addr_id" value="">
+            <div class="modal-header">
+              <h5 class="modal-title" id="addressModalTitle">Add delivery address</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-2">
+                <label class="form-label" for="addr_label">Label</label>
+                <input type="text" id="addr_label" name="label" class="form-control" maxlength="40" placeholder="Home, Office…">
+              </div>
+              <div class="row g-2">
+                <div class="col-md-7 mb-2">
+                  <label class="form-label" for="addr_recipient">Recipient name *</label>
+                  <input type="text" id="addr_recipient" name="recipient_name" class="form-control" maxlength="120" required>
+                </div>
+                <div class="col-md-5 mb-2">
+                  <label class="form-label" for="addr_phone">Phone</label>
+                  <input type="text" id="addr_phone" name="phone" class="form-control" maxlength="40">
+                </div>
+              </div>
+              <div class="mb-2">
+                <label class="form-label" for="addr_address">Address *</label>
+                <input type="text" id="addr_address" name="address_line" class="form-control" maxlength="255" placeholder="House / street / barangay" required>
+              </div>
+              <div class="row g-2">
+                <div class="col-5 mb-2">
+                  <label class="form-label" for="addr_city">City</label>
+                  <input type="text" id="addr_city" name="city" class="form-control" maxlength="80">
+                </div>
+                <div class="col-5 mb-2">
+                  <label class="form-label" for="addr_province">Province</label>
+                  <input type="text" id="addr_province" name="province" class="form-control" maxlength="80">
+                </div>
+                <div class="col-2 mb-2">
+                  <label class="form-label" for="addr_postal">Postal</label>
+                  <input type="text" id="addr_postal" name="postal" class="form-control" maxlength="20">
+                </div>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="is_default" id="addr_default" value="1">
+                <label class="form-check-label" for="addr_default">Set as default</label>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save address</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 <script>
@@ -184,5 +295,78 @@
     el.type = el.type === 'password' ? 'text' : 'password';
     btn.textContent = el.type === 'password' ? '👁' : '🙈';
   }
+
+  // ── Delivery address book ──────────────────────────────────
+  // Must wait for DOMContentLoaded: the Bootstrap bundle and app.js are
+  // loaded by the footer *after* this inline script, so `bootstrap` and
+  // `showConfirm` do not exist yet when this block is first parsed.
+  document.addEventListener('DOMContentLoaded', function () {
+    var modalEl = document.getElementById('addressModal');
+    if (!modalEl || typeof bootstrap === 'undefined') return;
+    var modal = new bootstrap.Modal(modalEl);
+    var fields = {
+      id:        'addr_id',
+      label:     'addr_label',
+      recipient: 'addr_recipient',
+      phone:     'addr_phone',
+      address:   'addr_address',
+      city:      'addr_city',
+      province:  'addr_province',
+      postal:    'addr_postal'
+    };
+    function set(name, value) {
+      var el = document.getElementById(fields[name]);
+      if (el) el.value = value == null ? '' : value;
+    }
+    function open(mode, data) {
+      document.getElementById('addressModalTitle').textContent =
+        mode === 'edit' ? 'Edit delivery address' : 'Add delivery address';
+      set('id', data && data.id ? data.id : '');
+      set('label', data ? data.label : '');
+      set('recipient', data ? data.recipient : '');
+      set('phone', data ? data.phone : '');
+      set('address', data ? data.address : '');
+      set('city', data ? data.city : '');
+      set('province', data ? data.province : '');
+      set('postal', data ? data.postal : '');
+      document.getElementById('addr_default').checked = !!(data && data.isDefault);
+      modal.show();
+    }
+
+    var addBtn = document.querySelector('.js-address-add');
+    if (addBtn) addBtn.addEventListener('click', function () { open('add', null); });
+
+    document.querySelectorAll('.js-address-edit').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        open('edit', {
+          id:        btn.dataset.id,
+          label:     btn.dataset.label,
+          recipient: btn.dataset.recipient,
+          phone:     btn.dataset.phone,
+          address:   btn.dataset.address,
+          city:      btn.dataset.city,
+          province:  btn.dataset.province,
+          postal:    btn.dataset.postal,
+          isDefault: btn.dataset.default === '1'
+        });
+      });
+    });
+
+    // Delete confirmation via the app modal (native confirm() is blocked in
+    // some embedded webviews).
+    document.addEventListener('submit', function (e) {
+      var form = e.target.closest('.js-address-delete-form');
+      if (!form) return;
+      e.preventDefault();
+      showConfirm({
+        size: 'sm',
+        title: 'Delete this address?',
+        message: 'This removes the saved address from your profile. This cannot be undone.',
+        confirmText: 'Delete',
+        confirmClass: 'btn-danger',
+        onConfirm: function () { form.submit(); }
+      });
+    });
+  });
 </script>
 <?php require 'views/partials/footer.php'; ?>

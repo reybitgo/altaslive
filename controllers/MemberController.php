@@ -20,7 +20,8 @@ class MemberController
     public function profile(): void
     {
         Auth::guard('member');
-        $user = Auth::user();
+        $user      = Auth::user();
+        $addresses = MemberAddress::forMember(Auth::id());
         require 'views/member/profile.php';
     }
 
@@ -106,6 +107,82 @@ class MemberController
         User::updateProfile($id, $data);
         flash('success', 'Profile updated successfully.');
         redirect('/?page=profile');
+    }
+
+    /** Read the posted address-book fields (create or edit). */
+    private function collectAddressInput(): array
+    {
+        return [
+            'label'          => trim((string) ($_POST['label'] ?? '')),
+            'recipient_name' => trim((string) ($_POST['recipient_name'] ?? '')),
+            'phone'          => trim((string) ($_POST['phone'] ?? '')),
+            'address_line'   => trim((string) ($_POST['address_line'] ?? '')),
+            'city'           => trim((string) ($_POST['city'] ?? '')),
+            'province'       => trim((string) ($_POST['province'] ?? '')),
+            'postal'         => trim((string) ($_POST['postal'] ?? '')),
+            'country'        => trim((string) ($_POST['country'] ?? 'PH')),
+            'is_default'     => ($_POST['is_default'] ?? '') === '1',
+        ];
+    }
+
+    public function saveAddress(): void
+    {
+        Auth::guard('member');
+        csrf_verify();
+        $uid  = Auth::id();
+        $id   = (int) ($_POST['address_id'] ?? 0);
+        $data = $this->collectAddressInput();
+
+        $missing = [];
+        if ($data['recipient_name'] === '') $missing[] = 'recipient name';
+        if ($data['address_line'] === '')   $missing[] = 'address';
+        if ($missing) {
+            flash('error', 'Please fill in the ' . implode(', ', $missing) . '.');
+            redirect('/?page=profile#addresses');
+        }
+
+        if ($id > 0) {
+            if (!MemberAddress::find($id, $uid)) {
+                flash('error', 'Address not found.');
+                redirect('/?page=profile#addresses');
+            }
+            MemberAddress::update($id, $uid, $data);
+            flash('success', 'Delivery address updated.');
+        } else {
+            if (MemberAddress::countForMember($uid) >= MemberAddress::MAX_ADDRESSES) {
+                flash('error', 'You can save up to ' . MemberAddress::MAX_ADDRESSES . ' addresses.');
+                redirect('/?page=profile#addresses');
+            }
+            MemberAddress::create($uid, $data);
+            flash('success', 'Delivery address saved.');
+        }
+        redirect('/?page=profile#addresses');
+    }
+
+    public function deleteAddress(): void
+    {
+        Auth::guard('member');
+        csrf_verify();
+        $id = (int) ($_POST['address_id'] ?? 0);
+        if ($id <= 0 || !MemberAddress::delete($id, Auth::id())) {
+            flash('error', 'Address not found.');
+        } else {
+            flash('success', 'Delivery address removed.');
+        }
+        redirect('/?page=profile#addresses');
+    }
+
+    public function setDefaultAddress(): void
+    {
+        Auth::guard('member');
+        csrf_verify();
+        $id = (int) ($_POST['address_id'] ?? 0);
+        if ($id <= 0 || !MemberAddress::setDefault($id, Auth::id())) {
+            flash('error', 'Address not found.');
+        } else {
+            flash('success', 'Default delivery address updated.');
+        }
+        redirect('/?page=profile#addresses');
     }
 
     public function earnings(): void
@@ -1316,6 +1393,7 @@ class MemberController
             'usdt_trc20'  => 'USDT (TRC20)',
             'usdt_bep20'  => 'USDT (BEP20)',
         ];
+        $addresses = MemberAddress::forMember(Auth::id());
         $pageTitle = 'Checkout';
         require 'views/member/checkout.php';
     }
@@ -1419,11 +1497,13 @@ class MemberController
                 }
                 Cart::clear((int) $cart['id']);
                 $pdo->commit();
+                $this->maybeSaveCheckoutAddress($addr);
                 flash('success', 'Order placed and paid. Thank you!');
                 redirect('/?page=shop_order&id=' . $orderId);
             }
 
             $pdo->commit();
+            $this->maybeSaveCheckoutAddress($addr);
             flash('success', 'Order placed. Upload your payment proof to continue.');
             redirect('/?page=shop_order&id=' . $orderId);
         } catch (InvalidArgumentException | RuntimeException $e) {
@@ -1438,6 +1518,36 @@ class MemberController
             shop_checkout_remember_input($_POST);
             flash('error', 'Could not place the order. Please try again.');
             redirect('/?page=checkout');
+        }
+    }
+
+    /**
+     * Optionally store the address the buyer just used, after a successful
+     * order. Best-effort: the order is already committed, so a failure here
+     * must never surface as an order error.
+     */
+    private function maybeSaveCheckoutAddress(array $addr): void
+    {
+        if (($_POST['save_address'] ?? '') !== '1') {
+            return;
+        }
+        $uid = Auth::id();
+        if (MemberAddress::countForMember($uid) >= MemberAddress::MAX_ADDRESSES) {
+            return;
+        }
+        try {
+            MemberAddress::create($uid, [
+                'label'          => trim((string) ($_POST['address_label'] ?? '')),
+                'recipient_name' => $addr['shipping_name'],
+                'phone'          => $addr['shipping_phone'],
+                'address_line'   => $addr['shipping_address'],
+                'city'           => $addr['shipping_city'],
+                'province'       => $addr['shipping_province'],
+                'postal'         => $addr['shipping_postal'],
+                'country'        => 'PH',
+            ]);
+        } catch (Throwable $e) {
+            // Ignore: the address book is a convenience, not part of the order.
         }
     }
 

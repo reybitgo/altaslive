@@ -368,6 +368,9 @@ $routes = [
     'shop_submit_proof'           => ['MemberController', 'submitShopProof',   'member'],
     'shop_cancel_order'           => ['MemberController', 'cancelShopOrder',   'member'],
     'shop_confirm_receipt'        => ['MemberController', 'confirmShopReceipt','member'],
+    'shop_address_save'           => ['MemberController', 'saveAddress',       'member'],
+    'shop_address_delete'         => ['MemberController', 'deleteAddress',     'member'],
+    'shop_address_default'        => ['MemberController', 'setDefaultAddress', 'member'],
     // â”€â”€ Admin Shop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     'admin_shop'                  => ['AdminController',  'shopProducts',      'admin'],
     'admin_product_status'         => ['AdminController',  'productStatus',     'admin'],

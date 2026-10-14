@@ -16,6 +16,35 @@
     <h4 class="mb-1">Checkout</h4>
     <p class="text-muted" style="font-size:.8rem;">Review your order and fill in the delivery details.</p>
 
+    <?php
+    // Anything the buyer typed on a failed attempt comes back with them (see
+    // shop_checkout_old_input()). On a fresh checkout ($old empty) we prefill
+    // from the member's default saved address, falling back to the profile.
+    $old = shop_checkout_old_input();
+    $user = Auth::user();
+
+    $defaultAddr = null;
+    foreach ($addresses as $a) {
+        if ((int) $a['is_default'] === 1) { $defaultAddr = $a; break; }
+    }
+    if (!$defaultAddr && !empty($addresses)) { $defaultAddr = $addresses[0]; }
+
+    $fromAddr = empty($old) ? [
+        'shipping_name'     => $defaultAddr['recipient_name'] ?? '',
+        'shipping_phone'    => $defaultAddr['phone'] ?? '',
+        'shipping_address'  => $defaultAddr['address_line'] ?? '',
+        'shipping_city'     => $defaultAddr['city'] ?? '',
+        'shipping_province' => $defaultAddr['province'] ?? '',
+        'shipping_postal'   => $defaultAddr['postal'] ?? '',
+    ] : [];
+
+    $pick = static function (string $key, string $fallback = '') use ($old, $fromAddr): string {
+        if (isset($old[$key]) && $old[$key] !== '') return (string) $old[$key];
+        if (isset($fromAddr[$key]) && $fromAddr[$key] !== '') return (string) $fromAddr[$key];
+        return $fallback;
+    };
+    ?>
+
     <form method="post" action="<?= link_to('place_order') ?>" id="checkoutForm">
       <?= csrf_field() ?>
       <input type="hidden" name="idem" value="<?= e(uniqid('', true)) ?>">
@@ -26,46 +55,75 @@
           <div class="card mb-3">
             <div class="card-header"><span class="card-title">📍 Delivery details</span></div>
             <div class="card-body">
+              <?php if (!empty($addresses)): ?>
+                <div class="mb-3">
+                  <label class="form-label" for="savedAddress">Pick a saved address</label>
+                  <select id="savedAddress" class="form-select">
+                    <option value="">— Fill in below —</option>
+                    <?php foreach ($addresses as $a): ?>
+                      <option value="<?= (int) $a['id'] ?>"
+                              data-name="<?= e($a['recipient_name']) ?>"
+                              data-phone="<?= e($a['phone']) ?>"
+                              data-address="<?= e($a['address_line']) ?>"
+                              data-city="<?= e($a['city']) ?>"
+                              data-province="<?= e($a['province']) ?>"
+                              data-postal="<?= e($a['postal']) ?>">
+                        <?= e((!empty($a['label']) ? $a['label'] . ' — ' : '') . $a['recipient_name'] . ' · ' . $a['address_line']) ?><?= (int) $a['is_default'] === 1 ? ' (default)' : '' ?>
+                      </option>
+                    <?php endforeach; ?>
+                  </select>
+                  <div class="form-text">Selecting one fills the fields below — you can still edit them.</div>
+                </div>
+              <?php endif; ?>
               <div class="row g-2">
                 <div class="col-md-6">
                   <label class="form-label" for="shipping_name">Recipient name *</label>
                   <input type="text" id="shipping_name" name="shipping_name" class="form-control" maxlength="120" required
-                         value="<?= e($old['shipping_name'] ?? (Auth::user()['full_name'] ?? '')) ?>">
+                         value="<?= e($pick('shipping_name', $user['full_name'] ?? '')) ?>">
                 </div>
                 <div class="col-md-6">
                   <label class="form-label" for="shipping_phone">Recipient phone</label>
                   <input type="text" id="shipping_phone" name="shipping_phone" class="form-control" maxlength="40"
-                         value="<?= e($old['shipping_phone'] ?? (Auth::user()['mobile'] ?? '')) ?>">
+                         value="<?= e($pick('shipping_phone', $user['mobile'] ?? '')) ?>">
                 </div>
                 <div class="col-12">
                   <label class="form-label" for="shipping_address">Delivery address *</label>
-                  <input type="text" id="shipping_address" name="shipping_address" class="form-control" maxlength="255" placeholder="House / street / barangay" required value="<?= e($old['shipping_address'] ?? '') ?>">
+                  <input type="text" id="shipping_address" name="shipping_address" class="form-control" maxlength="255" placeholder="House / street / barangay" required value="<?= e($pick('shipping_address')) ?>">
                 </div>
                 <div class="col-md-5">
                   <label class="form-label" for="shipping_city">City</label>
-                  <input type="text" id="shipping_city" name="shipping_city" class="form-control" maxlength="80" value="<?= e($old['shipping_city'] ?? '') ?>">
+                  <input type="text" id="shipping_city" name="shipping_city" class="form-control" maxlength="80" value="<?= e($pick('shipping_city')) ?>">
                 </div>
                 <div class="col-md-5">
                   <label class="form-label" for="shipping_province">Province</label>
-                  <input type="text" id="shipping_province" name="shipping_province" class="form-control" maxlength="80" value="<?= e($old['shipping_province'] ?? '') ?>">
+                  <input type="text" id="shipping_province" name="shipping_province" class="form-control" maxlength="80" value="<?= e($pick('shipping_province')) ?>">
                 </div>
                 <div class="col-md-2">
                   <label class="form-label" for="shipping_postal">Postal</label>
-                  <input type="text" id="shipping_postal" name="shipping_postal" class="form-control" maxlength="20" value="<?= e($old['shipping_postal'] ?? '') ?>">
+                  <input type="text" id="shipping_postal" name="shipping_postal" class="form-control" maxlength="20" value="<?= e($pick('shipping_postal')) ?>">
                 </div>
                 <div class="col-md-6">
                   <label class="form-label" for="billing_name">Billing name *</label>
                   <input type="text" id="billing_name" name="billing_name" class="form-control" maxlength="120" required
-                         value="<?= e($old['billing_name'] ?? (Auth::user()['full_name'] ?? '')) ?>">
+                         value="<?= e($pick('billing_name', $user['full_name'] ?? '')) ?>">
                   <div class="form-text">Name shown on the payment records.</div>
                 </div>
                 <div class="col-md-6">
                   <label class="form-label" for="billing_phone">Billing phone</label>
-                  <input type="text" id="billing_phone" name="billing_phone" class="form-control" maxlength="40" value="<?= e($old['billing_phone'] ?? '') ?>">
+                  <input type="text" id="billing_phone" name="billing_phone" class="form-control" maxlength="40" value="<?= e($pick('billing_phone')) ?>">
                 </div>
                 <div class="col-12">
                   <label class="form-label" for="notes_member">Delivery notes</label>
                   <textarea id="notes_member" name="notes_member" class="form-control" rows="2" maxlength="500" placeholder="Landmarks, preferred times…"><?= e($old['notes_member'] ?? '') ?></textarea>
+                </div>
+                <div class="col-12">
+                  <div class="form-check">
+                    <?php /* Pre-ticked only when the member has no saved addresses yet. */ ?>
+                    <input class="form-check-input" type="checkbox" name="save_address" id="save_address" value="1" <?= empty($addresses) ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="save_address" style="font-size:.85rem;">
+                      Save this address to my address book for next time.
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>
@@ -81,9 +139,7 @@
               // order, and have the whole form discarded by the failure path.
               $ewalletBalance = Ewallet::balance(Auth::id());
               $ewalletEnough  = $ewalletBalance + 0.005 >= (float) $totals['total_price'];
-              // Anything the buyer typed on a failed attempt comes back with
-              // them (see shop_checkout_old_input()).
-              $old = shop_checkout_old_input();
+              // ($old is read at the top of the file.)
               ?>
               <?php foreach ($paymentMethods as $key => $label): ?>
                 <div class="form-check mb-2">
@@ -232,6 +288,29 @@
     if (!e.persisted) return;
     sent = false;
     syncTermsGate();   // re-derives disabled + label from the checkbox state
+  });
+})();
+
+// Saved-address selector: picking one fills the delivery fields below. The
+// member can keep editing after; this is a shortcut, not a lock.
+(function () {
+  var sel = document.getElementById('savedAddress');
+  if (!sel) return;
+  var map = {
+    name:     'shipping_name',
+    phone:    'shipping_phone',
+    address:  'shipping_address',
+    city:     'shipping_city',
+    province: 'shipping_province',
+    postal:   'shipping_postal'
+  };
+  sel.addEventListener('change', function () {
+    var opt = sel.options[sel.selectedIndex];
+    if (!opt || !opt.value) return;
+    Object.keys(map).forEach(function (k) {
+      var el = document.getElementById(map[k]);
+      if (el) el.value = opt.dataset[k] || '';
+    });
   });
 })();
 </script>
