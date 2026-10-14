@@ -11,7 +11,7 @@
    whatever order the statuses happened to be listed. The model constant is
    the single source of truth, so adding a status there re-orders the tabs
    automatically without touching this view. */
-$tabs = array_merge(ShopOrder::STATUSES, ['all']);
+$tabs = array_merge(['all'], ShopOrder::STATUSES);
 ?>
 <?php require 'views/partials/head.php'; ?>
 <?php require 'views/partials/sidebar_admin.php'; ?>
