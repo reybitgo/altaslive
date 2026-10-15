@@ -1266,7 +1266,7 @@ default:
         if ($ok) {
             flash('success', 'Order moved to ' . shop_status_label($to) . '.');
         } else {
-            flash('error', 'This order just changed. Reload and try again.');
+            flash('error', 'This order was changed by someone else. Reload and try again.');
         }
         redirect($back);
     }

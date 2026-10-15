@@ -227,7 +227,7 @@ test('e-wallet happy path end to end', function (): void {
     T::ok(ShopOrder::ship($o, $ADMIN, '', '') === false, 'ship without courier/tracking refused');
     T::ok(ShopOrder::ship($o, $ADMIN, 'JRS', 'JRS-12345'), 'ship with courier+tracking');
     T::eq(8, Fixtures::stockOf($pid), 'stock 10 -> 8 after handoff');
-    T::ok(ShopOrder::markDelivered($o, $ADMIN, null, null) === false, 'delivered without POD refused');
+    T::throws(InvalidArgumentException::class, fn () => ShopOrder::markDelivered($o, $ADMIN, null, null), 'delivered without POD refused');
     T::ok(ShopOrder::markDelivered($o, $ADMIN, 'Juan Dela Cruz', null), 'delivered with receiver name');
     T::eq('Juan Dela Cruz', Fixtures::scalar("SELECT pod_receiver FROM shop_shipments WHERE order_id = ? AND state='active'", [$o]), 'POD stored on shipment');
     T::ok(ShopOrder::confirmReceipt($o, $MEMBER), 'buyer confirms receipt');

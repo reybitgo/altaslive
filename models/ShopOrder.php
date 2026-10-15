@@ -1130,7 +1130,10 @@ class ShopOrder
         if (!$order) return false;
         self::assertNotSelfReview($order);
         if (($podReceiver === null || trim($podReceiver) === '') && ($podImage === null || $podImage === '')) {
-            return false; // POD required (S27)
+            // POD required (S27). A missing input is a validation error, not a
+            // lost race — throw so the caller surfaces the real reason instead
+            // of the generic "order just changed" message reserved for false.
+            throw new InvalidArgumentException('Proof of delivery required — enter who received the order or attach a POD photo.');
         }
 
         // POD facts live on shop_shipments (§2.3), written by applySideEffects
