@@ -443,7 +443,7 @@
              TAB 8 — INVOICES & DOCUMENTS
              ════════════════════════════════════════════ -->
             <div class="tab-pane fade" id="tabPane-documents" role="tabpanel">
-                <form method="POST" action="<?= APP_URL ?>/?page=admin_save_settings">
+                <form method="POST" action="<?= APP_URL ?>/?page=admin_save_settings" id="invoiceAddressForm">
                     <?= csrf_field() ?>
                     <input type="hidden" name="group" value="documents">
                     <div class="card">
@@ -459,8 +459,24 @@
                                 <div class="form-text">Defaults to the site name when left blank</div>
                             </div>
                             <div class="mb-3">
+                                <label class="form-label">Region, Province, City, Barangay</label>
+                                <button type="button" id="invoice_loc" class="form-control text-start js-psgc-trigger" aria-haspopup="dialog">
+                                    <span class="text-muted js-psgc-placeholder">Select region, province, city, barangay…</span>
+                                </button>
+                                <input type="hidden" name="invoice_region" id="invoice_region" value="<?= e(setting('invoice_region')) ?>">
+                                <input type="hidden" name="invoice_province" id="invoice_province" value="<?= e(setting('invoice_province')) ?>">
+                                <input type="hidden" name="invoice_city" id="invoice_city" value="<?= e(setting('invoice_city')) ?>">
+                                <input type="hidden" name="invoice_barangay" id="invoice_barangay" value="<?= e(setting('invoice_barangay')) ?>">
+                                <input type="hidden" name="invoice_region_code" id="invoice_region_code" value="<?= e(setting('invoice_region_code')) ?>">
+                                <input type="hidden" name="invoice_province_code" id="invoice_province_code" value="<?= e(setting('invoice_province_code')) ?>">
+                                <input type="hidden" name="invoice_city_code" id="invoice_city_code" value="<?= e(setting('invoice_city_code')) ?>">
+                                <input type="hidden" name="invoice_barangay_code" id="invoice_barangay_code" value="<?= e(setting('invoice_barangay_code')) ?>">
+                            </div>
+                            <div class="mb-3">
                                 <label class="form-label">Business Address</label>
-                                <textarea name="invoice_address" class="form-control" rows="2"><?= e(setting('invoice_address')) ?></textarea>
+                                <input type="text" name="invoice_street" id="invoice_street" class="form-control mb-2" maxlength="255" placeholder="Street name, building, house no." value="<?= e(setting('invoice_street', setting('invoice_address'))) ?>">
+                                <textarea name="invoice_address" id="invoice_address" class="form-control" rows="2" readonly title="Composed automatically from the selected location and street above"><?= e(setting('invoice_address')) ?></textarea>
+                                <div class="form-text">Composed automatically: street + barangay, city, province, region. Printed on invoices.</div>
                             </div>
                             <div class="row g-2">
                                 <div class="col-md-6">
@@ -548,6 +564,7 @@
     </div>
 </div>
 
+<?php require 'views/partials/address_picker.php'; ?>
 <script>
     function togglePw(id, btn) {
         var el = document.getElementById(id);
@@ -565,6 +582,60 @@
             });
             pane.classList.add('show', 'active');
         }
+
+        // ── Business address: PSGC picker (same psgc.cloud fetch as profile) ──
+        var trigger = document.getElementById('invoice_loc');
+        var docForm = document.getElementById('invoiceAddressForm');
+        if (!trigger || !docForm || typeof PsgcPicker === 'undefined') return;
+
+        var invFields = {
+            region: 'invoice_region', province: 'invoice_province',
+            city: 'invoice_city', barangay: 'invoice_barangay',
+            regionCode: 'invoice_region_code', provinceCode: 'invoice_province_code',
+            cityCode: 'invoice_city_code', barangayCode: 'invoice_barangay_code'
+        };
+        function setInv(name, value) {
+            var el = document.getElementById(invFields[name]);
+            if (el) el.value = value == null ? '' : value;
+        }
+        function esc(s) {
+            return String(s).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; });
+        }
+        function composeAddress() {
+            var street = (document.getElementById('invoice_street').value || '').trim();
+            var parts = ['invoice_barangay', 'invoice_city', 'invoice_province', 'invoice_region'].map(function (id) {
+                return (document.getElementById(id).value || '').trim();
+            }).filter(Boolean);
+            var lines = [street].concat(parts);
+            document.getElementById('invoice_address').value = lines.length ? lines.join(', ') : '';
+        }
+        function renderInvLoc() {
+            var parts = ['invoice_barangay', 'invoice_city', 'invoice_province', 'invoice_region'].map(function (id) {
+                return (document.getElementById(id).value || '').trim();
+            }).filter(Boolean);
+            trigger.innerHTML = parts.length
+                ? '<span>' + parts.map(esc).join(', ') + '</span>'
+                : '<span class="text-muted js-psgc-placeholder">Select region, province, city, barangay…</span>';
+        }
+        PsgcPicker.attach({
+            trigger: trigger,
+            onPick: function (picked) {
+                setInv('region', picked.region ? picked.region.name : '');
+                setInv('province', picked.province ? picked.province.name : '');
+                setInv('city', picked.city ? picked.city.name : '');
+                setInv('barangay', picked.barangay ? picked.barangay.name : '');
+                setInv('regionCode', picked.region ? picked.region.code : '');
+                setInv('provinceCode', picked.province ? picked.province.code : '');
+                setInv('cityCode', picked.city ? picked.city.code : '');
+                setInv('barangayCode', picked.barangay ? picked.barangay.code : '');
+                renderInvLoc();
+                composeAddress();
+            }
+        });
+        document.getElementById('invoice_street').addEventListener('input', composeAddress);
+        docForm.addEventListener('submit', function () { renderInvLoc(); composeAddress(); });
+        renderInvLoc();
+        composeAddress();
     });
 </script>
 
