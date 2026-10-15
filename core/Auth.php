@@ -6,6 +6,15 @@
  */
 class Auth
 {
+    /**
+     * Roles that may access the admin area / own a held order.
+     *
+     * Single source of truth for the staff role set: Auth::isAdmin() and the
+     * hold-owner picker (User::assignableStaff()) both derive from it, so a
+     * future staff role only has to be added here.
+     */
+    public const ADMIN_ROLES = ['admin', 'superadmin'];
+
     // ── Session Bootstrap ─────────────────────────────────────────────────────
 
     public static function start(): void
@@ -140,7 +149,7 @@ class Auth
 
     public static function isAdmin(): bool
     {
-        return self::check() && in_array($_SESSION['user_role'], ['admin', 'superadmin'], true);
+        return self::check() && in_array($_SESSION['user_role'], self::ADMIN_ROLES, true);
     }
 
     public static function isSuperadmin(): bool

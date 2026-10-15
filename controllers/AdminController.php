@@ -1146,6 +1146,7 @@ class AdminController
         $activeShipment = ShopShipment::activeFor($orderId);
         $refunds       = ShopRefund::forOrder($orderId);
         $counts        = ShopOrder::statusCounts();
+        $staff         = User::assignableStaff();
         $pageTitle     = 'Order ' . e($order['order_no']);
         require 'views/admin/shop_order.php';
     }
@@ -1276,10 +1277,17 @@ default:
         csrf_verify();
 
         $orderId = (int) ($_POST['order_id'] ?? 0);
+        $ownerId = (int) ($_POST['hold_owner_id'] ?? 0);
+
+        if (!in_array($ownerId, array_column(User::assignableStaff(), 'id'), true)) {
+            flash('error', 'Choose a valid staff owner for the hold.');
+            redirect('/?page=admin_shop_order&id=' . $orderId);
+        }
+
         try {
             $ok = ShopOrder::onHold($orderId, Auth::id(),
                 trim((string) ($_POST['hold_reason'] ?? '')),
-                (int) ($_POST['hold_owner_id'] ?? 0),
+                $ownerId,
                 (string) ($_POST['hold_deadline'] ?? ''));
         } catch (RuntimeException $e) {
             flash('error', $e->getMessage());

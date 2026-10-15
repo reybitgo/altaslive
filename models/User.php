@@ -812,6 +812,31 @@ class User
         return $row ?: ['total' => 0, 'active' => 0, 'suspended' => 0, 'pending' => 0, 'deactivated' => 0, 'joined_today' => 0];
     }
 
+    /**
+     * Active staff who may own a held order (see ShopOrder::onHold()).
+     *
+     * Members are excluded. The superadmin proxy is excluded too — a
+     * superadmin acts as the primary admin (Auth::actingAdminId()), so it is
+     * never itself an assignable owner. Future non-superadmin staff roles join
+     * automatically once added to Auth::ADMIN_ROLES.
+     */
+    public static function assignableStaff(): array
+    {
+        $roles = array_values(array_diff(Auth::ADMIN_ROLES, ['superadmin']));
+        if (!$roles) {
+            return [];
+        }
+        $ph = implode(',', array_fill(0, count($roles), '?'));
+        $st = db()->prepare(
+            "SELECT id, username, role, full_name
+             FROM   users
+             WHERE  role IN ({$ph}) AND status = 'active'
+             ORDER BY username"
+        );
+        $st->execute($roles);
+        return $st->fetchAll();
+    }
+
     // ── Referral Chain (sponsor chain, not binary) ────────────────────────────
 
     /**

@@ -255,14 +255,51 @@ This tests the "sad path". Stock must **not** change when returning/reshipping t
 
 ## Test G — Hold and Resume
 
+### What a "Hold" is (read this first)
+
+A **Hold** is a **reversible pause**. Picture a shelf in a warehouse with a sign that says **"DO NOT SHIP YET"**. You move an order onto that shelf when something needs sorting out before it goes out — the customer asked to wait, you want to check the stock, a payment looks off, and so on. While an order is on that shelf:
+
+- it is **not cancelled** and **not shipped** — nothing is thrown away;
+- the goods stay **reserved** for this buyer (the stock does **not** go back up for sale);
+- the automatic "too late, auto-cancel" timers **stop counting** while it sits there.
+
+When the question is settled you **Resume** it, and it carries on from the **exact same step** it was on before (a **Paid** order resumes to **Paid** — not forward to Packing, not back to Pending).
+
+Every hold must name **three things**, so an order can never sit on the shelf forever with nobody responsible:
+
+| Field | What it means |
+|---|---|
+| **Reason** | A short note saying *why* it was paused. |
+| **Owner** | *Who* is responsible for taking it off the shelf. The dropdown already defaults to **you** — the admin who is logged in — but you can hand the job to another staff member. The "owner" is the person on the hook, not necessarily the person who clicked. |
+| **Deadline** | By when it should be looked at again. |
+
+> If you try to hold an order without a reason, an owner, or a deadline, the system **refuses** it — owner-less, deadline-less holds are "permanent limbo" and are not allowed.
+
+### Steps
+
 Use a fresh order (not completed).
 
-**In Window M:** Place E-Wallet order. **In Window W:** Mark it **Paid**.
+**In Window M:** Place an **E-Wallet** order (it is paid automatically at checkout). **In Window W:** open it and confirm the status is **Paid** — the only action shown is **Start packing / Packing** (there is no "Mark paid" button).
 
-1. Click **Place hold** → Provide reason → Submit. **PASS if** status becomes **On hold**.
-2. A **Resume to Paid** (or equivalent) button appears → Click it. **PASS if** status returns to **Paid**.
+1. In the **Hold** card on the right, fill in the three fields:
+   - **Reason** — type `customer_requested_delay`.
+   - **Owner** — leave the dropdown on its default. It already shows **you** (e.g. `@admin`). The list contains only staff who can own a hold; if more than one exists you may pick a different person.
+   - **Deadline** — pick a date/time a day or two in the future (e.g. two days from today at 5:00 PM).
+   Click **Place hold**.
+2. **PASS if** a green **"Order placed on hold."** message appears and the status badge becomes **On hold**.
+3. **PASS if** the right rail now shows an **On hold** card containing all three values you entered:
+   - **Reason:** `customer requested delay` (the underscore is shown as a space),
+   - **Owner:** the **username** you selected (e.g. `admin`) — shown as a name, not a number,
+   - **Deadline:** the date/time you entered.
+4. **PASS if** the stock did **not** change while on hold (a hold pauses the order; it does not move goods). Note the product's stock on `?page=admin_shop` before and after — it must be identical.
+5. Click **Resume to Paid**. **PASS if** the status returns to **exactly** where it was — **Paid** (not forward to Packing, not back to Pending) — and the action button reads **Start packing / Packing** again.
+6. **PASS if** the **On hold** card disappears and the reason/owner/deadline are cleared.
 
-> While on hold, buyer may still cancel in some cases — that’s intentional (hold is pause, not lock). Not a FAIL.
+> **Why it works this way:** a hold is a *pause, not a lock*. The buyer may still cancel while the order is on hold (the cancel follows the status it was paused from), and stock stays reserved so the goods are not sold to someone else. It is a way to say "wait for a human decision" without losing the order.
+
+> **Edge case (not a FAIL):** if you put a **Pending payment** order on hold, the **Resume** button reads "Resume to Pending Payment" — but resuming is refused ("the previous status is no longer reachable") because "Pending payment" is not a step you can move *an order into*. Holds are safest on a **Paid** or later pre-ship order.
+
+**Optional (only if two or more staff accounts exist):** repeat steps 1–3 but choose a **different** owner in the dropdown. **PASS if** the On-hold card shows **that** person's username.
 
 ---
 

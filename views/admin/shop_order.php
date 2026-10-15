@@ -295,7 +295,11 @@ $needConfirm = ['cancelled', 'returned_to_sender', 'payment_failed', 'on_hold'];
                 <?= csrf_field() ?>
                 <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
                 <input type="text" name="hold_reason" class="form-control form-control-sm mb-1" placeholder="Reason *" maxlength="160" required>
-                <input type="text" name="hold_owner_id" class="form-control form-control-sm mb-1" placeholder="Owner user id *" required>
+                <select name="hold_owner_id" class="form-select form-select-sm mb-1" required>
+                  <?php foreach (($staff ?? []) as $s): ?>
+                    <option value="<?= (int) $s['id'] ?>"<?= (int) $s['id'] === Auth::actingAdminId() ? ' selected' : '' ?>>@<?= e($s['username']) ?><?= $s['role'] !== 'admin' ? ' (' . e($s['role']) . ')' : '' ?></option>
+                  <?php endforeach; ?>
+                </select>
                 <input type="datetime-local" name="hold_deadline" class="form-control form-control-sm mb-2" required>
                 <button type="submit" class="btn btn-outline-warning btn-sm w-100">Place hold</button>
               </form>
