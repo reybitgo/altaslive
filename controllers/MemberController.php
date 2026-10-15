@@ -1258,6 +1258,15 @@ class MemberController
         require 'views/member/shop_order.php';
     }
 
+    public function shopInvoice(): void
+    {
+        Auth::guard('member');
+        $order  = $this->resolveOwnOrder();
+        $buyer  = User::find((int) $order['member_id']);
+        $seller = shop_seller_identity();
+        require 'views/shop/invoice.php';
+    }
+
     public function cart(): void
     {
         Auth::guard('member');

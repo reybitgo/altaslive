@@ -747,3 +747,68 @@ function shop_order_confirm_copy(string $to): ?string
     };
 }
 
+/**
+ * Seller identity printed on invoices and refund receipts. Settings-driven so
+ * the documents carry real legal details (name, address, TIN) rather than just
+ * the platform brand. Falls back to site_name so a fresh install still prints.
+ */
+function shop_seller_identity(): array
+{
+    $name = trim(setting('invoice_company_name'));
+    if ($name === '') {
+        $name = setting('site_name', APP_NAME);
+    }
+    return [
+        'name'    => $name,
+        'address' => setting('invoice_address'),
+        'tin'     => setting('invoice_tin'),
+        'phone'   => setting('invoice_phone'),
+        'email'   => setting('contact_email'),
+        'footer'  => setting('invoice_footer', 'This document is computer-generated and valid without a signature.'),
+        'vat'     => setting('invoice_vat_note', 'Prices are inclusive of applicable taxes.'),
+        'currency'=> setting('invoice_currency', 'PHP'),
+    ];
+}
+
+/**
+ * Refund credit-note / receipt number. Deterministic from the order number and
+ * refund id so it can be regenerated identically wherever it is displayed, and
+ * stored once in shop_refunds.receipt_ref so it is immutable after issue.
+ */
+function shop_credit_note_no(string $orderNo, int $refundId): string
+{
+    $prefix = setting('invoice_credit_prefix', 'CN');
+    return $prefix . '-' . $orderNo . '-' . str_pad((string) $refundId, 2, '0', STR_PAD_LEFT);
+}
+
+/** Human label for a shop_orders.payment_method value. */
+function shop_payment_method_label(string $method): string
+{
+    return match ($method) {
+        'ewallet'    => 'E-wallet',
+        'gcash'      => 'GCash',
+        'maya'       => 'Maya',
+        'usdt_trc20' => 'USDT (TRC20)',
+        'usdt_bep20' => 'USDT (BEP20)',
+        default      => ucfirst(str_replace('_', ' ', $method)),
+    };
+}
+
+/** Human label for a shop_refunds.method value. */
+function shop_refund_method_label(string $method): string
+{
+    return match ($method) {
+        'ewallet' => 'E-wallet credit',
+        'cash'    => 'Cash',
+        'bank'    => 'Bank transfer',
+        'manual'  => 'GCash / other (manual)',
+        default   => ucfirst(str_replace('_', ' ', $method)),
+    };
+}
+
+/** Human label for a shop_refunds.cause value. */
+function shop_refund_cause_label(string $cause): string
+{
+    return ucwords(str_replace('_', ' ', $cause));
+}
+

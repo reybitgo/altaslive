@@ -322,9 +322,9 @@ Use a fresh order (not completed).
 ### H3 — Approve and pay out refund (with wallet credit)
 
 1. On a **Delivered** order, open refund with **Payout route = E-wallet** → **Open refund task**.
-2. Click **Approve**.
+2. Click **Approve**. **PASS if** a credit note number is issued on the refund row.
 3. **In Window M**, note buyer’s **e-wallet balance**.
-4. **In Window W**, click **Mark paid (receipt required)** → Enter receipt reference (any text) → Submit. **PASS if** "Refund marked paid." and buyer balance increased by **exactly** refund amount.
+4. **In Window W**, click **Mark paid** → optionally enter an **External settlement ref** → Submit. **PASS if** "Refund marked paid." and buyer balance increased by **exactly** refund amount.
 5. Try clicking **Mark paid** again. **PASS if** it’s refused and balance does **not** increase a second time (no double credit).
 
 ---

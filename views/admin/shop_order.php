@@ -55,6 +55,8 @@ $needConfirm = ['cancelled', 'returned_to_sender', 'payment_failed', 'on_hold'];
             <button class="btn btn-sm btn-link p-0" onclick="copyText(<?= js((string) $order['payment_reference']) ?>)">copy</button>
           <?php endif; ?>
         </div>
+        <a href="<?= link_to('admin_order_invoice', ['id' => (int) $order['id']]) ?>"
+           target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary mt-2">🖨 Invoice</a>
       </div>
     </div>
 
@@ -377,16 +379,22 @@ $needConfirm = ['cancelled', 'returned_to_sender', 'payment_failed', 'on_hold'];
                   <span class="font-mono"><?= fmt_money((float) $rf['amount']) ?></span>
                   <span class="badge bg-<?= $rf['status'] === 'processed' ? 'success' : ($rf['status'] === 'denied' ? 'danger' : 'secondary') ?>"><?= e((string) $rf['status']) ?></span>
                 </div>
-                <div class="text-muted" style="font-size:.72rem;"><?= e(str_replace('_', ' ', (string) $rf['cause'])) ?>
-                  <?php if (!empty($rf['receipt_ref'])): ?> · receipt <?= e((string) $rf['receipt_ref']) ?><?php endif; ?>
+                <div class="text-muted" style="font-size:.72rem;"><?= e(shop_refund_cause_label((string) $rf['cause'])) ?>
+                  <?php if (!empty($rf['receipt_ref'])): ?>
+                    · credit note <span class="font-mono"><?= e((string) $rf['receipt_ref']) ?></span>
+                    <a href="<?= link_to('admin_order_refund_receipt', ['refund_id' => (int) $rf['id']]) ?>"
+                       target="_blank" rel="noopener">view / print</a>
+                  <?php endif; ?>
                 </div>
                 <?php if ($rf['status'] === 'open'): ?>
                   <form method="post" action="<?= link_to('admin_order_refund') ?>" class="d-flex gap-1 mt-1">
                     <?= csrf_field() ?>
                     <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
                     <input type="hidden" name="refund_id" value="<?= (int) $rf['id'] ?>">
-                    <button type="submit" name="refund_action" value="approve" class="btn btn-sm btn-outline-success">Approve</button>
-                    <button type="submit" name="refund_action" value="deny" class="btn btn-sm btn-outline-danger">Deny</button>
+                    <button type="submit" name="refund_action" value="approve" class="btn btn-sm btn-outline-success"
+                            data-confirm="Approve this <?= fmt_money((float) $rf['amount']) ?> refund? A credit note will be issued.">Approve</button>
+                    <button type="submit" name="refund_action" value="deny" class="btn btn-sm btn-outline-danger"
+                            data-confirm="Deny this <?= fmt_money((float) $rf['amount']) ?> refund? This cannot be undone.">Deny</button>
                   </form>
                 <?php elseif ($rf['status'] === 'approved'): ?>
                   <form method="post" action="<?= link_to('admin_order_refund') ?>" class="mt-1">
@@ -394,8 +402,8 @@ $needConfirm = ['cancelled', 'returned_to_sender', 'payment_failed', 'on_hold'];
                     <input type="hidden" name="order_id" value="<?= (int) $order['id'] ?>">
                     <input type="hidden" name="refund_id" value="<?= (int) $rf['id'] ?>">
                     <input type="hidden" name="refund_action" value="mark_paid">
-                    <input type="text" name="receipt_ref" class="form-control form-control-sm mb-1" placeholder="Receipt ref *" maxlength="80" required>
-                    <button type="submit" class="btn btn-sm btn-success w-100">Mark paid (receipt required)</button>
+                    <input type="text" name="external_ref" class="form-control form-control-sm mb-1" placeholder="External settlement ref (optional)" maxlength="80">
+                    <button type="submit" class="btn btn-sm btn-success w-100">Mark paid</button>
                   </form>
                 <?php endif; ?>
               </div>
@@ -472,12 +480,21 @@ $needConfirm = ['cancelled', 'returned_to_sender', 'payment_failed', 'on_hold'];
   document.addEventListener('submit', function (e) {
     var form = e.target.closest('.js-confirm-form');
     if (!form) return;
+
+    // Confirm the button the admin actually pressed. A form may carry several
+    // submitters (Refunds: Approve / Deny), so querySelector's "first submit
+    // button" is wrong here — it always reported Approve.
+    var submitter = e.submitter ||
+      (form.contains(document.activeElement) ? document.activeElement : null);
+    var btn = (submitter && form.contains(submitter) && /^(button|input)$/i.test(submitter.tagName))
+      ? submitter
+      : form.querySelector('button[type="submit"], input[type="submit"]');
+
     e.preventDefault();
 
-    var msg    = form.dataset.confirm || '';
+    var msg    = (btn && btn.dataset.confirm) || form.dataset.confirm || '';
     var target = (form.querySelector('input[name="to"]') || {}).value || '';
-    var btn    = form.querySelector('button[type="submit"]');
-    var label  = btn ? (btn.textContent || '').trim() : 'Confirm action';
+    var label  = btn ? (btn.textContent || btn.value || '').trim() : 'Confirm action';
 
     showConfirm({
       size: 'sm',
@@ -486,8 +503,19 @@ $needConfirm = ['cancelled', 'returned_to_sender', 'payment_failed', 'on_hold'];
         ? msg  // rendered above with e(); trusted HTML by contract
         : 'Move this order ' + label.replace(/\s*\(.*\)$/, '') + '?',
       confirmText: label,
-      confirmClass: /cancel|reject|failure|returned/i.test(label + ' ' + target) ? 'btn-danger' : 'btn-primary',
-      onConfirm: function () { form.submit(); }
+      confirmClass: /cancel|reject|deny|failure|returned/i.test(label + ' ' + target) ? 'btn-danger' : 'btn-primary',
+      onConfirm: function () {
+        // form.submit() drops the pressed button's name/value; carry it through
+        // a hidden input so refund_action=approve|deny actually posts.
+        if (btn && btn.name) {
+          var hidden = document.createElement('input');
+          hidden.type = 'hidden';
+          hidden.name = btn.name;
+          hidden.value = btn.value;
+          form.appendChild(hidden);
+        }
+        form.submit();
+      }
     });
   });  // The remaining forms (forward steps like Packing / Dispatch, plus hold,
   // refund-creation, note) also post real state changes with no other

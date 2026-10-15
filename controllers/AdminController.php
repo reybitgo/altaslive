@@ -555,6 +555,14 @@ class AdminController
             'shop_max_proof_attempts',
             'shop_report_window_days',
             'shop_max_delivery_attempts',
+            'invoice_company_name',
+            'invoice_address',
+            'invoice_tin',
+            'invoice_phone',
+            'invoice_footer',
+            'invoice_vat_note',
+            'invoice_credit_prefix',
+            'invoice_currency',
         ];
         $pdo = db();
         $st  = $pdo->prepare("INSERT INTO settings (key_name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)");
@@ -1366,6 +1374,48 @@ default:
         exit;
     }
 
+    /** Printable sales invoice for an order — the buyer's proof of purchase. */
+    public function orderInvoice(): void
+    {
+        Auth::guard('admin');
+
+        $orderId = (int) ($_GET['id'] ?? 0);
+        $order   = $orderId ? ShopOrder::findWithItems($orderId) : null;
+        if (!$order) {
+            http_response_code(404);
+            exit('Order not found');
+        }
+
+        $buyer  = User::find((int) $order['member_id']);
+        $seller = shop_seller_identity();
+        require 'views/shop/invoice.php';
+    }
+
+    /** Printable credit note / refund receipt for a refund task. */
+    public function orderRefundReceipt(): void
+    {
+        Auth::guard('admin');
+
+        $refundId = (int) ($_GET['refund_id'] ?? 0);
+        $refund   = $refundId ? ShopRefund::find($refundId) : null;
+        if (!$refund) {
+            http_response_code(404);
+            exit('Refund not found');
+        }
+
+        $order  = ShopOrder::findWithItems((int) $refund['order_id']);
+        $buyer  = User::find((int) $refund['member_id']);
+        $seller = shop_seller_identity();
+
+        ShopOrderEvent::log((int) $refund['order_id'], null, (string) $order['status'], 'admin', Auth::id(), [
+            'reason_code' => 'refund_receipt_viewed',
+            'note'        => 'Credit note ' . (string) $refund['receipt_ref'] . ' viewed',
+            'source'      => 'ui',
+        ]);
+
+        require 'views/shop/refund_receipt.php';
+    }
+
     /** Manual shipment facts edit — writes the ACTIVE shipment only (§4.2). */
     public function orderShipment(): void
     {
@@ -1451,7 +1501,7 @@ default:
 
                 case 'mark_paid':
                     ShopRefund::markPaid((int) ($_POST['refund_id'] ?? 0), Auth::id(),
-                        trim((string) ($_POST['receipt_ref'] ?? '')))
+                        trim((string) ($_POST['external_ref'] ?? '')))
                         ? flash('success', 'Refund marked paid.')
                         : flash('error', 'Refund must be approved before it can be marked paid.');
                     break;

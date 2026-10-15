@@ -435,7 +435,7 @@ test('every UI string the manual QA doc names actually exists', function (): voi
         'Packing', 'Ready to ship', 'Mark shipped (stock deducts)', 'Dispatch',
         'Delivered', 'Return to sender', 'Reship order', 'Record failure',
         'Place hold', 'Mark paid', 'Open refund task',
-        'Mark paid (receipt required)', 'Create Product', 'Update Product',
+        'External settlement ref (optional)', 'Create Product', 'Update Product',
         'Added to cart.', 'Add to cart', 'Already in cart', 'Proceed to checkout',
         'Browse the Shop', 'Cart is empty', 'View full cart', 'Your cart is empty',
         'Place order', 'Submit proof', 'Re-upload proof', 'Confirm receipt',

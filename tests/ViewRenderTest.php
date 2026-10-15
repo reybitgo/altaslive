@@ -474,4 +474,49 @@ test('C6 — the dead admin Complete button is gone', function (): void {
     );
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+T::group('Shop documents — invoice & credit note');
+
+test('the printable invoice and credit note render warning-free', function (): void {
+    $adminId  = Fixtures::admin();
+    $memberId = Fixtures::member(5000.00);
+    $pid      = Fixtures::product('__DOC__', 250.00, 5);
+    $oid      = Fixtures::pendingOrder($memberId, $pid, 2);
+    db()->prepare("UPDATE shop_orders SET status = 'delivered' WHERE id = ?")->execute([$oid]);
+
+    $refundId = Fixtures::refund($oid, 500.00, 'ewallet');
+    T::ok(ShopRefund::approve($refundId, $adminId), 'documents: refund approved so a credit note is issued');
+
+    $order  = ShopOrder::findWithItems($oid);
+    $buyer  = User::find($memberId);
+    $seller = shop_seller_identity();
+    $refund = ShopRefund::find($refundId);
+
+    // Same variable contract the controllers pass to the two documents.
+    $capture = static function (string $rel, array $vars): string {
+        ob_start();
+        try {
+            extract($vars, EXTR_SKIP);
+            /** @noinspection PhpIncludeInspection */
+            require REPO_ROOT . '/' . $rel;
+        } catch (Throwable $e) {
+            RenderLog::$problems[] = 'THROWN: ' . get_class($e) . ': ' . $e->getMessage();
+        }
+        return (string) ob_get_clean();
+    };
+
+    RenderLog::arm();
+    $invoice = $capture('views/shop/invoice.php', ['order' => $order, 'buyer' => $buyer, 'seller' => $seller]);
+    $note    = $capture('views/shop/refund_receipt.php', ['refund' => $refund, 'order' => $order, 'buyer' => $buyer, 'seller' => $seller]);
+    RenderLog::disarm();
+
+    assert_clean_render('shop documents');
+
+    T::ok(str_contains($invoice, (string) $order['order_no']), 'invoice: shows the stored order number');
+    T::ok(str_contains($invoice, 'INVOICE'), 'invoice: has an INVOICE heading');
+    T::ok(str_contains($invoice, '250.00'), 'invoice: prints the line unit price');
+    T::ok(str_contains($note, (string) $refund['receipt_ref']), 'credit note: shows the issued number');
+    T::ok(str_contains($note, (string) $order['order_no']), 'credit note: references the original order');
+});
+
 exit(T::summary());

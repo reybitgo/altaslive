@@ -359,6 +359,7 @@ $routes = [
     'shop'                        => ['MemberController', 'shop',              'member'],
     'shop_orders'                 => ['MemberController', 'shopOrders',        'member'],
     'shop_order'                  => ['MemberController', 'shopOrder',         'member'],
+    'shop_invoice'                => ['MemberController', 'shopInvoice',       'member'],
     'cart'                        => ['MemberController', 'cart',              'member'],
     'add_to_cart'                 => ['MemberController', 'addToCart',         'member'],
     'update_cart_item'            => ['MemberController', 'updateCartItem',    'member'],
@@ -385,6 +386,8 @@ $routes = [
     'admin_order_shipment'        => ['AdminController',  'orderShipment',     'admin'],
     'admin_order_reship'          => ['AdminController',  'orderReship',       'admin'],
     'admin_order_refund'          => ['AdminController',  'orderRefund',       'admin'],
+    'admin_order_invoice'         => ['AdminController',  'orderInvoice',      'admin'],
+    'admin_order_refund_receipt'  => ['AdminController',  'orderRefundReceipt','admin'],
     'admin_shop_expire'           => ['AdminController',  'shopExpire',        'admin'],
 ];
 

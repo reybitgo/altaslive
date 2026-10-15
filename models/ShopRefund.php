@@ -62,7 +62,7 @@ public const BLOCKING_STATUSES = ['open', 'approved'];
 
     public static function find(int $id): ?array
     {
-        $st = db()->prepare("SELECT r.*, o.member_id FROM shop_refunds r JOIN shop_orders o ON o.id = r.order_id WHERE r.id = ?");
+        $st = db()->prepare("SELECT r.*, o.member_id, o.order_no, o.created_at AS order_created_at FROM shop_refunds r JOIN shop_orders o ON o.id = r.order_id WHERE r.id = ?");
         $st->execute([$id]);
         return $st->fetch() ?: null;
     }
@@ -140,27 +140,44 @@ public const BLOCKING_STATUSES = ['open', 'approved'];
         $refund = self::find($id);
         if (!$refund) return false;
         self::assertNotSelfReview((int) $refund['member_id']);
-        $st = db()->prepare("UPDATE shop_refunds SET status = 'approved', approved_by = ?, approved_at = NOW() WHERE id = ? AND status = 'open'");
-        $st->execute([$adminId, $id]);
+
+        // Issue the credit-note number at approval. It is the receipt reference
+        // the settlement step consumes, so it must exist before money moves and
+        // must never be recomputed afterwards.
+        $receiptNo = trim((string) ($refund['receipt_ref'] ?? ''));
+        if ($receiptNo === '') {
+            $receiptNo = shop_credit_note_no((string) $refund['order_no'], $id);
+        }
+
+        $st = db()->prepare("UPDATE shop_refunds SET status = 'approved', approved_by = ?, approved_at = NOW(), receipt_ref = ? WHERE id = ? AND status = 'open'");
+        $st->execute([$adminId, mb_substr($receiptNo, 0, 80), $id]);
         return $st->rowCount() === 1;
     }
 
     /**
-     * Close a refund as paid — refuses an empty receipt reference (the
-     * "closed only by a receipt" rule, plan §2.3 table 8). E-wallet
-     * destinations are credited through the ledger in the same call.
+     * Close a refund as paid. The receipt reference is the credit-note number
+     * issued at approval, so the "closed only by a receipt" rule (plan §2.3
+     * table 8) is satisfied without an admin typing a free-text value. An
+     * optional external settlement reference (bank/GCash txn id) is appended to
+     * the note. E-wallet destinations are credited through the ledger in the
+     * same call.
      */
-    public static function markPaid(int $id, int $adminId, string $receiptRef): bool
+    public static function markPaid(int $id, int $adminId, string $externalRef = ''): bool
     {
-        if (trim($receiptRef) === '') {
-            throw new InvalidArgumentException('A receipt reference is required to close a refund.');
-        }
-
         $refund = self::find($id);
         if (!$refund || $refund['status'] !== 'approved') {
             return false;
         }
         self::assertNotSelfReview((int) $refund['member_id']);
+
+        // The receipt reference is the credit-note number issued at approval.
+        // Regenerate only for a row that predates issuance (legacy data), so the
+        // stored number stays immutable once issued.
+        $receiptRef = trim((string) ($refund['receipt_ref'] ?? ''));
+        if ($receiptRef === '') {
+            $receiptRef = shop_credit_note_no((string) $refund['order_no'], $id);
+        }
+        $externalRef = trim($externalRef);
 
             $pdo = db();
             $pdo->beginTransaction();
@@ -188,10 +205,18 @@ public const BLOCKING_STATUSES = ['open', 'approved'];
                     );
                 }
 
+            // An optional external settlement reference (bank/GCash txn id) is
+            // kept in the note; the issued credit-note number stays in
+            // receipt_ref so reprints are stable.
+            $note = trim((string) ($refund['note'] ?? ''));
+            if ($externalRef !== '') {
+                $note = trim($note . ' External settlement ref: ' . $externalRef);
+            }
+
             $st = $pdo->prepare(
-                "UPDATE shop_refunds SET status = 'processed', processed_by = ?, processed_at = NOW(), receipt_ref = ? WHERE id = ? AND status = 'approved'"
+                "UPDATE shop_refunds SET status = 'processed', processed_by = ?, processed_at = NOW(), receipt_ref = ?, note = ? WHERE id = ? AND status = 'approved'"
             );
-            $st->execute([$adminId, mb_substr($receiptRef, 0, 80), $id]);
+            $st->execute([$adminId, mb_substr($receiptRef, 0, 80), mb_substr($note, 0, 500), $id]);
             if ($st->rowCount() !== 1) {
                 $pdo->rollBack();
                 return false;

@@ -32,6 +32,10 @@ $overdue = $deadline && strtotime((string) $deadline) < time();
         <?= shop_status_badge($status, null) ?>
         <div class="fw-bold mt-1"><?= fmt_money((float) $order['total_price']) ?></div>
         <div class="text-muted" style="font-size:.74rem;">via <?= e(strtoupper((string) $order['payment_method'])) ?></div>
+        <?php if (!in_array($status, ['pending', 'payment_review', 'payment_failed', 'cancelled'], true)): ?>
+          <a href="<?= link_to('shop_invoice', ['id' => (int) $order['id']]) ?>"
+             target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary mt-2">🖨 Invoice</a>
+        <?php endif; ?>
       </div>
     </div>
 

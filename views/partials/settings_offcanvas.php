@@ -21,6 +21,7 @@ $offcanvasTabs = [
     'payouts'      => ['icon' => '💸', 'label' => 'Payout Methods'],
     'password'     => ['icon' => '🔒', 'label' => 'Change Password'],
     'reset'        => ['icon' => '⏱️', 'label' => 'Daily Cap Reset'],
+    'documents'    => ['icon' => '🧾', 'label' => 'Invoices & Documents'],
     'overview'     => ['icon' => 'ℹ️', 'label' => 'System Overview'],
 ];
 $isSettingsPage = ($_GET['page'] ?? '') === 'admin_settings';

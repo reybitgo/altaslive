@@ -440,7 +440,64 @@
             </div>
 
             <!-- ════════════════════════════════════════════
-             TAB 8 — SYSTEM OVERVIEW (read-only)
+             TAB 8 — INVOICES & DOCUMENTS
+             ════════════════════════════════════════════ -->
+            <div class="tab-pane fade" id="tabPane-documents" role="tabpanel">
+                <form method="POST" action="<?= APP_URL ?>/?page=admin_save_settings">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="group" value="documents">
+                    <div class="card">
+                        <div class="card-header d-flex align-items-center gap-2">
+                            <span style="width:28px;height:28px;background:#eff6ff;border-radius:.45rem;display:flex;align-items:center;justify-content:center;font-size:.85rem;">🧾</span>
+                            <span class="card-title">Invoices &amp; Documents</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-text mb-3" style="font-size:.75rem;">Legal details printed on the sales invoice and refund credit notes.</div>
+                            <div class="mb-3">
+                                <label class="form-label">Registered Business Name</label>
+                                <input type="text" name="invoice_company_name" class="form-control" value="<?= e(setting('invoice_company_name', setting('site_name'))) ?>">
+                                <div class="form-text">Defaults to the site name when left blank</div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Business Address</label>
+                                <textarea name="invoice_address" class="form-control" rows="2"><?= e(setting('invoice_address')) ?></textarea>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <label class="form-label">TIN</label>
+                                    <input type="text" name="invoice_tin" class="form-control font-mono" value="<?= e(setting('invoice_tin')) ?>">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Contact Phone</label>
+                                    <input type="text" name="invoice_phone" class="form-control" value="<?= e(setting('invoice_phone')) ?>">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Credit Note Prefix</label>
+                                    <input type="text" name="invoice_credit_prefix" class="form-control font-mono" value="<?= e(setting('invoice_credit_prefix', 'CN')) ?>" maxlength="12">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Currency Label</label>
+                                    <input type="text" name="invoice_currency" class="form-control" value="<?= e(setting('invoice_currency', 'PHP')) ?>" maxlength="8">
+                                </div>
+                            </div>
+                            <div class="mb-3 mt-3">
+                                <label class="form-label">Tax Note</label>
+                                <input type="text" name="invoice_vat_note" class="form-control" value="<?= e(setting('invoice_vat_note', 'Prices are inclusive of applicable taxes.')) ?>">
+                            </div>
+                            <div class="mb-0">
+                                <label class="form-label">Document Footer</label>
+                                <input type="text" name="invoice_footer" class="form-control" value="<?= e(setting('invoice_footer', 'This document is computer-generated and valid without a signature.')) ?>">
+                            </div>
+                        </div>
+                        <div class="card-footer border-top-0 pt-0">
+                            <button type="submit" class="btn btn-primary w-100">💾 Save Settings</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- ════════════════════════════════════════════
+             TAB 9 — SYSTEM OVERVIEW (read-only)
              ════════════════════════════════════════════ -->
             <div class="tab-pane fade" id="tabPane-overview" role="tabpanel">
                 <div class="card">
