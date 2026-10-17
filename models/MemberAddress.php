@@ -26,6 +26,9 @@ class MemberAddress
         'province_code'  => 20,
         'city_code'      => 20,
         'barangay_code'  => 20,
+        'billing_name'   => 120,
+        'billing_phone'  => 40,
+        'notes_member'   => 500,
     ];
 
     /** Default address first, then most recent. */
@@ -78,8 +81,8 @@ class MemberAddress
 
         $st = $pdo->prepare(
             "INSERT INTO member_addresses
-                (member_id, label, recipient_name, phone, address_line, barangay, city, province, region, postal, country, region_code, province_code, city_code, barangay_code, is_default)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                (member_id, label, recipient_name, phone, address_line, barangay, city, province, region, postal, country, region_code, province_code, city_code, barangay_code, billing_name, billing_phone, notes_member, is_default)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
         $st->execute([
             $memberId,
@@ -97,6 +100,9 @@ class MemberAddress
             $fields['province_code'],
             $fields['city_code'],
             $fields['barangay_code'],
+            $fields['billing_name'],
+            $fields['billing_phone'],
+            $fields['notes_member'],
             $isDefault ? 1 : 0,
         ]);
         return (int) $pdo->lastInsertId();
@@ -119,6 +125,7 @@ class MemberAddress
                 barangay = ?, city = ?, province = ?, region = ?,
                 postal = ?, country = ?,
                 region_code = ?, province_code = ?, city_code = ?, barangay_code = ?,
+                billing_name = ?, billing_phone = ?, notes_member = ?,
                 is_default = ?
              WHERE id = ? AND member_id = ?"
         );
@@ -137,6 +144,9 @@ class MemberAddress
             $fields['province_code'],
             $fields['city_code'],
             $fields['barangay_code'],
+            $fields['billing_name'],
+            $fields['billing_phone'],
+            $fields['notes_member'],
             $isDefault ? 1 : 0,
             $id,
             $memberId,

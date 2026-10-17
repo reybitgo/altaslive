@@ -206,6 +206,9 @@
                           data-province-code="<?= e($a['province_code'] ?? '') ?>"
                           data-city-code="<?= e($a['city_code'] ?? '') ?>"
                           data-barangay-code="<?= e($a['barangay_code'] ?? '') ?>"
+                          data-billing-name="<?= e($a['billing_name'] ?? '') ?>"
+                          data-billing-phone="<?= e($a['billing_phone'] ?? '') ?>"
+                          data-notes="<?= e($a['notes_member'] ?? '') ?>"
                           data-default="<?= (int) $a['is_default'] ?>">Edit</button>
                   <?php if ((int) $a['is_default'] !== 1): ?>
                     <form method="post" action="<?= link_to('shop_address_default') ?>">
@@ -275,6 +278,21 @@
                 <label class="form-label" for="addr_postal">Postal</label>
                 <input type="text" id="addr_postal" name="postal" class="form-control" maxlength="20" inputmode="numeric">
               </div>
+              <div class="row g-2">
+                <div class="col-md-6 mb-2">
+                  <label class="form-label" for="addr_billing_name">Billing name</label>
+                  <input type="text" id="addr_billing_name" name="billing_name" class="form-control" maxlength="120">
+                  <div class="form-text">Name shown on the payment records.</div>
+                </div>
+                <div class="col-md-6 mb-2">
+                  <label class="form-label" for="addr_billing_phone">Billing phone</label>
+                  <input type="text" id="addr_billing_phone" name="billing_phone" class="form-control" maxlength="40">
+                </div>
+              </div>
+              <div class="mb-2">
+                <label class="form-label" for="addr_notes_member">Delivery notes</label>
+                <textarea id="addr_notes_member" name="notes_member" class="form-control" rows="2" maxlength="500" placeholder="Landmarks, preferred times…"></textarea>
+              </div>
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" name="is_default" id="addr_default" value="1">
                 <label class="form-check-label" for="addr_default">Set as default</label>
@@ -329,7 +347,10 @@
       regionCode:    'addr_region_code',
       provinceCode:  'addr_province_code',
       cityCode:      'addr_city_code',
-      barangayCode:  'addr_barangay_code'
+      barangayCode:  'addr_barangay_code',
+      billingName:   'addr_billing_name',
+      billingPhone:  'addr_billing_phone',
+      notes:         'addr_notes_member'
     };
     function set(name, value) {
       var el = document.getElementById(fields[name]);
@@ -368,6 +389,9 @@
       set('provinceCode', data ? data.provinceCode : '');
       set('cityCode', data ? data.cityCode : '');
       set('barangayCode', data ? data.barangayCode : '');
+      set('billingName', data ? data.billingName : '');
+      set('billingPhone', data ? data.billingPhone : '');
+      set('notes', data ? data.notes : '');
       renderLoc();
       document.getElementById('addr_default').checked = !!(data && data.isDefault);
       modal.show();
@@ -410,6 +434,9 @@
           provinceCode: btn.dataset.provinceCode,
           cityCode:     btn.dataset.cityCode,
           barangayCode: btn.dataset.barangayCode,
+          billingName:  btn.dataset.billingName,
+          billingPhone: btn.dataset.billingPhone,
+          notes:        btn.dataset.notes,
           isDefault:    btn.dataset.default === '1'
         });
       });

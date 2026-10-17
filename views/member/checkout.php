@@ -42,6 +42,9 @@
         'shipping_province_code' => $defaultAddr['province_code'] ?? '',
         'shipping_city_code'     => $defaultAddr['city_code'] ?? '',
         'shipping_barangay_code' => $defaultAddr['barangay_code'] ?? '',
+        'billing_name'           => $defaultAddr['billing_name'] ?? '',
+        'billing_phone'          => $defaultAddr['billing_phone'] ?? '',
+        'notes_member'           => $defaultAddr['notes_member'] ?? '',
     ] : [];
 
     $pick = static function (string $key, string $fallback = '') use ($old, $fromAddr): string {
@@ -79,7 +82,10 @@
                               data-region-code="<?= e($a['region_code'] ?? '') ?>"
                               data-province-code="<?= e($a['province_code'] ?? '') ?>"
                               data-city-code="<?= e($a['city_code'] ?? '') ?>"
-                              data-barangay-code="<?= e($a['barangay_code'] ?? '') ?>">
+                              data-barangay-code="<?= e($a['barangay_code'] ?? '') ?>"
+                              data-billing-name="<?= e($a['billing_name'] ?? '') ?>"
+                              data-billing-phone="<?= e($a['billing_phone'] ?? '') ?>"
+                              data-notes="<?= e($a['notes_member'] ?? '') ?>">
                         <?= e((!empty($a['label']) ? $a['label'] . ' — ' : '') . $a['recipient_name'] . ' · ' . $a['address_line']) ?><?= (int) $a['is_default'] === 1 ? ' (default)' : '' ?>
                       </option>
                     <?php endforeach; ?>
@@ -132,7 +138,7 @@
                 </div>
                 <div class="col-12">
                   <label class="form-label" for="notes_member">Delivery notes</label>
-                  <textarea id="notes_member" name="notes_member" class="form-control" rows="2" maxlength="500" placeholder="Landmarks, preferred times…"><?= e($old['notes_member'] ?? '') ?></textarea>
+                  <textarea id="notes_member" name="notes_member" class="form-control" rows="2" maxlength="500" placeholder="Landmarks, preferred times…"><?= e($pick('notes_member')) ?></textarea>
                 </div>
                 <div class="col-12">
                   <div class="form-check">
@@ -327,7 +333,10 @@
     'region-code':   'shipping_region_code',
     'province-code': 'shipping_province_code',
     'city-code':     'shipping_city_code',
-    'barangay-code': 'shipping_barangay_code'
+    'barangay-code': 'shipping_barangay_code',
+    'billing-name':  'billing_name',
+    'billing-phone': 'billing_phone',
+    'notes':         'notes_member'
   };
   sel.addEventListener('change', function () {
     var opt = sel.options[sel.selectedIndex];

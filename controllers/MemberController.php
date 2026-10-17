@@ -128,6 +128,9 @@ class MemberController
             'province_code'  => trim((string) ($_POST['province_code'] ?? '')),
             'city_code'      => trim((string) ($_POST['city_code'] ?? '')),
             'barangay_code'  => trim((string) ($_POST['barangay_code'] ?? '')),
+            'billing_name'   => trim((string) ($_POST['billing_name'] ?? '')),
+            'billing_phone'  => trim((string) ($_POST['billing_phone'] ?? '')),
+            'notes_member'   => trim((string) ($_POST['notes_member'] ?? '')),
             'is_default'     => ($_POST['is_default'] ?? '') === '1',
         ];
     }
@@ -1576,6 +1579,9 @@ class MemberController
                 'province_code'  => $addr['province_code'] ?? '',
                 'city_code'      => $addr['city_code'] ?? '',
                 'barangay_code'  => $addr['barangay_code'] ?? '',
+                'billing_name'   => $addr['billing_name'] ?? '',
+                'billing_phone'  => $addr['billing_phone'] ?? '',
+                'notes_member'   => $addr['notes_member'] ?? '',
             ]);
         } catch (Throwable $e) {
             // Ignore: the address book is a convenience, not part of the order.
