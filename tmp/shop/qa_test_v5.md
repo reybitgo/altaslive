@@ -1,4 +1,4 @@
-# Shop QA Test (v4) - Beginner-Friendly Guide
+# Shop QA Test (v5) - Beginner-Friendly Guide
 
 This checklist walks you through testing the shop feature end-to-end. Follow it exactly. Do not skip instructions.
 
@@ -102,9 +102,11 @@ You will place **two** orders: (C1) E-Wallet (auto-paid), (C2) GCash (manual pro
 
 1. Add 2x `QA Widget` to cart (or set quantity to 2 in cart). Cart total should be **₱200.00**.
 2. From cart, click **Proceed to checkout**.
-3. Fill delivery/billing details (all required fields marked *):
-   - Recipient name, phone, delivery address, city/province/postal code
-   - Billing name/phone (if shown)
+3. In **Delivery details**, fill (all required fields marked *):
+   - Recipient name *, Recipient phone
+   - Region / Province / City / Barangay *, Street name/building/house no. *, Postal
+   - **Billing name *** , **Billing phone**, **Delivery notes**
+   - (optional) tick **"Save this address to my address book for next time."**
 4. Under Payment Method, select **E-Wallet** (if available).  
    > **Note:** If your balance is below the order total, the E-Wallet option will be **greyed out** with a red explanatory note. That is correct behavior — pick another payment method or top up. Do not fail this.
 5. **Terms checkbox:** Before ticking terms, the "Place order" button should be greyed out and read *"Tick the terms checkbox to place your order"*. Clicking it should do nothing.
@@ -157,6 +159,28 @@ This order starts unpaid so you can test the manual payment flow.
 2. Try to place the order **without ticking the Terms checkbox**.
 3. **PASS if:** You're returned to checkout with an error message, **and all delivery fields you typed remain filled in**.
 4. **FAIL if:** The form came back completely empty.
+
+### C4 — Billing details & address book round-trip
+
+This checks the **Billing name / Billing phone / Delivery notes** fields and the **"Save this address to my address book for next time."** checkbox.
+
+**In Window M:**
+
+1. Add 1x `QA Widget` to cart and go to checkout.
+2. In **Delivery details**, fill:
+   - **Billing name** = `QA Billing`
+   - **Billing phone** = `0917 000 0000`
+   - **Delivery notes** = `Leave at the gate`
+3. Tick **"Save this address to my address book for next time."**
+4. Place the order (E-Wallet is simplest). **PASS if** it succeeds.
+5. Go to **Profile → Delivery Addresses** (`?page=profile#addresses`). **PASS if** the address you just used appears in the list.
+6. Click **Edit** on that address. **PASS if** the modal opens as **Edit delivery address** and shows:
+   - **Billing name** = `QA Billing`
+   - **Billing phone** = `0917 000 0000`
+   - **Delivery notes** = `Leave at the gate`
+7. Change **Delivery notes** to `Ring the bell` and click **Save address**. **PASS if** a green "Delivery address updated." appears.
+8. Start a new checkout. **PASS if** the default saved address (or the address you pick from **"Pick a saved address"**) prefills **Billing name / Billing phone / Delivery notes**, including the updated `Ring the bell` note.
+9. **FAIL if** any of the three fields is empty after saving — that was the original defect.
 
 ---
 
@@ -390,6 +414,36 @@ Pending (unpaid) orders should auto-cancel so stock returns. Orders already in *
 
 ---
 
+## Test M — Invoices & Credit Notes (cross-reference)
+
+The full end-to-end invoice/credit-note suite lives in **`qa_test_invoice.md`** — run that document for deep coverage. This section is only the minimum needed to confirm the feature is wired up on this install; it deliberately does **not** duplicate the full suite.
+
+**The three facts:**
+
+- The invoice is a **live preview** before payment and a **frozen snapshot** the moment the order reaches **Paid**. After that it never changes, even if settings/products/order change.
+- Reverting payment or cancelling a paid order prints a red **VOID** stamp on the frozen invoice; paying again issues a **new** invoice numbered `-R2` (then `-R3`…).
+- A credit note's number is issued **automatically when a refund is approved** — you never type it.
+
+**Open the documents:**
+
+| Link | Where | URL |
+|---|---|---|
+| 🖨 Invoice | Admin → an order → top-right | `?page=admin_order_invoice&id=<ORDER_ID>` |
+| 🖨 Invoice | Member → My Orders → a paid order → top-right | `?page=shop_invoice&id=<ORDER_ID>` |
+| view / print | Admin → order → 💸 Refunds card | `?page=admin_order_refund_receipt&refund_id=<REFUND_ID>` |
+
+**Quick pass checks (on an admin invoice):**
+
+1. **PASS if** the seller block matches **Settings → Invoices & Documents**, the heading reads **SALES INVOICE**, and an `INV-<order_no>` number + `Issued:` date is shown.
+2. **PASS if** the items table has columns **Description · SKU · Qty · Unit Price · Amount**, each item shows its **SKU** (a product with no SKU shows a dash `—`), the item columns (**Qty · Unit Price · Amount**) are **left-aligned** under their headings, and the totals block (**Subtotal/Total/Amount Paid**) is **right-aligned**.
+3. **PASS if** the top-right has **Close** and **🖨 Print / Save as PDF**, and printing hides that toolbar.
+4. **Access control:** a member opening another member's invoice id is bounced to **My Orders** with a red **"Order not found."**; a guest is redirected to login; a member opening `?page=admin_order_invoice` gets **"Access denied."**
+5. **Edge:** open `?page=admin_order_invoice&id=99999999`. **PASS if** you are redirected to **Admin → Shop Orders** with a red **"Order not found."** (not a plain 404 text page).
+
+For credit-note content, numbering (`<PREFIX>-<order_no>-<NN>`), void/`-R2`, immutability, cash-route signatures and print checks, follow **`qa_test_invoice.md`**.
+
+---
+
 ## Final Checklist
 
 Tick only what you actually verified. Unticked is fine if not tested; ticking untested is worse.
@@ -399,6 +453,7 @@ Tick only what you actually verified. Unticked is fine if not tested; ticking un
 - [ ] Test C1: E-Wallet order completes automatically to Paid
 - [ ] Test C2: GCash order → Pending payment → Proof submitted → Payment under review (Cancel button removed). Reference optional on submit.
 - [ ] Test C3: Failed checkout preserves filled delivery form
+- [ ] Test C4: Billing name/phone/notes saved to the address book; saved address prefills checkout
 - [ ] Test D1: Wrong amount rejected; exact amount + valid reference marks Paid; proof verified; history logged
 - [ ] Test D2: Duplicate reference rejected across orders
 - [ ] Test D3: Proof submitted with NO reference → admin can still verify by entering canonical reference from proof
@@ -414,5 +469,6 @@ Tick only what you actually verified. Unticked is fine if not tested; ticking un
 - [ ] Test J: Shop enable/disable works (leave ON)
 - [ ] Test K: Edge cases pass
 - [ ] Test L: Basic accessibility checks pass
+- [ ] Test M: Invoice/credit-note essentials (frozen at Paid, SKU shown, left-aligned items vs right-aligned totals, access control)
 
 **End of QA.** Record any FAILs with exact steps and screenshots if possible.

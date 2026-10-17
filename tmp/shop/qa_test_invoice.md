@@ -23,7 +23,7 @@ Three facts to remember before you start:
 - [ ] **Two browser windows**: one for the Member (**Window M**), one for the Admin (**Window W**).
   - Use private/incognito for at least one of them, or two different browsers (e.g. Chrome for Admin, Firefox for Member). This stops the login sessions overwriting each other.
 - [ ] **Admin login.** Default is `admin` / `Admin@1234`. If it does not work, ask whoever set it up.
-- [ ] **Member account** with e-wallet balance and **at least one order that has reached `Paid`** (an order in `packing`/`ready_to_ship`/`shipped`/`delivered`/`completed` also works). If you have none, place and pay for a small order first — see the main shop QA doc (`qa_test_v4.md`) Tests D/E.
+- [ ] **Member account** with e-wallet balance and **at least one order that has reached `Paid`** (an order in `packing`/`ready_to_ship`/`shipped`/`delivered`/`completed` also works). If you have none, place and pay for a small order first — see the main shop QA doc (`qa_test_v5.md`) Tests D/E.
 - [ ] **A printer profile or "Save as PDF"** available in the browser (Chrome/Edge: Print → Destination → "Save as PDF").
 - [ ] Keep a **FAIL log** (a text file) and write down the **order number** (`AL…`) and **refund id** when asked. Refund ids are not shown on-screen; read the number from the URL of a refund receipt page (step F below) or from the DB if you have access.
 
@@ -93,7 +93,7 @@ Do this first so the invoices carry real company details.
 1. **In Window W**, go to **Admin → Shop Orders** and open **an order that was paid after you
    saved the Test A settings**. An order paid *before* Test A is frozen with the older company
    details (that is expected — see Test M); if that is your only paid order, pay for a fresh
-   small one now (main shop QA doc, `qa_test_v4.md`, Tests D/E) and use that instead.
+   small one now (main shop QA doc, `qa_test_v5.md`, Tests D/E) and use that instead.
 2. **PASS if** the top-right shows a **🖨 Invoice** button next to the order total.
 3. Click **🖨 Invoice**. A new tab opens.
 4. **PASS if** the page shows:
@@ -262,7 +262,7 @@ Prerequisite: an order that has a refund task, or create one now.
 ### H3 — Double-pay is refused
 
 1. On an already-**processed** refund, there is no **Mark paid** button. **PASS if** that is true.
-2. (If you can) attempt to re-submit a paid refund via a stale form or by replaying the POST. **PASS if** it is refused, the row stays `processed`, and the member's wallet is **not** credited a second time. For the wallet-balance proof, follow Test H3 in `qa_test_v4.md` (note the balance in Window M before and after).
+2. (If you can) attempt to re-submit a paid refund via a stale form or by replaying the POST. **PASS if** it is refused, the row stays `processed`, and the member's wallet is **not** credited a second time. For the wallet-balance proof, follow Test H3 in `qa_test_v5.md` (note the balance in Window M before and after).
 
 ---
 
@@ -286,7 +286,7 @@ Do this for **both** an invoice and a credit note.
 1. Click **🖨 Print / Save as PDF** (or press `Ctrl+P`). The print preview opens.
 2. **PASS if** the **Close** and **🖨 Print / Save as PDF** buttons are **hidden** in the preview (they must not print).
 3. **PASS if** the document sheet fills the page sensibly (no grey page background, no shadow, content not clipped at the right edge).
-4. **PASS if** the items table and totals are readable and the amounts are right-aligned.
+4. **PASS if** the items table and totals are readable: the item columns (**Qty · Unit Price · Amount**) are **left-aligned** under their headings, and the **totals** block (**Subtotal/Total/Amount Paid**) is **right-aligned**.
 5. Choose **Destination → Save as PDF** and save. Open the PDF.
    - **PASS if** the seller details, invoice/credit-note number, items, and totals are all present and legible.
 6. **FAIL if** a scrollbar, a stray button, or a blank/duplicate page prints.
@@ -295,7 +295,7 @@ Do this for **both** an invoice and a credit note.
 
 ## Test K — Edge cases
 
-1. **In Window W**, open an invoice and note the **SKU** column. **PASS if** each item shows the SKU that was stored on the order line when it was purchased (an old/legacy line with no stored SKU shows a dash **—**).
+1. **In Window W**, open an invoice and note the **SKU** column. **PASS if** each item shows the SKU captured on the order line at purchase time. New orders capture the SKU automatically; legacy rows were repaired with `php tmp/invoices/backfill_invoice_skus.php`. A product that has no SKU still shows a dash **—**.
    - Now go to **Admin → Shop Products**, edit that product, change its **SKU**, save, and reopen the invoice. **PASS if** the invoice still shows the **original** SKU — the invoice prints the purchase-time snapshot, not the product's current value.
 2. **In Window W → Settings → Invoices & Documents**, set **Business Address** to two lines:
    ```
@@ -309,7 +309,7 @@ Do this for **both** an invoice and a credit note.
    rendering). Then restore the one-line address and save.
 3. On the same invoice, **PASS if** the **Ship To** block shows the delivery name, phone, street address, and the city/province/postal/country line you entered at checkout.
 4. Open the invoice direct URL for a **non-existent** id: `?page=admin_order_invoice&id=99999999`.
-   **PASS if** you see the plain text **Order not found** (HTTP 404) — no stack trace, no partial page.
+   **PASS if** you are redirected to **Admin → Shop Orders** with a red **"Order not found."** message (no plain-text 404 page, no stack trace, no partial page).
 5. Open the credit note direct URL for a **non-existent** refund id: `?page=admin_order_refund_receipt&refund_id=99999999`.
    **PASS if** you see the plain text **Refund not found** (HTTP 404).
 6. Open a **guest** invoice/credit-note URL in a fresh private window.
@@ -354,7 +354,7 @@ Do this on a **paid** order whose invoice is already issued.
 ## Test N — Void on revert, and reissue as -R2
 
 Prerequisite: a **paid** order whose invoice is issued (from Test B), plus the ability to move
-the order back to `payment_review` (the main shop QA doc, `qa_test_v4.md`, shows how to revert
+the order back to `payment_review` (the main shop QA doc, `qa_test_v5.md`, shows how to revert
 a paid order).
 
 1. **In Window W**, note the issued invoice number `INV-<order_no>`.
@@ -402,7 +402,7 @@ Copy this into your FAIL log and tick as you go.
 - [ ] Test H-H3: Double-pay refused (no second wallet credit)
 - [ ] Test I: Cash/manual route shows signature block
 - [ ] Test J: Print / Save as PDF hides the toolbar and looks right
-- [ ] Test K: Edge cases (SKU snapshot, address wrap on new issues, 404s, guest redirect)
+- [ ] Test K: Edge cases (SKU snapshot, address wrap on new issues, invalid-id handling: admin invoice redirects; refund receipt 404s, guest redirect)
 - [ ] Test L: Numbers stable across reprints
 - [ ] Test M: Issued invoice is immutable (settings/product/order edits do not rewrite it)
 - [ ] Test N: Reverting payment voids the invoice (VOID stamp); re-payment issues `-R2`
