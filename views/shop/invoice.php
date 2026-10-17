@@ -52,6 +52,7 @@ $void       = $mode === 'void';
   table.items th { text-align:left; font-size:.7rem; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); border-bottom:1px solid var(--line); padding:8px 6px; }
   table.items td { font-size:.85rem; padding:8px 6px; border-bottom:1px solid #f1f1f1; vertical-align:top; }
   .num { text-align:right; font-family:'JetBrains Mono', monospace; }
+  table.items th.num, table.items td.num { text-align:left; }
   .totals { width:280px; margin-left:auto; margin-top:16px; }
   .totals tr td { font-size:.86rem; padding:5px 6px; }
   .totals tr.grand td { border-top:2px solid var(--ink); font-weight:700; font-size:1rem; padding-top:8px; }

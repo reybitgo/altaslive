@@ -1417,14 +1417,14 @@ default:
         $orderId = (int) ($_GET['id'] ?? 0);
         $order   = $orderId ? ShopOrder::find($orderId) : null;
         if (!$order) {
-            http_response_code(404);
-            exit('Order not found');
+            flash('error', 'Order not found.');
+            redirect('/?page=admin_shop_orders');
         }
 
         $doc = ShopInvoice::docForOrder((int) $order['id']);
         if (!$doc) {
-            http_response_code(404);
-            exit('Invoice not found');
+            flash('error', 'Invoice not found.');
+            redirect('/?page=admin_shop_order&id=' . (int) $order['id']);
         }
         require 'views/shop/invoice.php';
     }

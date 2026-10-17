@@ -42,7 +42,7 @@ class Cart
     }
     public static function getItems(int $cartId): array
     {
-        $st = db()->prepare("SELECT ci.*, p.name AS product_name, p.image_url, p.price AS current_price, p.stock, p.status AS product_status FROM cart_items ci JOIN products p ON p.id = ci.product_id WHERE ci.cart_id = ? ORDER BY ci.added_at ASC");
+        $st = db()->prepare("SELECT ci.*, p.name AS product_name, p.sku AS product_sku, p.image_url, p.price AS current_price, p.stock, p.status AS product_status FROM cart_items ci JOIN products p ON p.id = ci.product_id WHERE ci.cart_id = ? ORDER BY ci.added_at ASC");
         $st->execute([$cartId]);
         return $st->fetchAll();
     }
