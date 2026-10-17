@@ -233,7 +233,7 @@ class ShopOrder
             }
 
             // 9. Side effects for the target status.
-            self::applySideEffects($pdo, $orderId, $to, $order, $opts);
+            self::applySideEffects($pdo, $orderId, $to, $order, $opts, $actorType, $actorId);
 
             // 10. Append-only audit row (same transaction).
             ShopOrderEvent::log(
@@ -301,7 +301,7 @@ class ShopOrder
      * the stock deduction at courier handoff (shipped), deadline stamps, and
      * hold-field cleanup. All statements assume an open transaction on $pdo.
      */
-    private static function applySideEffects(PDO $pdo, int $orderId, string $to, array $order, array $opts = []): void
+    private static function applySideEffects(PDO $pdo, int $orderId, string $to, array $order, array $opts = [], string $actorType = 'system', ?int $actorId = null): void
     {
         // Reservation-state move, scoped to the states it is legal from (§0.3).
         if (isset(self::RESERVATION_ON[$to])) {
@@ -439,6 +439,20 @@ class ShopOrder
             $pdo->prepare(
                 "UPDATE shop_orders SET completion_due_at = DATE_ADD(NOW(), INTERVAL ? DAY) WHERE id = ?"
             )->execute([$days, $orderId]);
+        }
+
+        // Immutable invoice freeze: issue on payment, void when the payment is
+        // reverted or the order cancelled. Same transaction as the status
+        // write, so an order can never sit in `paid` without its snapshot (or
+        // carry a snapshot whose payment was rolled back). Re-payment after a
+        // void re-enters issue() and appends a new row (-R2); issue() is
+        // idempotent while an unvoided row exists (hold resume → paid).
+        if ($to === 'paid') {
+            ShopInvoice::issue($orderId, $pdo, $actorType, $actorId);
+        } elseif ($to === 'payment_review' && ($order['status'] ?? '') === 'paid') {
+            ShopInvoice::voidLatest($orderId, $pdo, 'paid_reverted');
+        } elseif ($to === 'cancelled') {
+            ShopInvoice::voidLatest($orderId, $pdo, 'order_cancelled');
         }
 
         // Leaving on_hold clears the hold fields.

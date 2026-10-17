@@ -3,17 +3,23 @@
  * @file   views/shop/invoice.php
  * @brief  Printable sales invoice for a shop order. Shared by the admin desk
  *         (AdminController::orderInvoice) and the buyer
- *         (MemberController::shopInvoice). Expects: $order, $buyer, $seller.
+ *         (MemberController::shopInvoice). Expects: $doc — an invoice document
+ *         payload from ShopInvoice::docForOrder() (frozen snapshot), or
+ *         ShopInvoice::build() (live preview). $doc['mode'] is one of
+ *         preview | issued | void; issued/void render the frozen fields,
+ *         preview renders live order data with an "issued on payment" note.
  */
-$orderNo  = (string) $order['order_no'];
-$items    = $order['items'] ?? [];
-$buyer    = is_array($buyer) ? $buyer : [];
-$subtotal = 0.0;
-foreach ($items as $it) {
-    $subtotal += (float) $it['total_price'];
-}
-$total   = (float) $order['total_price'];
-$paid    = !in_array((string) $order['status'], ['pending', 'payment_review', 'payment_failed', 'cancelled'], true);
+$mode       = (string) ($doc['mode'] ?? 'preview');
+$orderNo    = (string) $doc['order']['order_no'];
+$order      = $doc['order'];
+$items      = $doc['items'] ?? [];
+$buyer      = is_array($doc['buyer'] ?? null) ? $doc['buyer'] : [];
+$seller     = is_array($doc['seller'] ?? null) ? $doc['seller'] : [];
+$subtotal   = (float) ($doc['subtotal'] ?? 0.0);
+$total      = (float) ($doc['total'] ?? 0.0);
+$amountPaid = (float) ($doc['amount_paid'] ?? 0.0);
+$issued     = $mode !== 'preview';
+$void       = $mode === 'void';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -26,7 +32,8 @@ $paid    = !in_array((string) $order['status'], ['pending', 'payment_review', 'p
   :root { --ink:#1f2937; --muted:#6b7280; --line:#d1d5db; --brand:#1d4ed8; }
   * { box-sizing: border-box; }
   body { font-family: 'Segoe UI', Arial, sans-serif; color: var(--ink); margin: 0; background:#f3f4f6; }
-  .sheet { max-width: 820px; margin: 24px auto; background:#fff; padding: 40px; box-shadow:0 1px 3px rgba(0,0,0,.1); }
+  .sheet { position:relative; max-width: 820px; margin: 24px auto; background:#fff; padding: 40px; box-shadow:0 1px 3px rgba(0,0,0,.1); }
+  .void-stamp { position:absolute; top:38%; left:50%; transform:translate(-50%,-50%) rotate(-16deg); border:6px solid #dc2626; color:#dc2626; font-size:4.5rem; font-weight:800; letter-spacing:10px; padding:.1rem 1.4rem; opacity:.5; pointer-events:none; }
   .toolbar { max-width: 820px; margin: 16px auto 0; display:flex; gap:8px; justify-content:flex-end; }
   .toolbar button { font:inherit; padding:8px 16px; border-radius:6px; border:1px solid var(--line); background:#fff; cursor:pointer; }
   .toolbar button.primary { background: var(--brand); border-color: var(--brand); color:#fff; }
@@ -66,9 +73,10 @@ $paid    = !in_array((string) $order['status'], ['pending', 'payment_review', 'p
 </div>
 
 <div class="sheet">
+  <?php if ($void): ?><div class="void-stamp" aria-hidden="true">VOID</div><?php endif; ?>
   <div class="doc-head">
     <div class="seller">
-      <h1><?= e((string) $seller['name']) ?></h1>
+      <h1><?= e((string) ($seller['name'] ?? '')) ?></h1>
       <?php if (!empty($seller['address'])): ?><div><?= nl2br(e((string) $seller['address'])) ?></div><?php endif; ?>
       <?php if (!empty($seller['tin'])): ?><div>TIN: <?= e((string) $seller['tin']) ?></div><?php endif; ?>
       <?php if (!empty($seller['phone'])): ?><div><?= e((string) $seller['phone']) ?></div><?php endif; ?>
@@ -76,11 +84,24 @@ $paid    = !in_array((string) $order['status'], ['pending', 'payment_review', 'p
     </div>
     <div class="doc-title">
       <h2>SALES INVOICE</h2>
-      <div class="no"><?= e($orderNo) ?></div>
-      <div class="meta">
-        Date: <?= e(fmt_date((string) ($order['paid_at'] ?: $order['created_at']))) ?><br>
-        Status: <span class="badge"><?= e(str_replace('_', ' ', (string) $order['status'])) ?></span>
-      </div>
+      <?php if ($issued): ?>
+        <div class="no"><?= e((string) $doc['invoice_no']) ?></div>
+        <div class="meta">
+          Invoice for <?= e($orderNo) ?><br>
+          Issued: <?= e(fmt_date((string) $doc['issued_at'])) ?><br>
+          Status: <span class="badge"><?= e(str_replace('_', ' ', (string) $order['status'])) ?></span>
+          <?php if ($void): ?>
+            <br><span style="color:#dc2626;">Voided <?= e(fmt_date((string) $doc['voided_at'])) ?> — <?= e((string) ($doc['void_reason'] ?? '')) ?></span>
+          <?php endif; ?>
+        </div>
+      <?php else: ?>
+        <div class="no"><?= e($orderNo) ?></div>
+        <div class="meta">
+          Date: <?= e(fmt_date((string) ($order['paid_at'] !== '' ? $order['paid_at'] : $order['created_at']))) ?><br>
+          Status: <span class="badge"><?= e(str_replace('_', ' ', (string) $order['status'])) ?></span>
+          <br><span style="font-style:italic;">Preview — issued and frozen on payment</span>
+        </div>
+      <?php endif; ?>
     </div>
   </div>
 
@@ -139,7 +160,7 @@ $paid    = !in_array((string) $order['status'], ['pending', 'payment_review', 'p
   <table class="totals">
     <tr><td>Subtotal</td><td class="num"><?= fmt_money($subtotal) ?></td></tr>
     <tr class="grand"><td>Total</td><td class="num"><?= fmt_money($total) ?></td></tr>
-    <tr><td>Amount Paid</td><td class="num"><?= fmt_money($paid ? $total : 0.0) ?></td></tr>
+    <tr><td>Amount Paid</td><td class="num"><?= fmt_money($amountPaid) ?></td></tr>
   </table>
 
   <div class="paybox">

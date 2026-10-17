@@ -42,6 +42,7 @@ class MemberController
             'usdt_bep20_address' => trim($_POST['usdt_bep20_address']   ?? ''),
             'address'            => trim($_POST['address']              ?? ''),
         ];
+        $profileRedirect = Auth::isAdmin() ? '/?page=admin_settings#tabPane-password' : '/?page=profile';
 
         // Handle photo upload
         if (!empty($_FILES['photo']['tmp_name'])) {
@@ -91,22 +92,22 @@ class MemberController
         if ($newPw) {
             if (strlen($newPw) < 8) {
                 flash('error', 'New password must be at least 8 characters.');
-                redirect('/?page=profile');
+                redirect($profileRedirect);
             }
             if (!User::verifyPassword($id, $_POST['current_password'] ?? '')) {
                 flash('error', 'Current password is incorrect.');
-                redirect('/?page=profile');
+                redirect($profileRedirect);
             }
             if ($newPw !== ($_POST['new_password_confirm'] ?? '')) {
                 flash('error', 'New passwords do not match.');
-                redirect('/?page=profile');
+                redirect($profileRedirect);
             }
             User::updatePassword($id, $newPw);
         }
 
         User::updateProfile($id, $data);
         flash('success', 'Profile updated successfully.');
-        redirect('/?page=profile');
+        redirect($profileRedirect);
     }
 
     /** Read the posted address-book fields (create or edit). */
@@ -1261,9 +1262,12 @@ class MemberController
     public function shopInvoice(): void
     {
         Auth::guard('member');
-        $order  = $this->resolveOwnOrder();
-        $buyer  = User::find((int) $order['member_id']);
-        $seller = shop_seller_identity();
+        $order = $this->resolveOwnOrder();
+        $doc   = ShopInvoice::docForOrder((int) $order['id']);
+        if (!$doc) {
+            http_response_code(404);
+            exit('Invoice not found');
+        }
         require 'views/shop/invoice.php';
     }
 

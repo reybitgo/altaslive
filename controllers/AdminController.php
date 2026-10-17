@@ -522,67 +522,92 @@ class AdminController
         Auth::guard('admin');
         csrf_verify();
 
-        $allowed = [
-            'site_name',
-            'site_tagline',
-            'min_payout',
-            'contact_email',
-            'maintenance_mode',
-            'service_fee_gcash',
-            'service_fee_maya',
-            'service_fee_usdt_trc20',
-            'service_fee_usdt_bep20',
-            'usdt_trc20_gas_fee',
-            'usdt_bep20_gas_fee',
-            'gcash_enabled',
-            'maya_enabled',
-            'gcash_number',
-            'maya_number',
-            'usdt_trc20_address',
-            'usdt_bep20_address',
-            'default_cap_multiplier',
-            'reactivation_ewallet_enabled',
-            'reactivation_external_enabled',
-            'ewallet_transfer_fee',
-            'ewallet_min_transfer',
-            'ewallet_transfer_daily_limit',
-            'ewallet_transfer_weekly_limit',
-            'free_registration_enabled',
-            'seat_limit',
-            'shop_enabled',
-            'shop_payment_deadline_hours',
-            'shop_correction_window_hours',
-            'shop_max_proof_attempts',
-            'shop_report_window_days',
-            'shop_max_delivery_attempts',
-            'invoice_company_name',
-            'invoice_address',
-            'invoice_street',
-            'invoice_region',
-            'invoice_province',
-            'invoice_city',
-            'invoice_barangay',
-            'invoice_region_code',
-            'invoice_province_code',
-            'invoice_city_code',
-            'invoice_barangay_code',
-            'invoice_tin',
-            'invoice_phone',
-            'invoice_footer',
-            'invoice_vat_note',
-            'invoice_credit_prefix',
-            'invoice_currency',
+        $groups = [
+            'basics' => [
+                'site_name',
+                'site_tagline',
+                'contact_email',
+                'min_payout',
+                'shop_enabled',
+                'shop_payment_deadline_hours',
+                'shop_correction_window_hours',
+                'shop_max_proof_attempts',
+                'shop_report_window_days',
+                'shop_max_delivery_attempts',
+            ],
+            'maint' => [
+                'maintenance_mode',
+                'seat_limit',
+                'free_registration_enabled',
+            ],
+            'payments' => [
+                'reactivation_ewallet_enabled',
+                'reactivation_external_enabled',
+                'gcash_number',
+                'maya_number',
+                'usdt_trc20_address',
+                'usdt_bep20_address',
+            ],
+            'ewallet' => [
+                'ewallet_transfer_fee',
+                'ewallet_min_transfer',
+                'ewallet_transfer_daily_limit',
+                'ewallet_transfer_weekly_limit',
+            ],
+            'payouts' => [
+                'gcash_enabled',
+                'maya_enabled',
+                'service_fee_gcash',
+                'service_fee_maya',
+                'service_fee_usdt_trc20',
+                'service_fee_usdt_bep20',
+                'usdt_trc20_gas_fee',
+                'usdt_bep20_gas_fee',
+            ],
+            'reset' => [
+                'default_cap_multiplier',
+            ],
+            'documents' => [
+                'invoice_company_name',
+                'invoice_address',
+                'invoice_street',
+                'invoice_region',
+                'invoice_province',
+                'invoice_city',
+                'invoice_barangay',
+                'invoice_region_code',
+                'invoice_province_code',
+                'invoice_city_code',
+                'invoice_barangay_code',
+                'invoice_tin',
+                'invoice_phone',
+                'invoice_footer',
+                'invoice_vat_note',
+                'invoice_credit_prefix',
+                'invoice_currency',
+            ],
         ];
+        $group = $_POST['group'] ?? '';
+        if (!isset($groups[$group])) {
+            flash('error', 'Unknown settings group.');
+            redirect('/?page=admin_settings');
+        }
+
+        $checkboxKeys = ['gcash_enabled', 'maya_enabled', 'reactivation_ewallet_enabled', 'reactivation_external_enabled', 'shop_enabled'];
+        $hourKeys     = ['shop_payment_deadline_hours', 'shop_correction_window_hours', 'shop_max_proof_attempts', 'shop_report_window_days', 'shop_max_delivery_attempts'];
+
         $pdo = db();
         $st  = $pdo->prepare("INSERT INTO settings (key_name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)");
 
-        foreach ($allowed as $key) {
-            // Checkbox toggles: when unchecked the field is absent from POST,
-            // so we explicitly save '0' for these keys when not present.
-            if (in_array($key, ['gcash_enabled', 'maya_enabled', 'reactivation_ewallet_enabled', 'reactivation_external_enabled', 'shop_enabled'], true)) {
+        foreach ($groups[$group] as $key) {
+            // Only the submitted tab's keys are written, so saving one tab can
+            // never clobber toggles that live on another tab.
+            if (in_array($key, $checkboxKeys, true)) {
+                // Checkbox toggles: when unchecked the field is absent from POST,
+                // so we explicitly save '0' for these keys when not present.
                 $value = isset($_POST[$key]) && $_POST[$key] === '1' ? '1' : '0';
                 $st->execute([$key, $value]);
-            } elseif (in_array($key, ['shop_payment_deadline_hours', 'shop_correction_window_hours', 'shop_max_proof_attempts', 'shop_report_window_days', 'shop_max_delivery_attempts'], true)) {
+            } elseif (in_array($key, $hourKeys, true)) {
                 // Clamped in the controller (§4.3): a 0 deadline would expire
                 // every order on arrival; an unbounded attempt count lets a
                 // buyer loop proofs forever.
@@ -593,7 +618,8 @@ class AdminController
         }
 
         flash('success', 'Settings saved.');
-        redirect('/?page=admin_settings');
+        $hash = '#tabPane-' . $group;
+        redirect('/?page=admin_settings' . $hash);
     }
 
     public function manualReset(): void
@@ -620,7 +646,7 @@ class AdminController
         }
 
         flash('success', $msg);
-        redirect('/?page=admin_settings');
+        redirect('/?page=admin_settings#tabPane-reset');
     }
 
     public function capMonitor(): void
@@ -1389,14 +1415,17 @@ default:
         Auth::guard('admin');
 
         $orderId = (int) ($_GET['id'] ?? 0);
-        $order   = $orderId ? ShopOrder::findWithItems($orderId) : null;
+        $order   = $orderId ? ShopOrder::find($orderId) : null;
         if (!$order) {
             http_response_code(404);
             exit('Order not found');
         }
 
-        $buyer  = User::find((int) $order['member_id']);
-        $seller = shop_seller_identity();
+        $doc = ShopInvoice::docForOrder((int) $order['id']);
+        if (!$doc) {
+            http_response_code(404);
+            exit('Invoice not found');
+        }
         require 'views/shop/invoice.php';
     }
 

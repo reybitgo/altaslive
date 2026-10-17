@@ -407,7 +407,7 @@ function rate_limit_clear(string $key): void
 
 function setting(string $key, string $default = ''): string
 {
-    static $cache = [];
+    $cache = &setting_cache();
     if (!array_key_exists($key, $cache)) {
         $st = db()->prepare('SELECT value FROM settings WHERE key_name = ?');
         $st->execute([$key]);
@@ -416,6 +416,28 @@ function setting(string $key, string $default = ''): string
         $cache[$key] = ($value === false ? null : $value) ?? $default;
     }
     return $cache[$key];
+}
+
+/**
+ * Shared cache store for setting(). Exposed by reference so code that writes
+ * the settings table in-process (tests, one-off CLI scripts) can invalidate a
+ * stale entry with setting_forget() instead of reading the old value back.
+ */
+function &setting_cache(): array
+{
+    static $cache = [];
+    return $cache;
+}
+
+/** Drop one cached setting, or the entire cache when $key is null. */
+function setting_forget(?string $key = null): void
+{
+    $cache = &setting_cache();
+    if ($key === null) {
+        $cache = [];
+        return;
+    }
+    unset($cache[$key]);
 }
 
 // ── Pagination ────────────────────────────────────────────────────────────────

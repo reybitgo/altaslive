@@ -491,6 +491,9 @@ test('the printable invoice and credit note render warning-free', function (): v
     $buyer  = User::find($memberId);
     $seller = shop_seller_identity();
     $refund = ShopRefund::find($refundId);
+    $doc    = ShopInvoice::docForOrder($oid);
+
+    T::ok(is_array($doc) && ($doc['mode'] ?? '') === 'preview', 'invoice: an unissued order renders as a live preview');
 
     // Same variable contract the controllers pass to the two documents.
     $capture = static function (string $rel, array $vars): string {
@@ -506,7 +509,7 @@ test('the printable invoice and credit note render warning-free', function (): v
     };
 
     RenderLog::arm();
-    $invoice = $capture('views/shop/invoice.php', ['order' => $order, 'buyer' => $buyer, 'seller' => $seller]);
+    $invoice = $capture('views/shop/invoice.php', ['doc' => $doc]);
     $note    = $capture('views/shop/refund_receipt.php', ['refund' => $refund, 'order' => $order, 'buyer' => $buyer, 'seller' => $seller]);
     RenderLog::disarm();
 
@@ -517,6 +520,102 @@ test('the printable invoice and credit note render warning-free', function (): v
     T::ok(str_contains($invoice, '250.00'), 'invoice: prints the line unit price');
     T::ok(str_contains($note, (string) $refund['receipt_ref']), 'credit note: shows the issued number');
     T::ok(str_contains($note, (string) $order['order_no']), 'credit note: references the original order');
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+T::group('Shop documents — immutable invoice snapshots');
+
+test('issuing freezes the seller block; later settings edits do not rewrite it', function (): void {
+    $adminId  = Fixtures::admin();
+    $memberId = Fixtures::member(5000.00);
+    $pid      = Fixtures::product('__INV_FREEZE__', 100.00, 5);
+    $oid      = Fixtures::pendingOrder($memberId, $pid, 1);
+    $orderNo  = (string) Fixtures::scalar("SELECT order_no FROM shop_orders WHERE id = ?", [$oid]);
+
+    $setSetting = static function (string $key, string $value): void {
+        db()->prepare("INSERT INTO settings (key_name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)")
+            ->execute([$key, $value]);
+        // setting() caches per-process; without this the write above would be
+        // invisible to shop_seller_identity() later in the same test run.
+        setting_forget($key);
+    };
+    $oldName = (string) Fixtures::scalar("SELECT value FROM settings WHERE key_name = 'invoice_company_name'");
+
+    try {
+        $setSetting('invoice_company_name', 'Frozen Co A');
+        T::ok(ShopOrder::transition($oid, 'paid', 'admin', $adminId), 'freeze: order paid');
+
+        $row = ShopInvoice::latestRowFor($oid);
+        T::ok($row !== null, 'freeze: a snapshot row exists after payment');
+        T::ok((string) $row['invoice_no'] === 'INV-' . $orderNo, 'freeze: the invoice number is deterministic');
+
+        // The legal details are edited AFTER the invoice was issued.
+        $setSetting('invoice_company_name', 'Renamed Co B');
+
+        $doc = ShopInvoice::docForOrder($oid);
+        T::ok((string) ($doc['mode'] ?? '') === 'issued', 'freeze: the page reads the issued snapshot');
+        T::ok((string) $doc['seller']['name'] === 'Frozen Co A', 'freeze: seller name is the one from issue time');
+
+        $capture = static function (array $vars): string {
+            ob_start();
+            try {
+                extract($vars, EXTR_SKIP);
+                /** @noinspection PhpIncludeInspection */
+                require REPO_ROOT . '/views/shop/invoice.php';
+            } catch (Throwable $e) {
+                RenderLog::$problems[] = 'THROWN: ' . $e->getMessage();
+            }
+            return (string) ob_get_clean();
+        };
+        RenderLog::arm();
+        $html = $capture(['doc' => $doc]);
+        RenderLog::disarm();
+        assert_clean_render('issued invoice');
+        T::ok(str_contains($html, 'Frozen Co A'), 'freeze: the printed invoice keeps the original seller name');
+        T::ok(!str_contains($html, 'Renamed Co B'), 'freeze: the rename never reaches the issued invoice');
+    } finally {
+        $setSetting('invoice_company_name', $oldName);
+    }
+});
+
+test('reverting payment voids the snapshot; re-payment reissues it as -R2', function (): void {
+    $adminId  = Fixtures::admin();
+    $memberId = Fixtures::member(5000.00);
+    $pid      = Fixtures::product('__INV_VOID__', 100.00, 5);
+    $oid      = Fixtures::pendingOrder($memberId, $pid, 1);
+
+    T::ok(ShopOrder::transition($oid, 'paid', 'admin', $adminId), 'void: order paid once');
+    T::ok(ShopOrder::revertPaidToReview($oid, $adminId, 'test revert'), 'void: payment reverted');
+
+    $voidRow = ShopInvoice::latestRowFor($oid);
+    T::ok($voidRow !== null && (string) $voidRow['voided_at'] !== '', 'void: the snapshot is flagged void');
+    T::ok((string) $voidRow['void_reason'] === 'paid_reverted', 'void: the reason is recorded');
+
+    $voidDoc = ShopInvoice::docForOrder($oid);
+    T::ok((string) ($voidDoc['mode'] ?? '') === 'void', 'void: the page reads as void');
+
+    ob_start();
+    RenderLog::arm();
+    try {
+        $doc = $voidDoc;
+        /** @noinspection PhpIncludeInspection */
+        require REPO_ROOT . '/views/shop/invoice.php';
+    } catch (Throwable $e) {
+        RenderLog::$problems[] = 'THROWN: ' . $e->getMessage();
+    }
+    $voidHtml = (string) ob_get_clean();
+    RenderLog::disarm();
+    assert_clean_render('void invoice');
+    T::ok(str_contains($voidHtml, 'VOID'), 'void: the rendered invoice carries the VOID stamp');
+
+    // The reverted order is verified again.
+    T::ok(ShopOrder::transition($oid, 'paid', 'admin', $adminId), 'reissue: the order is paid again');
+
+    T::ok((int) Fixtures::scalar("SELECT COUNT(*) FROM shop_invoices WHERE order_id = ?", [$oid]) === 2, 'reissue: history keeps both rows');
+    $newDoc = ShopInvoice::docForOrder($oid);
+    T::ok((string) ($newDoc['mode'] ?? '') === 'issued', 'reissue: the newest snapshot is active');
+    T::ok(str_ends_with((string) $newDoc['invoice_no'], '-R2'), 'reissue: the number is suffixed -R2');
+    T::ok((string) $voidRow['invoice_no'] !== (string) $newDoc['invoice_no'], 'reissue: the voided number is not reused');
 });
 
 exit(T::summary());

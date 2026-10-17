@@ -452,7 +452,7 @@
                             <span class="card-title">Invoices &amp; Documents</span>
                         </div>
                         <div class="card-body">
-                            <div class="form-text mb-3" style="font-size:.75rem;">Legal details printed on the sales invoice and refund credit notes.</div>
+                            <div class="form-text mb-3" style="font-size:.75rem;">Legal details printed on the sales invoice and refund credit notes. Invoices already issued keep the details that were in effect when they were paid; changes here apply to invoices issued afterwards.</div>
                             <div class="mb-3">
                                 <label class="form-label">Registered Business Name</label>
                                 <input type="text" name="invoice_company_name" class="form-control" value="<?= e(setting('invoice_company_name', setting('site_name'))) ?>">

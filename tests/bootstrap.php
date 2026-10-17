@@ -434,7 +434,8 @@ function resetState(): void
     $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
     foreach ([
         'shop_order_events', 'shop_shipments', 'shop_order_items',
-        'shop_payment_proofs', 'shop_refunds', 'shop_orders',
+        'shop_payment_proofs', 'shop_refunds',
+        'shop_invoice_items', 'shop_invoices', 'shop_orders',
         'cart_items', 'carts', 'products',
         'member_addresses',
         'ewallet_ledger', 'commissions', 'payout_requests',
